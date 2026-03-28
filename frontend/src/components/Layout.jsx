@@ -6,6 +6,7 @@ const navItems = [
   { path: '/policy', label: 'Policy', icon: '📋' },
   { path: '/claims', label: 'Claims', icon: '💰' },
   { path: '/profile', label: 'Profile', icon: '👤' },
+  { path: '/admin', label: 'Admin', icon: '⚙️' },
 ];
 
 export function Layout({ children }) {

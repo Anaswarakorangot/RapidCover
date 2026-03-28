@@ -4,3 +4,4 @@ export { Dashboard } from './Dashboard';
 export { Policy } from './Policy';
 export { Claims } from './Claims';
 export { Profile } from './Profile';
+export { Admin } from './Admin';

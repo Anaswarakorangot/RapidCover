@@ -141,6 +141,78 @@ class ApiService {
   async getZone(zoneId) {
     return this.request(`/zones/${zoneId}`);
   }
+
+  // Triggers
+  async getActiveTriggers(zoneId = null) {
+    const query = zoneId ? `?zone_id=${zoneId}` : '';
+    return this.request(`/triggers/active${query}`);
+  }
+
+  // Admin endpoints
+  async getAdminDashboard() {
+    return this.request('/admin/dashboard');
+  }
+
+  async seedZones() {
+    return this.request('/admin/seed', { method: 'POST' });
+  }
+
+  async getAdminTriggers(activeOnly = false) {
+    const query = activeOnly ? '?active_only=true' : '';
+    return this.request(`/admin/triggers${query}`);
+  }
+
+  async getAdminClaims(statusFilter = null) {
+    const query = statusFilter ? `?status_filter=${statusFilter}` : '';
+    return this.request(`/admin/claims${query}`);
+  }
+
+  async simulateWeather(zoneId, rainfall_mm_hr = null, temp_celsius = null) {
+    return this.request('/admin/simulate/weather', {
+      method: 'POST',
+      body: { zone_id: zoneId, rainfall_mm_hr, temp_celsius },
+    });
+  }
+
+  async simulateAQI(zoneId, aqi) {
+    return this.request('/admin/simulate/aqi', {
+      method: 'POST',
+      body: { zone_id: zoneId, aqi },
+    });
+  }
+
+  async simulateShutdown(zoneId, reason) {
+    return this.request('/admin/simulate/shutdown', {
+      method: 'POST',
+      body: { zone_id: zoneId, reason },
+    });
+  }
+
+  async simulateClosure(zoneId, reason) {
+    return this.request('/admin/simulate/closure', {
+      method: 'POST',
+      body: { zone_id: zoneId, reason },
+    });
+  }
+
+  async processTrigger(triggerId) {
+    return this.request(`/admin/triggers/${triggerId}/process`, { method: 'POST' });
+  }
+
+  async approveClaim(claimId) {
+    return this.request(`/admin/claims/${claimId}/approve`, { method: 'POST' });
+  }
+
+  async rejectClaim(claimId, reason = null) {
+    return this.request(`/admin/claims/${claimId}/reject`, {
+      method: 'POST',
+      body: { reason },
+    });
+  }
+
+  async payoutClaim(claimId) {
+    return this.request(`/admin/claims/${claimId}/payout`, { method: 'POST' });
+  }
 }
 
 export const api = new ApiService();

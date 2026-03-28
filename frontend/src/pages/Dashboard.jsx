@@ -8,6 +8,8 @@ export function Dashboard() {
   const { user } = useAuth();
   const [policy, setPolicy] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [zone, setZone] = useState(null);
+  const [triggers, setTriggers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,6 +21,16 @@ export function Dashboard() {
         ]);
         setPolicy(policyData);
         setSummary(summaryData);
+
+        // Load zone info if user has zone_id
+        if (user?.zone_id) {
+          const zoneData = await api.getZone(user.zone_id).catch(() => null);
+          setZone(zoneData);
+
+          // Load active triggers for this zone
+          const triggerData = await api.getActiveTriggers(user.zone_id).catch(() => ({ triggers: [] }));
+          setTriggers(triggerData.triggers || []);
+        }
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
       } finally {
@@ -26,7 +38,7 @@ export function Dashboard() {
       }
     }
     loadData();
-  }, []);
+  }, [user?.zone_id]);
 
   if (loading) {
     return (
@@ -35,6 +47,14 @@ export function Dashboard() {
       </div>
     );
   }
+
+  const TRIGGER_LABELS = {
+    rain: { icon: '🌧️', label: 'Heavy Rain', color: 'blue' },
+    heat: { icon: '🌡️', label: 'Extreme Heat', color: 'red' },
+    aqi: { icon: '💨', label: 'Dangerous AQI', color: 'yellow' },
+    shutdown: { icon: '🚫', label: 'Civic Shutdown', color: 'purple' },
+    closure: { icon: '🏪', label: 'Store Closure', color: 'gray' },
+  };
 
   return (
     <div className="space-y-6">
@@ -46,7 +66,43 @@ export function Dashboard() {
         <p className="text-gray-600">
           {policy ? 'Your coverage is active' : 'Get protected today'}
         </p>
+        {zone && (
+          <p className="text-sm text-gray-500 mt-1">
+            Zone: {zone.name} ({zone.code})
+          </p>
+        )}
       </div>
+
+      {/* Active Triggers Alert */}
+      {triggers.length > 0 && (
+        <Card className="bg-red-50 border-red-200">
+          <CardBody>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-red-600 font-semibold">Active Disruptions</span>
+              <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">
+                {triggers.length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {triggers.map((trigger) => {
+                const info = TRIGGER_LABELS[trigger.trigger_type] || { icon: '⚠️', label: trigger.trigger_type };
+                return (
+                  <div key={trigger.id} className="flex items-center gap-2 text-sm text-red-700">
+                    <span>{info.icon}</span>
+                    <span className="font-medium">{info.label}</span>
+                    <span className="text-red-500">- Severity {trigger.severity}/5</span>
+                  </div>
+                );
+              })}
+            </div>
+            {policy && (
+              <p className="text-xs text-red-600 mt-2">
+                You're covered! Claims will be auto-processed.
+              </p>
+            )}
+          </CardBody>
+        </Card>
+      )}
 
       {/* Active Policy Card */}
       {policy ? (

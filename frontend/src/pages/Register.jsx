@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button, Input, Card, CardBody } from '../components/ui';
 import api from '../services/api';
@@ -14,9 +14,23 @@ export function Register() {
     phone: '',
     name: '',
     platform: 'zepto',
+    zone_id: '',
   });
+  const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadZones() {
+      try {
+        const zoneData = await api.getZones();
+        setZones(zoneData);
+      } catch (err) {
+        console.error('Failed to load zones:', err);
+      }
+    }
+    loadZones();
+  }, []);
 
   function handleChange(e) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -32,6 +46,7 @@ export function Register() {
       const cleanData = {
         ...formData,
         phone: formData.phone.replace(/\s/g, ''),
+        zone_id: formData.zone_id ? parseInt(formData.zone_id, 10) : null,
       };
       await api.register(cleanData);
       // After registration, redirect to login
@@ -90,6 +105,28 @@ export function Register() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Dark Store Zone
+              </label>
+              <select
+                name="zone_id"
+                value={formData.zone_id}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select your zone</option>
+                {zones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.city} - {zone.name} ({zone.code})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Choose the dark store zone where you primarily work
+              </p>
             </div>
 
             {error && (
