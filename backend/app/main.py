@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database import init_db
 from app.api.router import api_router
+# Import models so they register with SQLAlchemy Base
+from app.models import Partner, Zone, Policy, TriggerEvent, Claim
 
 settings = get_settings()
 
