@@ -1,0 +1,13 @@
+from fastapi import APIRouter
+
+from app.api.partners import router as partners_router
+from app.api.policies import router as policies_router
+from app.api.claims import router as claims_router
+from app.api.zones import router as zones_router
+
+api_router = APIRouter(prefix="/api/v1")
+
+api_router.include_router(partners_router)
+api_router.include_router(policies_router)
+api_router.include_router(claims_router)
+api_router.include_router(zones_router)
