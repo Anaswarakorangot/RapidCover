@@ -17,6 +17,7 @@ export function Register() {
     zone_id: '',
   });
   const [zones, setZones] = useState([]);
+  const [zonesLoading, setZonesLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -27,6 +28,8 @@ export function Register() {
         setZones(zoneData);
       } catch (err) {
         console.error('Failed to load zones:', err);
+      } finally {
+        setZonesLoading(false);
       }
     }
     loadZones();
@@ -115,14 +118,23 @@ export function Register() {
                 name="zone_id"
                 value={formData.zone_id}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={zonesLoading}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
               >
-                <option value="">Select your zone</option>
-                {zones.map((zone) => (
-                  <option key={zone.id} value={zone.id}>
-                    {zone.city} - {zone.name} ({zone.code})
-                  </option>
-                ))}
+                {zonesLoading ? (
+                  <option value="">Loading zones...</option>
+                ) : zones.length === 0 ? (
+                  <option value="">No zones available - contact admin</option>
+                ) : (
+                  <>
+                    <option value="">Select your zone</option>
+                    {zones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.city} - {zone.name} ({zone.code})
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
               <p className="text-xs text-gray-500 mt-1">
                 Choose the dark store zone where you primarily work
