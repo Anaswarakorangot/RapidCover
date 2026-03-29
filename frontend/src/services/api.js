@@ -142,6 +142,10 @@ class ApiService {
     return this.request(`/zones/${zoneId}`);
   }
 
+  async getNearestZones(lat, lng, limit = 3) {
+    return this.request(`/zones/nearest?lat=${lat}&lng=${lng}&limit=${limit}`);
+  }
+
   // Triggers
   async getActiveTriggers(zoneId = null) {
     const query = zoneId ? `?zone_id=${zoneId}` : '';

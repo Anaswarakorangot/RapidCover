@@ -20,6 +20,8 @@ export function Register() {
   const [zonesLoading, setZonesLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [gpsStatus, setGpsStatus] = useState('idle'); // idle | loading | success | too_far | error | denied
+  const [detectedZone, setDetectedZone] = useState(null);
 
   useEffect(() => {
     async function loadZones() {
@@ -34,6 +36,46 @@ export function Register() {
     }
     loadZones();
   }, []);
+
+  const MAX_DETECTION_DISTANCE_KM = 25;
+
+  async function detectLocation() {
+    if (!navigator.geolocation) {
+      setGpsStatus('error');
+      return;
+    }
+
+    setGpsStatus('loading');
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const result = await api.getNearestZones(latitude, longitude);
+          if (result.length > 0) {
+            const nearest = result[0];
+            if (nearest.distance_km <= MAX_DETECTION_DISTANCE_KM) {
+              setDetectedZone(nearest);
+              setFormData((prev) => ({ ...prev, zone_id: String(nearest.zone.id) }));
+              setGpsStatus('success');
+            } else {
+              setDetectedZone(nearest);
+              setGpsStatus('too_far');
+            }
+          } else {
+            setGpsStatus('error');
+          }
+        } catch (err) {
+          console.error('Failed to get nearest zones:', err);
+          setGpsStatus('error');
+        }
+      },
+      (error) => {
+        setGpsStatus(error.code === 1 ? 'denied' : 'error');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
 
   function handleChange(e) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -114,6 +156,50 @@ export function Register() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Dark Store Zone
               </label>
+
+              <button
+                type="button"
+                onClick={detectLocation}
+                disabled={gpsStatus === 'loading' || zonesLoading}
+                className="w-full mb-2 px-3 py-2 bg-green-50 border border-green-300 rounded-lg text-green-700 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {gpsStatus === 'loading' ? (
+                  <>
+                    <span className="animate-spin">&#9696;</span>
+                    Detecting location...
+                  </>
+                ) : (
+                  <>
+                    <span>&#128205;</span>
+                    Detect My Zone
+                  </>
+                )}
+              </button>
+
+              {gpsStatus === 'success' && detectedZone && (
+                <p className="text-sm text-green-600 mb-2">
+                  Detected: {detectedZone.zone.name} ({detectedZone.distance_km} km away)
+                </p>
+              )}
+
+              {gpsStatus === 'too_far' && detectedZone && (
+                <p className="text-sm text-amber-600 mb-2">
+                  No zones near your location. Nearest is {detectedZone.zone.name} ({detectedZone.distance_km} km away). Please select manually.
+                </p>
+              )}
+
+              {gpsStatus === 'denied' && (
+                <p className="text-sm text-amber-600 mb-2">
+                  Location access denied. Please select zone manually.
+                </p>
+              )}
+
+              {gpsStatus === 'error' && (
+                <p className="text-sm text-red-600 mb-2">
+                  Could not detect location. Please select zone manually.
+                </p>
+              )}
+
               <select
                 name="zone_id"
                 value={formData.zone_id}
@@ -137,7 +223,11 @@ export function Register() {
                 )}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Choose the dark store zone where you primarily work
+                {gpsStatus === 'success'
+                  ? 'Zone auto-detected. You can change it if needed.'
+                  : gpsStatus === 'too_far'
+                  ? 'Select from available zones below'
+                  : 'Use GPS detection or choose manually'}
               </p>
             </div>
 
