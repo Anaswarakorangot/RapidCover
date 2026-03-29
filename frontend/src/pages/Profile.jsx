@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardBody, Button, Input } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
+import { NotificationToggle } from '../components/NotificationToggle';
 import api from '../services/api';
 
 const LANGUAGES = [
@@ -122,6 +123,14 @@ export function Profile() {
           </CardBody>
         </Card>
       )}
+
+      {/* Notifications */}
+      <Card>
+        <CardBody>
+          <h3 className="font-semibold text-gray-900 mb-2">Notifications</h3>
+          <NotificationToggle />
+        </CardBody>
+      </Card>
 
       {/* Account Actions */}
       <Card>

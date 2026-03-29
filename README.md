@@ -425,8 +425,8 @@ Six Q-Commerce-specific attack vectors with bespoke detection:
 
 **Deliverable:** This README + 2-min video
 
-### Phase 2 — Core Product (Weeks 3–4)
-- PWA scaffold — Android installable, push notifications live
+### Phase 2 — Core Product (Weeks 3–4) ✅
+- [x] PWA scaffold — Android installable, push notifications live
 - Partner registration, OTP login, Zepto ID validation, KYC lite
 - Native GPS zone detection + Zone Risk Scorer (Model 1)
 - Policy creation + dynamic premium engine (Model 2)

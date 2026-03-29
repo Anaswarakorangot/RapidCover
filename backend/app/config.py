@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # Zero-Touch Automation
     auto_payout_enabled: bool = False  # Enable for demo mode to auto-pay approved claims
 
+    # Web Push Notifications (VAPID)
+    vapid_private_key: str = ""
+    vapid_public_key: str = ""
+    vapid_claim_email: str = "mailto:admin@rapidcover.in"
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

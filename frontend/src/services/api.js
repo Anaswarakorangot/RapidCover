@@ -223,6 +223,24 @@ class ApiService {
   async payoutClaim(claimId) {
     return this.request(`/admin/claims/${claimId}/payout`, { method: 'POST' });
   }
+
+  // Push Notifications
+  async subscribePush(subscriptionData) {
+    return this.request('/notifications/subscribe', {
+      method: 'POST',
+      body: subscriptionData,
+    });
+  }
+
+  async unsubscribePush() {
+    return this.request('/notifications/unsubscribe', {
+      method: 'POST',
+    });
+  }
+
+  async getNotificationStatus() {
+    return this.request('/notifications/status');
+  }
 }
 
 export const api = new ApiService();
