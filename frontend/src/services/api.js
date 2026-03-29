@@ -232,14 +232,16 @@ class ApiService {
     });
   }
 
-  async unsubscribePush() {
+  async unsubscribePush(endpoint = null) {
     return this.request('/notifications/unsubscribe', {
       method: 'POST',
+      body: endpoint ? { endpoint } : {},
     });
   }
 
-  async getNotificationStatus() {
-    return this.request('/notifications/status');
+  async getNotificationStatus(endpoint = null) {
+    const query = endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : '';
+    return this.request(`/notifications/status${query}`);
   }
 }
 

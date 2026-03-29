@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNotifications } from '../context/NotificationContext';
+import { useNotifications } from '../hooks/useNotifications';
 
 export function NotificationToggle() {
   const {

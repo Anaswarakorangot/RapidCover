@@ -9,6 +9,10 @@ class PushSubscriptionCreate(BaseModel):
     auth_key: str
 
 
+class PushSubscriptionDelete(BaseModel):
+    endpoint: Optional[str] = None
+
+
 class PushSubscriptionResponse(BaseModel):
     id: int
     endpoint: str

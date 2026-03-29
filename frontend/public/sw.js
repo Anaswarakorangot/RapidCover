@@ -1,7 +1,7 @@
 // RapidCover Service Worker
 // Handles caching and push notifications
 
-const CACHE_NAME = 'rapidcover-v1';
+const CACHE_NAME = 'rapidcover-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -40,6 +40,13 @@ self.addEventListener('fetch', (event) => {
 
   // Skip non-GET requests
   if (request.method !== 'GET') return;
+
+  // In local dev, avoid serving cached Vite assets. Otherwise stale modules can
+  // blank the app after file moves/renames until the cache is manually cleared.
+  if (self.location.hostname === 'localhost' && self.location.port === '5173') {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   // API requests: network first
   if (url.pathname.startsWith('/api/')) {

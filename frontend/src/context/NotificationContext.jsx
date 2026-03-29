@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   isPushSupported,
   getPermissionState,
@@ -9,45 +9,64 @@ import {
 } from '../services/pushNotifications';
 import api from '../services/api';
 import { useAuth } from './AuthContext';
-
-const NotificationContext = createContext(null);
+import { NotificationContext } from './NotificationContextValue';
 
 export function NotificationProvider({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [isSupported, setIsSupported] = useState(false);
   const [permission, setPermission] = useState('default');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Register service worker and check state on mount
+  const syncNotificationState = useCallback(async () => {
+    const supported = isPushSupported();
+    setIsSupported(supported);
+    setPermission(supported ? getPermissionState() : 'unsupported');
+
+    if (!supported) {
+      setIsSubscribed(false);
+      return;
+    }
+
+    try {
+      await registerServiceWorker();
+    } catch (err) {
+      console.warn('Service worker registration failed:', err);
+    }
+
+    let endpoint = null;
+    try {
+      const subscription = await getCurrentSubscription();
+      endpoint = subscription?.endpoint || null;
+    } catch {
+      endpoint = null;
+    }
+
+    if (!isAuthenticated) {
+      setIsSubscribed(false);
+      return;
+    }
+
+    try {
+      const status = await api.getNotificationStatus(endpoint);
+      setIsSubscribed(status.is_subscribed);
+    } catch {
+      setIsSubscribed(false);
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     const init = async () => {
-      const supported = isPushSupported();
-      setIsSupported(supported);
-
-      if (supported) {
-        // Register service worker
-        try {
-          await registerServiceWorker();
-        } catch (err) {
-          console.warn('Service worker registration failed:', err);
-        }
-
-        setPermission(getPermissionState());
-
-        try {
-          const subscription = await getCurrentSubscription();
-          setIsSubscribed(!!subscription);
-        } catch {
-          setIsSubscribed(false);
-        }
+      setLoading(true);
+      try {
+        await syncNotificationState();
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     init();
-  }, []);
+  }, [syncNotificationState, user?.id]);
 
   const enableNotifications = useCallback(async () => {
     if (!isSupported) {
@@ -64,7 +83,7 @@ export function NotificationProvider({ children }) {
         await api.subscribePush(subscriptionData);
       }
 
-      setIsSubscribed(true);
+      await syncNotificationState();
       return true;
     } catch (error) {
       setPermission(getPermissionState());
@@ -72,27 +91,27 @@ export function NotificationProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [isSupported, isAuthenticated]);
+  }, [isSupported, isAuthenticated, syncNotificationState]);
 
   const disableNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      // Unsubscribe from browser
-      await unsubscribeFromPush();
+      const currentSubscription = await getCurrentSubscription();
+      const endpoint = currentSubscription?.endpoint || null;
 
-      // Unsubscribe from backend
+      // Unsubscribe from backend for this device
       if (isAuthenticated) {
-        await api.unsubscribePush();
+        await api.unsubscribePush(endpoint);
       }
 
-      setIsSubscribed(false);
+      // Unsubscribe from browser
+      await unsubscribeFromPush();
+      await syncNotificationState();
       return true;
-    } catch (error) {
-      throw error;
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, syncNotificationState]);
 
   const value = {
     isSupported,
@@ -108,12 +127,4 @@ export function NotificationProvider({ children }) {
       {children}
     </NotificationContext.Provider>
   );
-}
-
-export function useNotifications() {
-  const context = useContext(NotificationContext);
-  if (!context) {
-    throw new Error('useNotifications must be used within a NotificationProvider');
-  }
-  return context;
 }
