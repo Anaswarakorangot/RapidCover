@@ -21,6 +21,7 @@ from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent, TriggerType
 from app.models.zone import Zone
 from app.services.fraud_detector import calculate_fraud_score, FRAUD_THRESHOLDS
+from app.config import get_settings
 
 
 # Payout configuration
@@ -227,6 +228,13 @@ def process_trigger_event(
             fraud_score=fraud_result["score"],
             validation_data=json.dumps(validation_data),
         )
+
+        # Auto-payout for demo mode: immediately pay approved claims
+        settings = get_settings()
+        if settings.auto_payout_enabled and claim.status == ClaimStatus.APPROVED:
+            claim.status = ClaimStatus.PAID
+            claim.upi_ref = f"RAPID{policy.id:06d}{int(datetime.utcnow().timestamp())}"
+            claim.paid_at = datetime.utcnow()
 
         db.add(claim)
         created_claims.append(claim)

@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     debug: bool = True
     environment: str = "development"
 
+    # Zero-Touch Automation
+    auto_payout_enabled: bool = False  # Enable for demo mode to auto-pay approved claims
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
