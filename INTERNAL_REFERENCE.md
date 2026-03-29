@@ -39,7 +39,9 @@ This implementation specifically frames the problem around dark-store delivery p
 
 ### Core features currently present
 
-- Partner registration with phone, name, platform, and zone selection
+- Partner registration with phone, name, platform, partner ID, and zone selection
+- Partner ID validation against mock platform records (Zepto/Blinkit)
+- GPS-based zone auto-detection during registration (25km threshold)
 - OTP-based login flow with JWT session handling
 - Zone seeding and zone lookup APIs
 - Weekly policy quote generation and policy creation
@@ -101,8 +103,8 @@ The biggest gaps between the intended design and the implementation are:
 - Optional auto-payout in demo mode via `AUTO_PAYOUT_ENABLED=true` environment variable
 - No real payout integration: payout is just a status change with a generated fake UPI reference
 - No push notification system
-- No real GPS collection or zone auto-detection
-- No real Partner ID validation
+- ~~No real GPS collection or zone auto-detection~~ DONE - GPS-based zone detection with 25km threshold
+- ~~No real Partner ID validation~~ DONE - Mock validation for Zepto (ZPT + 6 digits) and Blinkit (BLK + 6 digits) partner IDs
 - No KYC or Aadhaar-face verification workflow
 - No real worker activity validation from a platform partner feed
 
@@ -240,7 +242,7 @@ The intended worker flow is:
 
 The current implemented flow is:
 
-1. Register using name, phone, platform, and manually selected zone
+1. Register using name, phone, platform, and GPS-detected or manually selected zone
 2. Request OTP
 3. Enter OTP, which is exposed directly by the backend in development
 4. Authenticate and land on the dashboard
@@ -258,7 +260,8 @@ The current implemented flow is:
 
 - `POST /api/v1/partners/register`
 - Creates a `Partner` row
-- No KYC or partner-ID validation happens
+- Partner ID can be validated via `GET /api/v1/partners/validate-id` (soft validation, warns but doesn't block)
+- No KYC workflow implemented
 
 #### Login
 
@@ -335,13 +338,20 @@ The frontend contains these screens in `frontend/src/pages/`:
 Purpose:
 
 - onboard a new worker
-- collect name, phone, platform, and zone
+- collect name, phone, platform, partner ID, and zone
 
 Current behavior:
 
 - fetches zones from backend
+- collects partner ID with on-blur validation against platform records
+- shows validation status (checking/valid/invalid) with visual feedback
+- soft validation - warns but doesn't block registration
+- provides "Detect My Zone" button for GPS-based auto-detection
+- auto-selects nearest zone if within 25km
+- shows "too far" message if nearest zone exceeds 25km
+- falls back to manual dropdown selection
 - disables the zone selector while zones are loading
-- allows registration with nullable `zone_id`
+- allows registration with nullable `zone_id` and `partner_id`
 
 ### Login
 
@@ -546,6 +556,13 @@ backend/
 #### `backend/app/services/premium.py`
 
 - returns quotes based on policy tier and zone risk band
+
+#### `backend/app/services/partner_validation.py`
+
+- mock validation for partner IDs
+- Zepto format: ZPT + 6 digits
+- Blinkit format: BLK + 6 digits
+- IDs ending in 000 return "not found", 999 return "suspended", others return "verified"
 
 #### `backend/app/data/seed_zones.py`
 
@@ -859,8 +876,8 @@ This is one of the clearest implementation-vs-plan deviations in the repository.
 2. Finish the PWA layer
    Add service worker, install flow, cache strategy, offline shell, and real icon assets.
 
-3. Replace manual zone selection with actual GPS-assisted onboarding
-   Even a demo geolocation flow would better match the product promise.
+3. ~~Replace manual zone selection with actual GPS-assisted onboarding~~ DONE
+   GPS-based zone detection implemented with 25km threshold and fallback to manual selection.
 
 4. Add real role separation
    Admin endpoints should require explicit admin authentication.
@@ -880,7 +897,7 @@ This is one of the clearest implementation-vs-plan deviations in the repository.
 
 1. Align pricing tiers between README, code, and UI
 2. Align trigger duration logic with actual enforcement
-3. Remove or implement placeholder fields such as Aadhaar/KYC flow and partner validation
+3. Remove or implement placeholder fields such as Aadhaar/KYC flow (partner validation now implemented)
 4. Replace random risk scoring with deterministic demo data or a simple reproducible model
 
 ### Frontend improvements
@@ -960,8 +977,8 @@ Based on the codebase plus the implementation-status screenshots, the most accur
 - pitch/demo video artefacts in repo
 - push notifications
 - service worker
-- GPS-based onboarding
-- partner-ID validation
+- ~~GPS-based onboarding~~ DONE - implemented with 25km threshold
+- ~~partner-ID validation~~ DONE - mock validation with platform-specific formats
 - KYC flow
 - real payment integration
 - live map
