@@ -46,6 +46,14 @@ copy .env.example .env
 
 If `.env.example` is not present yet, you can still run locally because the backend has development defaults in `app/config.py`.
 
+For push notifications, add VAPID keys to `backend/.env`:
+
+```bash
+VAPID_PRIVATE_KEY=your-vapid-private-key
+VAPID_PUBLIC_KEY=your-vapid-public-key
+VAPID_CLAIM_EMAIL=mailto:admin@example.com
+```
+
 Start the backend:
 
 ```bash
@@ -83,11 +91,52 @@ Create `frontend/.env` if you want to point the frontend to a different backend 
 
 ```bash
 VITE_API_URL=http://localhost:8000/api/v1
+VITE_VAPID_PUBLIC_KEY=your-vapid-public-key
 ```
 
 If you do not set `VITE_API_URL`, the frontend already defaults to `http://localhost:8000/api/v1`.
 
-## 4. Seed development data
+`VITE_VAPID_PUBLIC_KEY` is required if you want to test PWA push notifications locally.
+
+## 4. Web push notification setup
+
+Push notifications require:
+
+1. Install frontend dependencies:
+
+```bash
+cd frontend
+npm install
+```
+
+2. Install backend dependencies:
+
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+3. Generate VAPID keys:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+4. Add the generated values to your local env files:
+
+```bash
+# backend/.env
+VAPID_PRIVATE_KEY=your-generated-private-key
+VAPID_PUBLIC_KEY=your-generated-public-key
+VAPID_CLAIM_EMAIL=mailto:admin@example.com
+
+# frontend/.env
+VITE_VAPID_PUBLIC_KEY=your-generated-public-key
+```
+
+The frontend public key and backend public key must match.
+
+## 5. Seed development data
 
 The registration flow depends on zones. After starting the backend, seed zones before testing the app.
 
@@ -101,7 +150,7 @@ POST http://localhost:8000/api/v1/admin/seed
 
 Once zones are seeded, the registration page will show zone options.
 
-## 5. Typical local workflow
+## 6. Typical local workflow
 
 Terminal 1:
 
@@ -120,7 +169,7 @@ npm run dev
 
 Open the app at `http://localhost:5173`.
 
-## 6. Common issues
+## 7. Common issues
 
 ### Registration page shows no zones
 
@@ -133,6 +182,15 @@ Check that:
 - the backend is running on port `8000`
 - the frontend is using `VITE_API_URL=http://localhost:8000/api/v1`
 
+### Push notifications are not working
+
+Check that:
+
+- `frontend/.env` contains `VITE_VAPID_PUBLIC_KEY`
+- `backend/.env` contains `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_CLAIM_EMAIL`
+- the frontend and backend public keys are identical
+- you restarted both dev servers after changing env files
+
 ### Database file location
 
 For local development, SQLite is created from the backend default database URL:
@@ -143,7 +201,7 @@ sqlite:///./rapidcover.db
 
 This means the database file is created relative to the backend working directory.
 
-## 7. Recommended first checks after clone
+## 8. Recommended first checks after clone
 
 1. Start the backend and confirm `http://localhost:8000/health` returns healthy.
 2. Start the frontend and confirm the app opens at `http://localhost:5173`.
