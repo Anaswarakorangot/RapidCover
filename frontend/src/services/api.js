@@ -81,6 +81,12 @@ class ApiService {
     });
   }
 
+  async validatePartnerId(partnerId, platform) {
+    return this.request(
+      `/partners/validate-id?partner_id=${encodeURIComponent(partnerId)}&platform=${encodeURIComponent(platform)}`
+    );
+  }
+
   // Partner
   async getProfile() {
     return this.request('/partners/me');

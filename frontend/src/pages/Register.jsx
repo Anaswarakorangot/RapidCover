@@ -14,6 +14,7 @@ export function Register() {
     phone: '',
     name: '',
     platform: 'zepto',
+    partner_id: '',
     zone_id: '',
   });
   const [zones, setZones] = useState([]);
@@ -22,6 +23,8 @@ export function Register() {
   const [error, setError] = useState('');
   const [gpsStatus, setGpsStatus] = useState('idle'); // idle | loading | success | too_far | error | denied
   const [detectedZone, setDetectedZone] = useState(null);
+  const [partnerIdStatus, setPartnerIdStatus] = useState('idle'); // idle | checking | valid | invalid
+  const [partnerIdMessage, setPartnerIdMessage] = useState('');
 
   useEffect(() => {
     async function loadZones() {
@@ -78,7 +81,35 @@ export function Register() {
   }
 
   function handleChange(e) {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+
+    // Reset partner ID validation when platform changes
+    if (name === 'platform') {
+      setPartnerIdStatus('idle');
+      setPartnerIdMessage('');
+    }
+  }
+
+  async function validatePartnerId() {
+    const partnerId = formData.partner_id.trim();
+    if (!partnerId) {
+      setPartnerIdStatus('idle');
+      setPartnerIdMessage('');
+      return;
+    }
+
+    setPartnerIdStatus('checking');
+    setPartnerIdMessage('');
+
+    try {
+      const result = await api.validatePartnerId(partnerId, formData.platform);
+      setPartnerIdStatus(result.valid ? 'valid' : 'invalid');
+      setPartnerIdMessage(result.message);
+    } catch (err) {
+      setPartnerIdStatus('invalid');
+      setPartnerIdMessage('Unable to verify partner ID');
+    }
   }
 
   async function handleSubmit(e) {
@@ -91,6 +122,7 @@ export function Register() {
       const cleanData = {
         ...formData,
         phone: formData.phone.replace(/\s/g, ''),
+        partner_id: formData.partner_id.trim() || null,
         zone_id: formData.zone_id ? parseInt(formData.zone_id, 10) : null,
       };
       await api.register(cleanData);
@@ -150,6 +182,52 @@ export function Register() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Partner ID
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  name="partner_id"
+                  placeholder={formData.platform === 'zepto' ? 'ZPT123456' : 'BLK123456'}
+                  value={formData.partner_id}
+                  onChange={handleChange}
+                  onBlur={validatePartnerId}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 pr-10 ${
+                    partnerIdStatus === 'valid'
+                      ? 'border-green-300 focus:ring-green-500'
+                      : partnerIdStatus === 'invalid'
+                      ? 'border-amber-300 focus:ring-amber-500'
+                      : 'border-gray-300 focus:ring-blue-500'
+                  }`}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {partnerIdStatus === 'checking' && (
+                    <span className="animate-spin text-gray-400">&#9696;</span>
+                  )}
+                  {partnerIdStatus === 'valid' && (
+                    <span className="text-green-600">&#10003;</span>
+                  )}
+                  {partnerIdStatus === 'invalid' && (
+                    <span className="text-amber-600">&#10007;</span>
+                  )}
+                </span>
+              </div>
+              {partnerIdMessage && (
+                <p
+                  className={`text-sm mt-1 ${
+                    partnerIdStatus === 'valid' ? 'text-green-600' : 'text-amber-600'
+                  }`}
+                >
+                  {partnerIdMessage}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Your {formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'} partner ID (optional)
+              </p>
             </div>
 
             <div>
