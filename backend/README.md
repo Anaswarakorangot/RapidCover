@@ -38,6 +38,11 @@ cp .env.example .env
 # Edit .env with your database credentials
 ```
 
+Key environment variables:
+- `DATABASE_URL` - Database connection string
+- `JWT_SECRET` - Secret key for JWT tokens
+- `AUTO_PAYOUT_ENABLED` - Set to `true` for demo mode (auto-pay approved claims)
+
 4. Run the development server:
 
 ```bash
@@ -73,8 +78,11 @@ backend/
 │   │   ├── claims.py        # Claim history
 │   │   └── zones.py         # Zone management
 │   └── services/            # Business logic
-│       ├── auth.py          # JWT/OTP authentication
-│       └── premium.py       # Premium calculation
+│       ├── auth.py              # JWT/OTP authentication
+│       ├── premium.py           # Premium calculation
+│       ├── trigger_detector.py  # Detect & auto-process triggers
+│       ├── claims_processor.py  # Auto-create claims from triggers
+│       └── fraud_detector.py    # Fraud scoring for claims
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -100,6 +108,16 @@ backend/
 - `GET /api/v1/claims` - Get claim history (paginated)
 - `GET /api/v1/claims/summary` - Get claims summary
 - `GET /api/v1/claims/{id}` - Get claim details
+
+### Admin
+- `POST /api/v1/admin/seed` - Seed zones database
+- `POST /api/v1/admin/simulate/weather` - Simulate rain/heat event
+- `POST /api/v1/admin/simulate/aqi` - Simulate AQI breach
+- `POST /api/v1/admin/simulate/shutdown` - Simulate curfew
+- `POST /api/v1/admin/simulate/closure` - Simulate store closure
+- `POST /api/v1/admin/claims/{id}/approve|reject|payout` - Manage claims
+
+**Note:** Simulations automatically create triggers AND claims (zero-touch automation).
 
 ### Zones
 - `GET /api/v1/zones` - List zones

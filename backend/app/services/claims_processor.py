@@ -21,6 +21,13 @@ from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent, TriggerType
 from app.models.zone import Zone
 from app.services.fraud_detector import calculate_fraud_score, FRAUD_THRESHOLDS
+from app.services.notifications import (
+    notify_claim_created,
+    notify_claim_approved,
+    notify_claim_paid,
+    notify_claim_rejected,
+)
+from app.config import get_settings
 
 
 # Payout configuration
@@ -228,6 +235,13 @@ def process_trigger_event(
             validation_data=json.dumps(validation_data),
         )
 
+        # Auto-payout for demo mode: immediately pay approved claims
+        settings = get_settings()
+        if settings.auto_payout_enabled and claim.status == ClaimStatus.APPROVED:
+            claim.status = ClaimStatus.PAID
+            claim.upi_ref = f"RAPID{policy.id:06d}{int(datetime.utcnow().timestamp())}"
+            claim.paid_at = datetime.utcnow()
+
         db.add(claim)
         created_claims.append(claim)
 
@@ -235,6 +249,15 @@ def process_trigger_event(
         db.commit()
         for claim in created_claims:
             db.refresh(claim)
+            # Send push notifications based on claim status
+            if claim.status == ClaimStatus.PAID:
+                notify_claim_paid(claim, db)
+            elif claim.status == ClaimStatus.APPROVED:
+                notify_claim_approved(claim, db)
+            elif claim.status == ClaimStatus.REJECTED:
+                notify_claim_rejected(claim, db)
+            else:
+                notify_claim_created(claim, db)
 
     return created_claims
 
@@ -261,6 +284,7 @@ def approve_claim(claim_id: int, db: Session) -> Optional[Claim]:
         claim.status = ClaimStatus.APPROVED
         db.commit()
         db.refresh(claim)
+        notify_claim_approved(claim, db)
 
     return claim
 
@@ -283,6 +307,7 @@ def reject_claim(claim_id: int, db: Session, reason: str = None) -> Optional[Cla
 
         db.commit()
         db.refresh(claim)
+        notify_claim_rejected(claim, db)
 
     return claim
 
@@ -304,6 +329,7 @@ def mark_as_paid(
 
         db.commit()
         db.refresh(claim)
+        notify_claim_paid(claim, db)
 
     return claim
 

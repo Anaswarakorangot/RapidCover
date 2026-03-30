@@ -38,3 +38,4 @@ class Partner(Base):
     # Relationships
     zone = relationship("Zone", back_populates="partners")
     policies = relationship("Policy", back_populates="partner")
+    push_subscriptions = relationship("PushSubscription", back_populates="partner")

@@ -1,3 +1,5 @@
+from math import radians, sin, cos, sqrt, atan2
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
@@ -5,7 +7,40 @@ from app.database import get_db
 from app.models.zone import Zone
 from app.schemas.zone import ZoneResponse, ZoneCreate, ZoneRiskUpdate
 
+
+def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Calculate distance between two coordinates in km using Haversine formula."""
+    R = 6371  # Earth's radius in km
+    dlat = radians(lat2 - lat1)
+    dlng = radians(lng2 - lng1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c
+
 router = APIRouter(prefix="/zones", tags=["zones"])
+
+
+@router.get("/nearest")
+def get_nearest_zones(
+    lat: float = Query(..., ge=-90, le=90, description="Latitude"),
+    lng: float = Query(..., ge=-180, le=180, description="Longitude"),
+    limit: int = Query(3, ge=1, le=10, description="Maximum zones to return"),
+    db: Session = Depends(get_db),
+):
+    """Find nearest zones to given GPS coordinates."""
+    zones = db.query(Zone).all()
+
+    zones_with_distance = []
+    for zone in zones:
+        if zone.dark_store_lat and zone.dark_store_lng:
+            distance = haversine_distance(lat, lng, zone.dark_store_lat, zone.dark_store_lng)
+            zones_with_distance.append({
+                "zone": ZoneResponse.model_validate(zone),
+                "distance_km": round(distance, 2),
+            })
+
+    zones_with_distance.sort(key=lambda x: x["distance_km"])
+    return zones_with_distance[:limit]
 
 
 @router.get("", response_model=list[ZoneResponse])

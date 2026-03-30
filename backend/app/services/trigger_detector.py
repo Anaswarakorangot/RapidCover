@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models.trigger_event import TriggerEvent, TriggerType, TRIGGER_THRESHOLDS
 from app.models.zone import Zone
+from app.services.claims_processor import process_trigger_event
 from app.services.external_apis import (
     MockWeatherAPI,
     MockAQIAPI,
@@ -305,6 +306,14 @@ def detect_and_save_triggers(zone_id: int, db: Session) -> list[TriggerEvent]:
         db.commit()
         for t in saved_triggers:
             db.refresh(t)
+
+        # AUTO-PROCESS: Generate claims immediately when triggers are detected
+        for trigger in saved_triggers:
+            try:
+                process_trigger_event(trigger, db)
+            except Exception as e:
+                # Log error but don't fail trigger creation
+                print(f"Error auto-processing trigger {trigger.id}: {e}")
 
     return saved_triggers
 

@@ -14,12 +14,17 @@ export function Register() {
     phone: '',
     name: '',
     platform: 'zepto',
+    partner_id: '',
     zone_id: '',
   });
   const [zones, setZones] = useState([]);
   const [zonesLoading, setZonesLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [gpsStatus, setGpsStatus] = useState('idle'); // idle | loading | success | too_far | error | denied
+  const [detectedZone, setDetectedZone] = useState(null);
+  const [partnerIdStatus, setPartnerIdStatus] = useState('idle'); // idle | checking | valid | invalid
+  const [partnerIdMessage, setPartnerIdMessage] = useState('');
 
   useEffect(() => {
     async function loadZones() {
@@ -35,8 +40,76 @@ export function Register() {
     loadZones();
   }, []);
 
+  const MAX_DETECTION_DISTANCE_KM = 25;
+
+  async function detectLocation() {
+    if (!navigator.geolocation) {
+      setGpsStatus('error');
+      return;
+    }
+
+    setGpsStatus('loading');
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const result = await api.getNearestZones(latitude, longitude);
+          if (result.length > 0) {
+            const nearest = result[0];
+            if (nearest.distance_km <= MAX_DETECTION_DISTANCE_KM) {
+              setDetectedZone(nearest);
+              setFormData((prev) => ({ ...prev, zone_id: String(nearest.zone.id) }));
+              setGpsStatus('success');
+            } else {
+              setDetectedZone(nearest);
+              setGpsStatus('too_far');
+            }
+          } else {
+            setGpsStatus('error');
+          }
+        } catch (err) {
+          console.error('Failed to get nearest zones:', err);
+          setGpsStatus('error');
+        }
+      },
+      (error) => {
+        setGpsStatus(error.code === 1 ? 'denied' : 'error');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
   function handleChange(e) {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+
+    // Reset partner ID validation when platform changes
+    if (name === 'platform') {
+      setPartnerIdStatus('idle');
+      setPartnerIdMessage('');
+    }
+  }
+
+  async function validatePartnerId() {
+    const partnerId = formData.partner_id.trim();
+    if (!partnerId) {
+      setPartnerIdStatus('idle');
+      setPartnerIdMessage('');
+      return;
+    }
+
+    setPartnerIdStatus('checking');
+    setPartnerIdMessage('');
+
+    try {
+      const result = await api.validatePartnerId(partnerId, formData.platform);
+      setPartnerIdStatus(result.valid ? 'valid' : 'invalid');
+      setPartnerIdMessage(result.message);
+    } catch (err) {
+      setPartnerIdStatus('invalid');
+      setPartnerIdMessage('Unable to verify partner ID');
+    }
   }
 
   async function handleSubmit(e) {
@@ -49,6 +122,7 @@ export function Register() {
       const cleanData = {
         ...formData,
         phone: formData.phone.replace(/\s/g, ''),
+        partner_id: formData.partner_id.trim() || null,
         zone_id: formData.zone_id ? parseInt(formData.zone_id, 10) : null,
       };
       await api.register(cleanData);
@@ -112,8 +186,98 @@ export function Register() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Partner ID
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  name="partner_id"
+                  placeholder={formData.platform === 'zepto' ? 'ZPT123456' : 'BLK123456'}
+                  value={formData.partner_id}
+                  onChange={handleChange}
+                  onBlur={validatePartnerId}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 pr-10 ${
+                    partnerIdStatus === 'valid'
+                      ? 'border-green-300 focus:ring-green-500'
+                      : partnerIdStatus === 'invalid'
+                      ? 'border-amber-300 focus:ring-amber-500'
+                      : 'border-gray-300 focus:ring-blue-500'
+                  }`}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {partnerIdStatus === 'checking' && (
+                    <span className="animate-spin text-gray-400">&#9696;</span>
+                  )}
+                  {partnerIdStatus === 'valid' && (
+                    <span className="text-green-600">&#10003;</span>
+                  )}
+                  {partnerIdStatus === 'invalid' && (
+                    <span className="text-amber-600">&#10007;</span>
+                  )}
+                </span>
+              </div>
+              {partnerIdMessage && (
+                <p
+                  className={`text-sm mt-1 ${
+                    partnerIdStatus === 'valid' ? 'text-green-600' : 'text-amber-600'
+                  }`}
+                >
+                  {partnerIdMessage}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Your {formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'} partner ID (optional)
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Dark Store Zone
               </label>
+
+              <button
+                type="button"
+                onClick={detectLocation}
+                disabled={gpsStatus === 'loading' || zonesLoading}
+                className="w-full mb-2 px-3 py-2 bg-green-50 border border-green-300 rounded-lg text-green-700 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {gpsStatus === 'loading' ? (
+                  <>
+                    <span className="animate-spin">&#9696;</span>
+                    Detecting location...
+                  </>
+                ) : (
+                  <>
+                    <span>&#128205;</span>
+                    Detect My Zone
+                  </>
+                )}
+              </button>
+
+              {gpsStatus === 'success' && detectedZone && (
+                <p className="text-sm text-green-600 mb-2">
+                  Detected: {detectedZone.zone.name} ({detectedZone.distance_km} km away)
+                </p>
+              )}
+
+              {gpsStatus === 'too_far' && detectedZone && (
+                <p className="text-sm text-amber-600 mb-2">
+                  No zones near your location. Nearest is {detectedZone.zone.name} ({detectedZone.distance_km} km away). Please select manually.
+                </p>
+              )}
+
+              {gpsStatus === 'denied' && (
+                <p className="text-sm text-amber-600 mb-2">
+                  Location access denied. Please select zone manually.
+                </p>
+              )}
+
+              {gpsStatus === 'error' && (
+                <p className="text-sm text-red-600 mb-2">
+                  Could not detect location. Please select zone manually.
+                </p>
+              )}
+
               <select
                 name="zone_id"
                 value={formData.zone_id}
@@ -137,7 +301,11 @@ export function Register() {
                 )}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Choose the dark store zone where you primarily work
+                {gpsStatus === 'success'
+                  ? 'Zone auto-detected. You can change it if needed.'
+                  : gpsStatus === 'too_far'
+                  ? 'Select from available zones below'
+                  : 'Use GPS detection or choose manually'}
               </p>
             </div>
 

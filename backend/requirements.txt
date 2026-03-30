@@ -23,3 +23,6 @@ httpx>=0.26.0
 
 # Utilities
 python-dotenv>=1.0.0
+
+# Push notifications
+pywebpush>=2.0.0

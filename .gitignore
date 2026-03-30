@@ -1,3 +1,6 @@
+# Environment
+.env
+
 # Claude
 CLAUDE.md
 .claude/

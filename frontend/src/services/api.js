@@ -81,6 +81,12 @@ class ApiService {
     });
   }
 
+  async validatePartnerId(partnerId, platform) {
+    return this.request(
+      `/partners/validate-id?partner_id=${encodeURIComponent(partnerId)}&platform=${encodeURIComponent(platform)}`
+    );
+  }
+
   // Partner
   async getProfile() {
     return this.request('/partners/me');
@@ -140,6 +146,10 @@ class ApiService {
 
   async getZone(zoneId) {
     return this.request(`/zones/${zoneId}`);
+  }
+
+  async getNearestZones(lat, lng, limit = 3) {
+    return this.request(`/zones/nearest?lat=${lat}&lng=${lng}&limit=${limit}`);
   }
 
   // Triggers
@@ -212,6 +222,26 @@ class ApiService {
 
   async payoutClaim(claimId) {
     return this.request(`/admin/claims/${claimId}/payout`, { method: 'POST' });
+  }
+
+  // Push Notifications
+  async subscribePush(subscriptionData) {
+    return this.request('/notifications/subscribe', {
+      method: 'POST',
+      body: subscriptionData,
+    });
+  }
+
+  async unsubscribePush(endpoint = null) {
+    return this.request('/notifications/unsubscribe', {
+      method: 'POST',
+      body: endpoint ? { endpoint } : {},
+    });
+  }
+
+  async getNotificationStatus(endpoint = null) {
+    const query = endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : '';
+    return this.request(`/notifications/status${query}`);
   }
 }
 

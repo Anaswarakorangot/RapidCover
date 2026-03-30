@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -18,6 +18,7 @@ from app.services.auth import (
     create_access_token,
     get_current_partner,
 )
+from app.services.partner_validation import validate_partner_id
 
 router = APIRouter(prefix="/partners", tags=["partners"])
 
@@ -116,3 +117,21 @@ def update_partner_profile(
     db.commit()
     db.refresh(partner)
     return partner
+
+
+@router.get("/validate-id")
+def validate_partner_id_endpoint(
+    partner_id: str = Query(..., description="Partner ID to validate (e.g., ZPT123456)"),
+    platform: str = Query(..., description="Platform name (zepto or blinkit)"),
+):
+    """
+    Validate a partner ID against platform records.
+
+    Returns validation status and message.
+    Mock behavior:
+    - IDs ending in 000 → "Not found in records"
+    - IDs ending in 999 → "Account suspended"
+    - All other valid formats → "Verified"
+    """
+    result = validate_partner_id(partner_id, platform)
+    return result
