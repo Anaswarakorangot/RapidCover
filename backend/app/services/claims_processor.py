@@ -149,9 +149,17 @@ def get_eligible_policies(zone_id: int, db: Session) -> list[tuple[Policy, Partn
     """
     Get all active policies for partners in a zone.
 
+    Includes policies that are:
+    - Currently active (not expired)
+    - Within the 48-hour grace period (expired but within grace window)
+
     Returns list of (Policy, Partner) tuples.
     """
     now = datetime.utcnow()
+
+    # Grace period is 48 hours after expiry
+    GRACE_PERIOD_HOURS = 48
+    grace_cutoff = now - timedelta(hours=GRACE_PERIOD_HOURS)
 
     results = (
         db.query(Policy, Partner)
@@ -161,7 +169,8 @@ def get_eligible_policies(zone_id: int, db: Session) -> list[tuple[Policy, Partn
             Partner.is_active == True,
             Policy.is_active == True,
             Policy.starts_at <= now,
-            Policy.expires_at > now,
+            # Include policies in grace period (expired within last 48 hours)
+            Policy.expires_at > grace_cutoff,
         )
         .all()
     )
