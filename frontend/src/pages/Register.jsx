@@ -1,7 +1,272 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Button, Input, Card, CardBody } from '../components/ui';
 import api from '../services/api';
+
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --green-primary: #3DB85C;
+    --green-dark:    #2a9e47;
+    --green-light:   #e8f7ed;
+    --text-dark:     #1a2e1a;
+    --text-mid:      #4a5e4a;
+    --text-light:    #8a9e8a;
+    --white:         #ffffff;
+    --gray-bg:       #f7f9f7;
+    --border:        #e2ece2;
+    --error:         #dc2626;
+    --warning:       #d97706;
+  }
+
+  .reg-screen {
+    width: 100%;
+    min-height: 100vh;
+    background: var(--white);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: 'DM Sans', sans-serif;
+    padding: 32px 28px 48px;
+  }
+
+  .reg-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 28px;
+  }
+
+  .reg-logo-icon {
+    width: 56px;
+    height: 56px;
+    background: var(--green-primary);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(61,184,92,0.35);
+    margin-bottom: 12px;
+  }
+
+  .reg-logo-brand {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 22px;
+    color: var(--text-dark);
+  }
+
+  .reg-logo-sub {
+    font-size: 11px;
+    color: var(--text-light);
+    font-weight: 500;
+    letter-spacing: 0.4px;
+    margin-top: 3px;
+  }
+
+  .reg-card {
+    width: 100%;
+    max-width: 360px;
+    background: var(--white);
+    border-radius: 24px;
+    padding: 28px 24px;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.08);
+  }
+
+  .reg-title {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 24px;
+    color: var(--text-dark);
+    margin-bottom: 6px;
+  }
+
+  .reg-subtitle {
+    font-size: 13px;
+    color: var(--text-mid);
+    margin-bottom: 24px;
+  }
+
+  .reg-field { margin-bottom: 16px; }
+
+  .reg-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 6px;
+    display: block;
+    font-family: 'Nunito', sans-serif;
+  }
+
+  .reg-label-hint {
+    font-size: 11px;
+    color: var(--text-light);
+    font-weight: 400;
+    margin-left: 6px;
+  }
+
+  .reg-input-wrap { position: relative; }
+
+  .reg-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text-dark);
+    background: var(--gray-bg);
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .reg-input::placeholder { color: #b8c8b8; }
+
+  .reg-input:focus {
+    border-color: var(--green-primary);
+    box-shadow: 0 0 0 3px rgba(61,184,92,0.12);
+    background: var(--white);
+  }
+
+  .reg-input.valid   { border-color: var(--green-primary); }
+  .reg-input.invalid { border-color: var(--warning); }
+
+  .reg-input-icon {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  .reg-select-wrap { position: relative; }
+
+  .reg-select-wrap::after {
+    content: '▾';
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-light);
+    pointer-events: none;
+    font-size: 13px;
+  }
+
+  .reg-gps-btn {
+    width: 100%;
+    padding: 13px 16px;
+    background: var(--green-light);
+    border: 1.5px solid #b6dfc0;
+    border-radius: 14px;
+    color: var(--green-dark);
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .reg-gps-btn:hover:not(:disabled) {
+    background: #d4f0dc;
+    border-color: var(--green-primary);
+  }
+
+  .reg-gps-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .reg-status {
+    font-size: 12.5px;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    line-height: 1.4;
+  }
+
+  .reg-status.success { background: var(--green-light); color: var(--green-dark); }
+  .reg-status.warning { background: #fef3c7; color: var(--warning); }
+  .reg-status.error   { background: #fef2f2; color: var(--error); }
+
+  .reg-hint { font-size: 11.5px; color: var(--text-light); margin-top: 5px; }
+  .reg-hint.valid   { color: var(--green-dark); }
+  .reg-hint.invalid { color: var(--warning); }
+
+  .reg-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--green-primary);
+    border: none;
+    border-radius: 16px;
+    color: var(--white);
+    font-family: 'Nunito', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s;
+    box-shadow: 0 8px 22px rgba(61,184,92,0.38);
+    margin-top: 8px;
+  }
+
+  .reg-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 55%);
+    pointer-events: none;
+    border-radius: inherit;
+  }
+
+  .reg-btn:active { transform: scale(0.97); }
+  .reg-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .reg-btn .spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .reg-error {
+    font-size: 12.5px;
+    color: var(--error);
+    background: #fef2f2;
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  .reg-footer {
+    margin-top: 24px;
+    font-size: 13px;
+    color: var(--text-mid);
+    text-align: center;
+  }
+
+  .reg-footer a {
+    color: var(--green-primary);
+    font-weight: 700;
+    text-decoration: none;
+    font-family: 'Nunito', sans-serif;
+  }
+`;
 
 const PLATFORMS = [
   { value: 'zepto', label: 'Zepto' },
@@ -10,20 +275,17 @@ const PLATFORMS = [
 
 export function Register() {
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
-    phone: '',
-    name: '',
-    platform: 'zepto',
-    partner_id: '',
-    zone_id: '',
+    phone: '', name: '', platform: 'zepto', partner_id: '', zone_id: '',
   });
   const [zones, setZones] = useState([]);
   const [zonesLoading, setZonesLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [gpsStatus, setGpsStatus] = useState('idle'); // idle | loading | success | too_far | error | denied
+  const [gpsStatus, setGpsStatus] = useState('idle');
   const [detectedZone, setDetectedZone] = useState(null);
-  const [partnerIdStatus, setPartnerIdStatus] = useState('idle'); // idle | checking | valid | invalid
+  const [partnerIdStatus, setPartnerIdStatus] = useState('idle');
   const [partnerIdMessage, setPartnerIdMessage] = useState('');
 
   useEffect(() => {
@@ -43,13 +305,8 @@ export function Register() {
   const MAX_DETECTION_DISTANCE_KM = 25;
 
   async function detectLocation() {
-    if (!navigator.geolocation) {
-      setGpsStatus('error');
-      return;
-    }
-
+    if (!navigator.geolocation) { setGpsStatus('error'); return; }
     setGpsStatus('loading');
-
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
@@ -73,9 +330,7 @@ export function Register() {
           setGpsStatus('error');
         }
       },
-      (error) => {
-        setGpsStatus(error.code === 1 ? 'denied' : 'error');
-      },
+      (err) => { setGpsStatus(err.code === 1 ? 'denied' : 'error'); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }
@@ -83,25 +338,14 @@ export function Register() {
   function handleChange(e) {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-
-    // Reset partner ID validation when platform changes
-    if (name === 'platform') {
-      setPartnerIdStatus('idle');
-      setPartnerIdMessage('');
-    }
+    if (name === 'platform') { setPartnerIdStatus('idle'); setPartnerIdMessage(''); }
   }
 
   async function validatePartnerId() {
     const partnerId = formData.partner_id.trim();
-    if (!partnerId) {
-      setPartnerIdStatus('idle');
-      setPartnerIdMessage('');
-      return;
-    }
-
+    if (!partnerId) { setPartnerIdStatus('idle'); setPartnerIdMessage(''); return; }
     setPartnerIdStatus('checking');
     setPartnerIdMessage('');
-
     try {
       const result = await api.validatePartnerId(partnerId, formData.platform);
       setPartnerIdStatus(result.valid ? 'valid' : 'invalid');
@@ -116,9 +360,7 @@ export function Register() {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
-      // Clean phone number - remove spaces
       const cleanData = {
         ...formData,
         phone: formData.phone.replace(/\s/g, ''),
@@ -126,7 +368,6 @@ export function Register() {
         zone_id: formData.zone_id ? parseInt(formData.zone_id, 10) : null,
       };
       await api.register(cleanData);
-      // After registration, redirect to login
       navigate('/login');
       alert('Registration successful! Please login.');
     } catch (err) {
@@ -136,201 +377,148 @@ export function Register() {
     }
   }
 
+  const pidInputClass = `reg-input${partnerIdStatus === 'valid' ? ' valid' : partnerIdStatus === 'invalid' ? ' invalid' : ''}`;
+  const pidIcon = partnerIdStatus === 'checking' ? '⏳' : partnerIdStatus === 'valid' ? '✓' : partnerIdStatus === 'invalid' ? '✗' : null;
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
-      <div className="text-center mb-8">
-        <span className="text-5xl">🛡️</span>
-        <h1 className="text-2xl font-bold text-gray-900 mt-4">Join RapidCover</h1>
-        <p className="text-gray-600 mt-2">Get income protection in minutes</p>
-      </div>
+    <>
+      <style>{styles}</style>
+      <div className="reg-screen">
 
-      <Card className="w-full max-w-sm">
-        <CardBody>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Full Name"
-              name="name"
-              placeholder="Enter your name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-            />
+        {/* Logo */}
+        <div className="reg-logo">
+          <div className="reg-logo-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path d="M3 12h3l3-9 4 18 3-9h5" stroke="white" strokeWidth="2.2"
+                strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div className="reg-logo-brand">RapidCover</div>
+          <div className="reg-logo-sub">Parametric Income Intelligence</div>
+        </div>
 
-            <Input
-              label="Phone Number"
-              name="phone"
-              type="tel"
-              placeholder="+91 9876543210"
-              value={formData.phone}
-              onChange={handleChange}
-              required
-            />
+        {/* Card */}
+        <div className="reg-card">
+          <div className="reg-title">Create Account</div>
+          <div className="reg-subtitle">Get income protection in minutes.</div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Platform
-              </label>
-              <select
-                name="platform"
-                value={formData.platform}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {PLATFORMS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+          <form onSubmit={handleSubmit}>
+
+            {/* Full Name */}
+            <div className="reg-field">
+              <label className="reg-label">Full Name</label>
+              <input className="reg-input" name="name" placeholder="Enter your name"
+                value={formData.name} onChange={handleChange} required />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Partner ID
+            {/* Phone */}
+            <div className="reg-field">
+              <label className="reg-label">Phone Number</label>
+              <input className="reg-input" name="phone" type="tel" placeholder="+91 9876543210"
+                value={formData.phone} onChange={handleChange} required />
+            </div>
+
+            {/* Platform */}
+            <div className="reg-field">
+              <label className="reg-label">Platform</label>
+              <div className="reg-select-wrap">
+                <select className="reg-input" name="platform" value={formData.platform} onChange={handleChange}>
+                  {PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Partner ID */}
+            <div className="reg-field">
+              <label className="reg-label">
+                Partner ID <span className="reg-label-hint">(optional)</span>
               </label>
-              <div className="relative">
+              <div className="reg-input-wrap">
                 <input
-                  type="text"
-                  name="partner_id"
+                  className={pidInputClass}
+                  type="text" name="partner_id"
                   placeholder={formData.platform === 'zepto' ? 'ZPT123456' : 'BLK123456'}
                   value={formData.partner_id}
                   onChange={handleChange}
                   onBlur={validatePartnerId}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 pr-10 ${
-                    partnerIdStatus === 'valid'
-                      ? 'border-green-300 focus:ring-green-500'
-                      : partnerIdStatus === 'invalid'
-                      ? 'border-amber-300 focus:ring-amber-500'
-                      : 'border-gray-300 focus:ring-blue-500'
-                  }`}
+                  style={{ paddingRight: pidIcon ? '40px' : '16px' }}
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {partnerIdStatus === 'checking' && (
-                    <span className="animate-spin text-gray-400">&#9696;</span>
-                  )}
-                  {partnerIdStatus === 'valid' && (
-                    <span className="text-green-600">&#10003;</span>
-                  )}
-                  {partnerIdStatus === 'invalid' && (
-                    <span className="text-amber-600">&#10007;</span>
-                  )}
-                </span>
+                {pidIcon && (
+                  <span className="reg-input-icon"
+                    style={{ color: partnerIdStatus === 'valid' ? 'var(--green-primary)' : 'var(--warning)' }}>
+                    {pidIcon}
+                  </span>
+                )}
               </div>
-              {partnerIdMessage && (
-                <p
-                  className={`text-sm mt-1 ${
-                    partnerIdStatus === 'valid' ? 'text-green-600' : 'text-amber-600'
-                  }`}
-                >
-                  {partnerIdMessage}
-                </p>
-              )}
-              <p className="text-xs text-gray-500 mt-1">
-                Your {formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'} partner ID (optional)
-              </p>
+              <div className={`reg-hint${partnerIdMessage ? ` ${partnerIdStatus}` : ''}`}>
+                {partnerIdMessage || `Your ${formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'} partner ID`}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Dark Store Zone
-              </label>
+            {/* Zone */}
+            <div className="reg-field">
+              <label className="reg-label">Dark Store Zone</label>
 
-              <button
-                type="button"
-                onClick={detectLocation}
-                disabled={gpsStatus === 'loading' || zonesLoading}
-                className="w-full mb-2 px-3 py-2 bg-green-50 border border-green-300 rounded-lg text-green-700 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {gpsStatus === 'loading' ? (
-                  <>
-                    <span className="animate-spin">&#9696;</span>
-                    Detecting location...
-                  </>
-                ) : (
-                  <>
-                    <span>&#128205;</span>
-                    Detect My Zone
-                  </>
-                )}
+              <button type="button" className="reg-gps-btn" onClick={detectLocation}
+                disabled={gpsStatus === 'loading' || zonesLoading}>
+                {gpsStatus === 'loading'
+                  ? <><span>⏳</span> Detecting location...</>
+                  : <><span>📍</span> Detect My Zone</>}
               </button>
 
               {gpsStatus === 'success' && detectedZone && (
-                <p className="text-sm text-green-600 mb-2">
-                  Detected: {detectedZone.zone.name} ({detectedZone.distance_km} km away)
-                </p>
+                <div className="reg-status success">✓ Detected: {detectedZone.zone.name} ({detectedZone.distance_km} km away)</div>
               )}
-
               {gpsStatus === 'too_far' && detectedZone && (
-                <p className="text-sm text-amber-600 mb-2">
-                  No zones near your location. Nearest is {detectedZone.zone.name} ({detectedZone.distance_km} km away). Please select manually.
-                </p>
+                <div className="reg-status warning">No zones near you. Nearest: {detectedZone.zone.name} ({detectedZone.distance_km} km). Select manually.</div>
               )}
-
               {gpsStatus === 'denied' && (
-                <p className="text-sm text-amber-600 mb-2">
-                  Location access denied. Please select zone manually.
-                </p>
+                <div className="reg-status warning">Location access denied. Select zone manually.</div>
               )}
-
               {gpsStatus === 'error' && (
-                <p className="text-sm text-red-600 mb-2">
-                  Could not detect location. Please select zone manually.
-                </p>
+                <div className="reg-status error">Could not detect location. Select zone manually.</div>
               )}
 
-              <select
-                name="zone_id"
-                value={formData.zone_id}
-                onChange={handleChange}
-                disabled={zonesLoading}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              >
-                {zonesLoading ? (
-                  <option value="">Loading zones...</option>
-                ) : zones.length === 0 ? (
-                  <option value="">No zones available - contact admin</option>
-                ) : (
-                  <>
-                    <option value="">Select your zone</option>
-                    {zones.map((zone) => (
-                      <option key={zone.id} value={zone.id}>
-                        {zone.city} - {zone.name} ({zone.code})
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                {gpsStatus === 'success'
-                  ? 'Zone auto-detected. You can change it if needed.'
-                  : gpsStatus === 'too_far'
-                  ? 'Select from available zones below'
-                  : 'Use GPS detection or choose manually'}
-              </p>
+              <div className="reg-select-wrap">
+                <select className="reg-input" name="zone_id" value={formData.zone_id}
+                  onChange={handleChange} disabled={zonesLoading}>
+                  {zonesLoading ? <option value="">Loading zones...</option>
+                    : zones.length === 0 ? <option value="">No zones available — contact admin</option>
+                      : <>
+                        <option value="">Select your zone</option>
+                        {zones.map((zone) => (
+                          <option key={zone.id} value={zone.id}>
+                            {zone.city} - {zone.name} ({zone.code})
+                          </option>
+                        ))}
+                      </>
+                  }
+                </select>
+              </div>
+
+              <div className="reg-hint">
+                {gpsStatus === 'success' ? 'Zone auto-detected. You can change it if needed.'
+                  : gpsStatus === 'too_far' ? 'Select from available zones below'
+                    : 'Use GPS detection or choose manually'}
+              </div>
             </div>
 
-            {error && (
-              <p className="text-sm text-red-600">{error}</p>
-            )}
+            {error && <div className="reg-error">{error}</div>}
 
-            <Button
-              type="submit"
-              className="w-full"
-              loading={loading}
-              disabled={!formData.name || !formData.phone}
-            >
-              Register
-            </Button>
+            <button type="submit" className="reg-btn"
+              disabled={!formData.name || !formData.phone || loading}>
+              {loading && <span className="spinner" />}
+              Create Account
+            </button>
+
           </form>
-        </CardBody>
-      </Card>
+        </div>
 
-      <p className="mt-6 text-sm text-gray-500">
-        Already registered?{' '}
-        <Link to="/login" className="text-blue-600 hover:underline">
-          Login here
-        </Link>
-      </p>
-    </div>
+        <div className="reg-footer">
+          Already registered? <Link to="/login">Login here</Link>
+        </div>
+
+      </div>
+    </>
   );
 }

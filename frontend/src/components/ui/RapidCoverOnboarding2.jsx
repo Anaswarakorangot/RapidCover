@@ -2,11 +2,7 @@
  * RapidCoverOnboarding2.jsx
  * ─────────────────────────────────────────────
  * Second onboarding slide — stressed delivery partner in rain/storm.
- * Same layout as slide 1. Drop in after RapidCoverOnboarding.
- *
- * Usage:
- *   import RapidCoverOnboarding2 from './RapidCoverOnboarding2';
- *   <RapidCoverOnboarding2 onNext={() => navigate('/login')} />
+ * Changes: green theme, removed stat cards, button = "Get Started"
  */
 
 import { useState, useEffect } from "react";
@@ -17,14 +13,13 @@ const styles = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   :root {
-    --blue-primary:  #2563eb;
-    --blue-dark:     #1a4fcf;
-    --blue-light:    #eff6ff;
-    --orange:        #f97316;
     --green-primary: #3DB85C;
-    --text-dark:     #1a1a2e;
-    --text-mid:      #4a4a6a;
-    --text-light:    #9a9ab8;
+    --green-dark:    #2a9e47;
+    --green-light:   #e8f7ed;
+    --orange:        #f97316;
+    --text-dark:     #1a2e1a;
+    --text-mid:      #4a5e4a;
+    --text-light:    #8a9e8a;
     --white:         #ffffff;
   }
 
@@ -57,13 +52,13 @@ const styles = `
   .rc2-logo-icon {
     width: 42px;
     height: 42px;
-    background: var(--blue-primary);
+    background: var(--green-primary);
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+    box-shadow: 0 4px 14px rgba(61,184,92,0.35);
   }
 
   .rc2-logo-text .brand {
@@ -98,7 +93,7 @@ const styles = `
     right: -50px;
     width: 300px;
     height: 300px;
-    background: radial-gradient(ellipse at 55% 45%, #bfdbfe 0%, #93c5fd 35%, transparent 65%);
+    background: radial-gradient(ellipse at 55% 45%, #c8f0d0 0%, #a8e4b8 35%, transparent 65%);
     border-radius: 50%;
     pointer-events: none;
   }
@@ -126,7 +121,7 @@ const styles = `
     position: absolute;
     width: 2px;
     border-radius: 2px;
-    background: linear-gradient(to bottom, transparent, #93c5fd);
+    background: linear-gradient(to bottom, transparent, #a8e4b8);
     animation: rc2Rain linear infinite;
     opacity: 0.55;
   }
@@ -241,13 +236,13 @@ const styles = `
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: #bfdbfe;
+    background: #cde8d0;
     cursor: pointer;
     transition: all 0.3s ease;
   }
 
   .rc2-dot.active {
-    background: var(--blue-primary);
+    background: var(--green-primary);
     height: 22px;
     border-radius: 4px;
   }
@@ -269,54 +264,23 @@ const styles = `
     animation: rc2FadeUp 0.7s ease 0.65s forwards;
   }
 
-  .rc2-tagline span { color: var(--blue-primary); }
-
-  .rc2-stats {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 18px;
-    opacity: 0;
-    transform: translateY(20px);
-    animation: rc2FadeUp 0.7s ease 0.78s forwards;
-  }
-
-  .rc2-stat-card {
-    flex: 1;
-    background: var(--blue-light);
-    border-radius: 14px;
-    padding: 10px 12px;
-  }
-
-  .rc2-stat-num {
-    font-family: 'Nunito', sans-serif;
-    font-size: 18px;
-    font-weight: 900;
-    color: var(--blue-primary);
-    line-height: 1;
-  }
-
-  .rc2-stat-label {
-    font-size: 10px;
-    color: var(--text-mid);
-    margin-top: 3px;
-    line-height: 1.3;
-  }
+  .rc2-tagline span { color: var(--green-primary); }
 
   .rc2-description {
     font-size: 13.5px;
     color: var(--text-mid);
     line-height: 1.65;
-    margin-bottom: 28px;
+    margin-bottom: 32px;
     opacity: 0;
     transform: translateY(20px);
-    animation: rc2FadeUp 0.7s ease 0.88s forwards;
+    animation: rc2FadeUp 0.7s ease 0.78s forwards;
   }
 
   /* ── CTA ── */
   .rc2-btn {
     width: 100%;
     padding: 17px;
-    background: var(--blue-primary);
+    background: var(--green-primary);
     border: none;
     border-radius: 18px;
     color: var(--white);
@@ -328,9 +292,9 @@ const styles = `
     position: relative;
     overflow: hidden;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
-    box-shadow: 0 8px 24px rgba(37,99,235,0.38);
+    box-shadow: 0 8px 24px rgba(61,184,92,0.38);
     opacity: 0;
-    animation: rc2FadeUp 0.7s ease 1.0s forwards;
+    animation: rc2FadeUp 0.7s ease 0.9s forwards;
   }
 
   .rc2-btn::after {
@@ -344,7 +308,7 @@ const styles = `
 
   .rc2-btn:active {
     transform: scale(0.97);
-    box-shadow: 0 4px 12px rgba(37,99,235,0.22);
+    box-shadow: 0 4px 12px rgba(61,184,92,0.22);
   }
 
   /* ── Slide hint ── */
@@ -356,7 +320,7 @@ const styles = `
     margin-top: 20px;
     margin-bottom: env(safe-area-inset-bottom, 28px);
     opacity: 0;
-    animation: rc2FadeUp 0.7s ease 1.15s forwards;
+    animation: rc2FadeUp 0.7s ease 1.05s forwards;
   }
 
   .rc2-slide-hint .label {
@@ -376,8 +340,8 @@ const styles = `
     display: block;
     width: 5px;
     height: 5px;
-    border-right: 1.8px solid var(--blue-primary);
-    border-bottom: 1.8px solid var(--blue-primary);
+    border-right: 1.8px solid var(--green-primary);
+    border-bottom: 1.8px solid var(--green-primary);
     transform: rotate(-45deg);
     font-style: normal;
   }
@@ -423,114 +387,69 @@ const rainDrops = Array.from({ length: 18 }, (_, i) => ({
 /* ─── Stressed delivery partner SVG ─── */
 const StressedPartnerIllustration = () => (
   <svg viewBox="0 0 260 280" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* shadow */}
     <ellipse cx="130" cy="268" rx="80" ry="9" fill="#00000015" />
-
-    {/* puddle */}
-    <ellipse cx="100" cy="245" rx="55" ry="8" fill="#bfdbfe" opacity="0.5" />
-    <ellipse cx="100" cy="245" rx="38" ry="5" fill="#93c5fd" opacity="0.4" />
-
-    {/* rear wheel */}
+    <ellipse cx="100" cy="245" rx="55" ry="8" fill="#a8e4b8" opacity="0.5" />
+    <ellipse cx="100" cy="245" rx="38" ry="5" fill="#3DB85C" opacity="0.3" />
     <circle cx="68" cy="222" r="32" fill="#1e293b" />
     <circle cx="68" cy="222" r="24" fill="#334155" />
-    <circle cx="68" cy="222" r="10" fill="#2563eb" />
-    <circle cx="68" cy="222" r="4"  fill="#1e293b" />
-
-    {/* front wheel */}
+    <circle cx="68" cy="222" r="10" fill="#3DB85C" />
+    <circle cx="68" cy="222" r="4" fill="#1e293b" />
     <circle cx="196" cy="224" r="28" fill="#1e293b" />
     <circle cx="196" cy="224" r="20" fill="#334155" />
-    <circle cx="196" cy="224" r="9"  fill="#2563eb" />
-    <circle cx="196" cy="224" r="3"  fill="#1e293b" />
-
-    {/* scooter body */}
-    <path d="M76 192 Q88 155 128 152 L176 150 Q198 148 208 168 L216 192 Q196 202 128 202 Z" fill="#2563eb" />
-    <path d="M76 192 Q70 212 68 224 L98 224 L98 197 Z" fill="#1a4fcf" />
-
-    {/* handlebar */}
+    <circle cx="196" cy="224" r="9" fill="#3DB85C" />
+    <circle cx="196" cy="224" r="3" fill="#1e293b" />
+    <path d="M76 192 Q88 155 128 152 L176 150 Q198 148 208 168 L216 192 Q196 202 128 202 Z" fill="#3DB85C" />
+    <path d="M76 192 Q70 212 68 224 L98 224 L98 197 Z" fill="#2a9e47" />
     <rect x="108" y="144" width="68" height="16" rx="8" fill="#1e293b" />
-    <rect x="110" y="145" width="64" height="7"  rx="3" fill="#334155" />
-    <line x1="198" y1="168" x2="196" y2="197" stroke="#1a4fcf" strokeWidth="7" strokeLinecap="round" />
+    <rect x="110" y="145" width="64" height="7" rx="3" fill="#334155" />
+    <line x1="198" y1="168" x2="196" y2="197" stroke="#2a9e47" strokeWidth="7" strokeLinecap="round" />
     <rect x="193" y="143" width="38" height="7" rx="3" fill="#1e293b" />
-
-    {/* footrest */}
-    <rect x="80" y="200" width="48" height="6" rx="3" fill="#1a4fcf" />
-
-    {/* delivery box — slightly tilted from storm */}
+    <rect x="80" y="200" width="48" height="6" rx="3" fill="#2a9e47" />
     <g transform="rotate(-4, 146, 113)">
       <rect x="118" y="90" width="56" height="50" rx="4" fill="#f97316" />
-      <rect x="118" y="90" width="56" height="9"  rx="4" fill="#ea6c00" />
-      <line x1="146" y1="90"  x2="146" y2="140" stroke="#ea6c00" strokeWidth="2.5" />
+      <rect x="118" y="90" width="56" height="9" rx="4" fill="#ea6c00" />
+      <line x1="146" y1="90" x2="146" y2="140" stroke="#ea6c00" strokeWidth="2.5" />
       <line x1="118" y1="109" x2="174" y2="109" stroke="#ea6c00" strokeWidth="2.5" />
-      {/* wet patch on box */}
       <ellipse cx="132" cy="98" rx="6" ry="3" fill="#fed7aa" opacity="0.5" />
     </g>
-
-    {/* rider body */}
     <path d="M133 190 Q126 178 118 173 L128 168 Q140 175 150 188 Z" fill="#fde68a" />
     <ellipse cx="150" cy="158" rx="19" ry="26" fill="#fcd34d" />
-
-    {/* rain poncho / jacket */}
-    <path d="M128 155 Q128 143 150 141 Q172 143 172 155 L168 182 Q150 186 132 182 Z" fill="#1d4ed8" />
-    <path d="M132 157 Q150 154 162 157 L160 173 Q150 175 134 173 Z" fill="#2563eb" opacity="0.6" />
-
-    {/* left arm gripping tight */}
+    <path d="M128 155 Q128 143 150 141 Q172 143 172 155 L168 182 Q150 186 132 182 Z" fill="#2a9e47" />
+    <path d="M132 157 Q150 154 162 157 L160 173 Q150 175 134 173 Z" fill="#3DB85C" opacity="0.6" />
     <path d="M128 158 Q112 154 110 148 Q110 140 117 141 Q124 143 128 150 Z" fill="#fde68a" />
-    {/* right arm */}
     <path d="M170 155 Q182 150 185 147 L186 157 Q178 161 172 160 Z" fill="#fde68a" />
-
-    {/* helmet — dark rainy style */}
     <circle cx="150" cy="122" r="24" fill="#1e293b" />
     <path d="M126 118 Q126 96 150 94 Q174 96 174 118 L170 124 Q150 130 130 124 Z" fill="#1e293b" />
-    {/* visor */}
-    <path d="M130 119 Q150 126 170 119 L168 125 Q150 130 132 125 Z" fill="#2563eb" opacity="0.7" />
-    {/* helmet shine */}
+    <path d="M130 119 Q150 126 170 119 L168 125 Q150 130 132 125 Z" fill="#3DB85C" opacity="0.7" />
     <path d="M133 105 Q142 100 155 103" stroke="#374151" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.6" />
-
-    {/* face — worried expression */}
     <circle cx="150" cy="124" r="18" fill="#fde68a" />
-    {/* worried brows */}
     <path d="M141 117 Q144 114 147 116" stroke="#78350f" strokeWidth="1.8" fill="none" strokeLinecap="round" />
     <path d="M153 116 Q156 114 159 117" stroke="#78350f" strokeWidth="1.8" fill="none" strokeLinecap="round" />
-    {/* wide worried eyes */}
     <ellipse cx="144" cy="121" rx="2.5" ry="3" fill="#1e293b" />
     <ellipse cx="156" cy="121" rx="2.5" ry="3" fill="#1e293b" />
-    {/* frown */}
     <path d="M145 130 Q150 127 155 130" stroke="#92400e" strokeWidth="1.8" fill="none" strokeLinecap="round" />
-    {/* sweat drop */}
-    <path d="M161 116 Q162 112 164 115 Q164 118 161 116Z" fill="#93c5fd" />
-
-    {/* lightning bolt */}
+    <path d="M161 116 Q162 112 164 115 Q164 118 161 116Z" fill="#a8e4b8" />
     <path d="M22 60 L30 80 L24 80 L32 100 L18 76 L26 76 Z" fill="#fbbf24" opacity="0.9" />
-
-    {/* rain lines (scene-level) */}
-    <line x1="8"  y1="160" x2="14" y2="185" stroke="#93c5fd" strokeWidth="2"   strokeLinecap="round" opacity="0.5" />
-    <line x1="18" y1="145" x2="24" y2="170" stroke="#93c5fd" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
-    <line x1="28" y1="158" x2="34" y2="183" stroke="#93c5fd" strokeWidth="2"   strokeLinecap="round" opacity="0.45" />
-    <line x1="38" y1="140" x2="44" y2="165" stroke="#93c5fd" strokeWidth="1.5" strokeLinecap="round" opacity="0.35" />
-    <line x1="218" y1="140" x2="224" y2="165" stroke="#93c5fd" strokeWidth="2"   strokeLinecap="round" opacity="0.45" />
-    <line x1="228" y1="155" x2="234" y2="180" stroke="#93c5fd" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
-    <line x1="238" y1="148" x2="244" y2="173" stroke="#93c5fd" strokeWidth="2"   strokeLinecap="round" opacity="0.5" />
-    <line x1="248" y1="160" x2="254" y2="185" stroke="#93c5fd" strokeWidth="1.5" strokeLinecap="round" opacity="0.35" />
-
-    {/* cloud */}
-    <circle cx="55"  cy="45" r="18" fill="#94a3b8" opacity="0.8" />
-    <circle cx="75"  cy="35" r="22" fill="#94a3b8" opacity="0.85" />
+    <line x1="8" y1="160" x2="14" y2="185" stroke="#a8e4b8" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+    <line x1="18" y1="145" x2="24" y2="170" stroke="#a8e4b8" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
+    <line x1="28" y1="158" x2="34" y2="183" stroke="#a8e4b8" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
+    <line x1="38" y1="140" x2="44" y2="165" stroke="#a8e4b8" strokeWidth="1.5" strokeLinecap="round" opacity="0.35" />
+    <line x1="218" y1="140" x2="224" y2="165" stroke="#a8e4b8" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
+    <line x1="228" y1="155" x2="234" y2="180" stroke="#a8e4b8" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
+    <line x1="238" y1="148" x2="244" y2="173" stroke="#a8e4b8" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+    <line x1="248" y1="160" x2="254" y2="185" stroke="#a8e4b8" strokeWidth="1.5" strokeLinecap="round" opacity="0.35" />
+    <circle cx="55" cy="45" r="18" fill="#94a3b8" opacity="0.8" />
+    <circle cx="75" cy="35" r="22" fill="#94a3b8" opacity="0.85" />
     <circle cx="100" cy="38" r="19" fill="#94a3b8" opacity="0.8" />
     <circle cx="118" cy="46" r="15" fill="#94a3b8" opacity="0.75" />
     <rect x="50" y="46" width="80" height="20" rx="2" fill="#94a3b8" opacity="0.78" />
-
-    {/* small rain from cloud */}
-    <line x1="62"  y1="66" x2="58"  y2="82" stroke="#bfdbfe" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
-    <line x1="75"  y1="66" x2="71"  y2="82" stroke="#bfdbfe" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
-    <line x1="88"  y1="66" x2="84"  y2="82" stroke="#bfdbfe" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
-    <line x1="101" y1="66" x2="97"  y2="82" stroke="#bfdbfe" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
-    <line x1="114" y1="66" x2="110" y2="82" stroke="#bfdbfe" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
-
-    {/* ₹0 floating — income lost */}
-    <rect x="185" y="55" width="52" height="26" rx="13" fill="#fee2e2" />
-    <text x="211" y="73" textAnchor="middle" fontSize="13" fontWeight="800" fill="#dc2626" fontFamily="Nunito, sans-serif">₹0</text>
-
-    {/* zone suspended tag */}
+    <line x1="62" y1="66" x2="58" y2="82" stroke="#c8f0d0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+    <line x1="75" y1="66" x2="71" y2="82" stroke="#c8f0d0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+    <line x1="88" y1="66" x2="84" y2="82" stroke="#c8f0d0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+    <line x1="101" y1="66" x2="97" y2="82" stroke="#c8f0d0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+    <line x1="114" y1="66" x2="110" y2="82" stroke="#c8f0d0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+    <rect x="185" y="55" width="52" height="26" rx="13" fill="#dcfce7" />
+    <text x="211" y="73" textAnchor="middle" fontSize="13" fontWeight="800" fill="#16a34a" fontFamily="Nunito, sans-serif">₹0</text>
     <rect x="168" y="88" width="82" height="22" rx="11" fill="#fef3c7" />
     <text x="209" y="103" textAnchor="middle" fontSize="10" fontWeight="700" fill="#92400e" fontFamily="Nunito, sans-serif">Zone Suspended</text>
   </svg>
@@ -618,33 +537,20 @@ export default function RapidCoverOnboarding2({ onNext }) {
         {/* Content */}
         <div className="rc2-content">
           <div className="rc2-tagline">
-            When Zepto Stops,<br />
+            When Your Zone Stops,<br />
             <span>Your Income Doesn't.</span>
           </div>
 
-          <div className="rc2-stats">
-            <div className="rc2-stat-card">
-              <div className="rc2-stat-num">₹0</div>
-              <div className="rc2-stat-label">what platforms pay during zone suspension</div>
-            </div>
-            <div className="rc2-stat-card">
-              <div className="rc2-stat-num">49s</div>
-              <div className="rc2-stat-label">average time to UPI credit with RapidCover</div>
-            </div>
-            <div className="rc2-stat-card">
-              <div className="rc2-stat-num">₹59</div>
-              <div className="rc2-stat-label">per week — less than one chai a day</div>
-            </div>
-          </div>
+          {/* ── Stat cards REMOVED ── */}
 
           <p className="rc2-description">
-            Rain, heatwave, AQI spike, curfew — if your zone shuts down, 
-            RapidCover detects it automatically and credits your UPI 
+            Rain, heatwave, AQI spike, curfew — if your delivery zone shuts down,
+            RapidCover detects it automatically and credits your UPI
             before you even reach home. Zero claim forms. Zero waiting.
           </p>
 
           <button className="rc2-btn" onClick={onNext}>
-            Get My Cover — ₹59/week
+            Get Started
           </button>
 
           <div className="rc2-slide-hint">
