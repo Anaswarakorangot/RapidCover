@@ -1,0 +1,9 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local accidental files
+nul
+
+# Local tooling docs
+CLAUDE.md
