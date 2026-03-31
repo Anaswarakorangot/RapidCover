@@ -1,9 +1,23 @@
+# Environment
+.env
+
+# Claude
+CLAUDE.md
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
 # Python cache
 __pycache__/
 *.py[cod]
 
 # Local accidental files
 nul
-
-# Local tooling docs
-CLAUDE.md

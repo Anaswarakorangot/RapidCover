@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/* Custom CSS variables for RapidCover theme */
+:root {
+  --rc-primary: #2563eb;
+  --rc-primary-dark: #1d4ed8;
+  --rc-success: #16a34a;
+  --rc-warning: #f59e0b;
+  --rc-danger: #dc2626;
+}
+
+/* Base styles */
+body {
+  @apply bg-gray-50 text-gray-900 antialiased;
+}
+
+/* PWA safe area padding for notched devices */
+@supports (padding: env(safe-area-inset-top)) {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
