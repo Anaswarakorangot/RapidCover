@@ -1,0 +1,789 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   RapidCover Admin Panel — Dark Premium Theme
+   Matches the mockup exactly: dark bg, amber/green accents, card surfaces
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Root & Layout ───────────────────────────────────────────────────────── */
+
+.admin-root {
+  min-height: 100vh;
+  background: #141414;
+  color: #e5e5e5;
+  padding: 2rem 2.5rem;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  .admin-root { padding: 1rem; }
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+}
+
+.admin-title {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: #f5f5f5;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.admin-subtitle {
+  font-size: 0.85rem;
+  color: #737373;
+  margin: 0.2rem 0 0;
+}
+
+.admin-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #1e1e1e;
+  border: 1px solid #2a2a2a;
+  border-radius: 9999px;
+  padding: 0.45rem 1rem;
+  font-size: 0.82rem;
+  color: #a3a3a3;
+  white-space: nowrap;
+}
+
+.admin-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e88;
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ── Sections (Cards) ───────────────────────────────────────────────────── */
+
+.admin-section {
+  background: #1c1c1c;
+  border: 1px solid #2a2a2a;
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  animation: fadeInUp 0.5s ease both;
+}
+
+.admin-section-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #737373;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 1.25rem;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Loader ──────────────────────────────────────────────────────────────── */
+
+.admin-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 1rem;
+  color: #737373;
+}
+
+.admin-loader__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #2a2a2a;
+  border-top-color: #d4a24e;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AdminStats.jsx
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 500px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
+
+.stat-card {
+  background: #252525;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.stat-card--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stat-card:hover {
+  border-color: #444;
+  background: #2a2a2a;
+}
+
+.stat-card__label {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: capitalize;
+}
+
+.stat-card__value {
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ── Loss Ratio Bar ─────────────────────────────────────────────────────── */
+
+.loss-ratio-bar {
+  margin-top: 0.5rem;
+}
+
+.loss-ratio-bar__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+
+.loss-ratio-bar__title {
+  font-size: 0.82rem;
+  color: #a3a3a3;
+}
+
+.loss-ratio-bar__value {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.loss-ratio-bar__track {
+  position: relative;
+  height: 10px;
+  background: #2a2a2a;
+  border-radius: 999px;
+  overflow: visible;
+}
+
+.loss-ratio-bar__fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.loss-ratio-bar__threshold {
+  position: absolute;
+  top: -4px;
+  width: 3px;
+  height: 18px;
+  background: #f59e0b;
+  border-radius: 2px;
+  transform: translateX(-50%);
+}
+
+.loss-ratio-bar__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #555;
+  margin-top: 0.4rem;
+  position: relative;
+}
+
+.loss-ratio-bar__threshold-label {
+  position: absolute;
+  color: #f59e0b;
+  font-size: 0.68rem;
+  transform: translateX(-50%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TriggerPanel.jsx
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Live Engine Status Bar ─────────────────────────────────────────────── */
+
+.engine-status-bar {
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.1rem;
+}
+
+.engine-status-bar__row {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+}
+
+.engine-status-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.engine-label {
+  font-size: 0.72rem;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.engine-value {
+  font-size: 0.82rem;
+  color: #e5e5e5;
+  font-weight: 500;
+}
+
+.engine-value--highlight {
+  color: #fbbf24;
+}
+
+.engine-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.engine-dot--live {
+  background: #22c55e;
+  box-shadow: 0 0 5px #22c55e88;
+}
+
+.engine-dot--mock {
+  background: #f59e0b;
+  box-shadow: 0 0 5px #f59e0b66;
+}
+
+.engine-dot--off {
+  background: #555;
+}
+
+.engine-sources {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 0.6rem;
+  border-top: 1px solid #222;
+}
+
+.engine-source {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+}
+
+.engine-source__name {
+  color: #a3a3a3;
+}
+
+.engine-source__status {
+  color: #666;
+  font-style: italic;
+}
+
+/* ── Trigger Panel ──────────────────────────────────────────────────────── */
+
+.trigger-panel__desc {
+  color: #888;
+  font-size: 0.88rem;
+  margin: -0.5rem 0 1.25rem;
+}
+
+.trigger-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 700px) {
+  .trigger-grid { grid-template-columns: 1fr; }
+}
+
+.trigger-card {
+  background: #1c1c1c;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 1.15rem 1.25rem;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.trigger-card:hover {
+  border-color: #555;
+  background: #222;
+}
+
+.trigger-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.trigger-card__icon {
+  font-size: 1.1rem;
+}
+
+.trigger-card__label {
+  font-size: 1rem;
+  color: #f5f5f5;
+}
+
+.trigger-card__detail {
+  font-size: 0.78rem;
+  color: #777;
+  margin: 0 0 0.85rem;
+}
+
+.trigger-card__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #252525;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #e5e5e5;
+  padding: 0.5rem 1.15rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.trigger-card__btn:hover:not(:disabled) {
+  background: #333;
+  border-color: #666;
+}
+
+.trigger-card__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.trigger-card__spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #555;
+  border-top-color: #d4a24e;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* ── Simulation Log ─────────────────────────────────────────────────────── */
+
+.sim-log {
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 1.15rem 1.25rem;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.sim-log__title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #f5f5f5;
+  margin-bottom: 0.85rem;
+}
+
+.sim-log__line {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.78rem;
+  line-height: 1.85;
+  color: #22c55e;
+  animation: fadeIn 0.3s ease both;
+}
+
+.sim-log__total {
+  color: #f5f5f5 !important;
+  font-size: 0.88rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #2a2a2a;
+}
+
+.sim-log__ts {
+  color: #5eead4;
+  margin-right: 0;
+}
+
+.sim-log__sep {
+  color: #555;
+  margin: 0 0.4rem;
+}
+
+.sim-log__msg {
+  color: #b0b0b0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ClaimsQueue.jsx
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.claims-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.claims-filters {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.claims-filter-select {
+  background: #252525;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #e5e5e5;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  appearance: auto;
+}
+
+.claims-filter-select:focus {
+  outline: none;
+  border-color: #d4a24e;
+}
+
+.claims-loading {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+.claims-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #2a2a2a;
+  border-top-color: #d4a24e;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.claims-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.claim-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid #222;
+  gap: 1rem;
+}
+
+.claim-row:last-child {
+  border-bottom: none;
+}
+
+.claim-row__left {
+  flex: 1;
+  min-width: 0;
+}
+
+.claim-row__top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.3rem;
+}
+
+.claim-row__id {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #f5f5f5;
+}
+
+.claim-row__detail {
+  font-size: 0.78rem;
+  color: #888;
+  line-height: 1.55;
+}
+
+.claim-anomaly {
+  color: #f97316;
+  font-style: italic;
+}
+
+.claim-paid-tag {
+  color: #22c55e;
+  font-weight: 500;
+}
+
+/* Badges */
+.claim-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.badge--review {
+  background: #451a03;
+  color: #fb923c;
+  border: 1px solid #7c2d12;
+}
+
+.badge--validation {
+  background: #422006;
+  color: #fbbf24;
+  border: 1px solid #78350f;
+}
+
+.badge--approved {
+  background: #052e16;
+  color: #4ade80;
+  border: 1px solid #166534;
+}
+
+.badge--rejected {
+  background: #300a0a;
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+}
+
+.claim-trigger-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 6px;
+  background: #252525;
+  color: #a3a3a3;
+  border: 1px solid #333;
+}
+
+/* Fraud score */
+.claim-row__right {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-shrink: 0;
+}
+
+.claim-fraud-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.claim-fraud-label {
+  font-size: 0.68rem;
+  color: #777;
+}
+
+.claim-fraud-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+/* Action buttons */
+.claim-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.claim-btn {
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #444;
+  min-width: 88px;
+  text-align: center;
+}
+
+.claim-btn--approve {
+  background: #252525;
+  color: #e5e5e5;
+}
+
+.claim-btn--approve:hover:not(:disabled) {
+  background: #333;
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.claim-btn--reject {
+  background: #252525;
+  color: #e5e5e5;
+}
+
+.claim-btn--reject:hover:not(:disabled) {
+  background: #333;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.claim-btn--view {
+  background: #252525;
+  color: #a3a3a3;
+}
+
+.claim-btn--view:hover {
+  background: #333;
+  border-color: #666;
+}
+
+.claim-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Legend */
+.claims-legend {
+  font-size: 0.72rem;
+  color: #555;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #222;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ExclusionsCard.jsx
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.exclusions-irdai-badge {
+  display: inline-block;
+  background: #1a2e1a;
+  color: #4ade80;
+  border: 1px solid #166534;
+  border-radius: 8px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+.exclusions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+
+@media (max-width: 700px) {
+  .exclusions-grid { grid-template-columns: 1fr; }
+}
+
+.exclusion-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  background: #222;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  transition: border-color 0.2s;
+}
+
+.exclusion-item:hover {
+  border-color: #444;
+}
+
+.exclusion-icon {
+  font-size: 1.1rem;
+  margin-top: 0.1rem;
+  flex-shrink: 0;
+}
+
+.exclusion-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.exclusion-label {
+  font-size: 0.85rem;
+  color: #e5e5e5;
+  font-weight: 500;
+}
+
+.exclusion-detail {
+  font-size: 0.72rem;
+  color: #666;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Scrollbar (dark theme)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.admin-root ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-root ::-webkit-scrollbar-track {
+  background: #1c1c1c;
+}
+
+.admin-root ::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
+.admin-root ::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

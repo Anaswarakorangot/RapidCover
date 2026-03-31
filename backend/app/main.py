@@ -7,6 +7,7 @@ from app.database import init_db
 from app.api.router import api_router
 # Import models so they register with SQLAlchemy Base
 from app.models import Partner, Zone, Policy, TriggerEvent, Claim
+from app.services.scheduler import start_scheduler, stop_scheduler
 
 settings = get_settings()
 
@@ -18,8 +19,12 @@ async def lifespan(app: FastAPI):
     print("Starting RapidCover API...")
     init_db()
     print("Database tables created.")
+    # Start background trigger polling (every 45s)
+    start_scheduler()
+    print("Background trigger scheduler started.")
     yield
     # Shutdown
+    stop_scheduler()
     print("Shutting down RapidCover API...")
 
 
