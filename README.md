@@ -31,13 +31,15 @@
 4. [Why Mobile App (PWA)](#-why-mobile-app-pwa)
 5. [Weekly Premium Model](#-weekly-premium-model)
 6. [Parametric Triggers](#-parametric-triggers)
-7. [AI/ML Integration Plan](#-aiml-integration-plan)
-8. [Fraud Detection Architecture](#-fraud-detection-architecture)
-9. [Application Workflow](#-application-workflow)
-10. [Analytics Dashboard](#-analytics-dashboard)
-11. [Tech Stack & Architecture](#-tech-stack--architecture)
-12. [Development Plan — 6 Weeks](#-development-plan--6-weeks)
-13. [Business Viability](#-business-viability)
+7. [What RapidCover Does NOT Cover](#-what-rapidcover-does-not-cover--standard-exclusions)
+8. [AI/ML Integration Plan](#-aiml-integration-plan)
+9. [Fraud Detection Architecture](#-fraud-detection-architecture)
+10. [Application Workflow](#-application-workflow)
+11. [Analytics Dashboard](#-analytics-dashboard)
+12. [Tech Stack & Architecture](#-tech-stack--architecture)
+13. [Actuarial Model](#-actuarial-model--financial-viability--pricing-basis)
+14. [Development Plan — 6 Weeks](#-development-plan--6-weeks)
+15. [Business Viability](#-business-viability)
 
 ---
 
@@ -215,6 +217,51 @@ Note       : Most Q-Commerce-specific trigger in existence — unique to RapidCo
        ↓
 [Payout Calculated] → [Razorpay UPI Credit] → [Push Notification to Lock Screen]
 ```
+
+---
+
+## 🚫 What RapidCover Does NOT Cover — Standard Exclusions
+
+RapidCover is a **parametric income protection product** with a strictly defined scope. The following are permanently excluded from coverage, in alignment with IRDAI guidelines and standard parametric insurance practice.
+
+> These exclusions are non-negotiable and are presented to every partner at onboarding before policy activation. A dedicated "What's not covered" screen is shown before the first premium is collected.
+
+### Excluded Events
+
+| Exclusion Category | Details |
+|--------------------|---------|
+| **War & Armed Conflict** | Loss of income caused by war, invasion, civil war, military coup, armed insurgency, or terrorism — whether declared or undeclared |
+| **Pandemic / Epidemic Declaration** | National or state government-declared public health emergencies (e.g. COVID-19 type lockdowns). Routine disease outbreaks not classified as emergencies are NOT excluded |
+| **Nuclear & Radioactive Events** | Any disruption arising from nuclear reaction, radiation, or radioactive contamination |
+| **Government Policy Changes** | Income loss caused by regulatory changes, GST/policy shifts, or platform-level policy decisions (e.g. commission restructuring) |
+| **Platform Operational Decisions** | Planned maintenance, scheduled downtimes, algorithm changes, surge pricing removal, or voluntary platform shutdowns unrelated to an external disruption event |
+| **Self-Inflicted / Voluntary Loss** | Worker voluntarily going offline, account suspension due to partner-side violations, deliberate avoidance of runs |
+| **Health, Accident & Life** | Any medical expenses, hospitalisation, disability, or death — strictly excluded. RapidCover is NOT a health or life insurance product |
+| **Vehicle Damage & Repair** | Bike, scooter, or vehicle damage, repair costs, fuel costs, or any mobility-related expense — strictly excluded |
+| **Financial Market Events** | Currency devaluation, fuel price spikes, or inflation-driven earning reductions |
+| **Disruptions Under 45 Minutes** | De minimis threshold — events resolving within 45 minutes do not qualify for a payout to prevent micro-claim abuse |
+| **Claims Filed After 48 Hours** | Any claim submission or trigger validation attempted more than 48 hours after the disruption event window closes |
+| **Collateral or Consequential Loss** | Any indirect loss beyond the verified income window (e.g. loss of tip income, future earning projections, reputational impact) |
+
+### Why These Exclusions Exist
+
+These exclusions serve three purposes:
+
+1. **Regulatory alignment** — IRDAI requires parametric products to define triggers and exclusions with precision. Ambiguous exclusions create claims disputes that defeat the zero-touch model.
+2. **Product integrity** — RapidCover's promise is *automatic payout for verifiable external disruptions*. Events that cannot be objectively verified via API (war, self-infliction) cannot participate in the parametric model.
+3. **Financial sustainability** — Catastrophic or correlated risks (pandemic, war) are uninsurable at the individual policy level without reinsurance treaty support. Including them would make the product non-viable.
+
+### ℹ️ What About Accidents & Health?
+
+If Manoj gets into an accident while delivering, RapidCover does not cover this. However, he is not unprotected:
+
+| Coverage Type | Product | Cost |
+|--------------|---------|------|
+| Accidental death / disability | PM Suraksha Bima Yojana | ₹20/year |
+| Life cover | PM Jeevan Jyoti Bima Yojana | ₹436/year |
+| Accident during active delivery | Zepto / Blinkit platform insurance | ₹0 (included) |
+
+RapidCover is designed to complement — not replace — these products.
 
 ---
 
@@ -408,6 +455,101 @@ Six Q-Commerce-specific attack vectors with bespoke detection:
 | Notifications | Web Push + Twilio Trial + WhatsApp mock | Lock screen + SMS + WhatsApp in 6 languages |
 | Geospatial | Turf.js + PostGIS | Zone polygon matching, GPS trajectory analysis |
 | Hosting | Railway / Render (free tier) | Zero-cost hackathon deployment |
+
+---
+
+## 📐 Actuarial Model — Financial Viability & Pricing Basis
+
+RapidCover's weekly premium is not just an ML output — it is grounded in actuarial first principles. This section documents the loss model, reserve methodology, and break-even analysis that underpin the product's financial sustainability.
+
+### Key Actuarial Assumptions
+
+| Parameter | Value | Basis |
+|-----------|-------|-------|
+| Target Loss Ratio | 58–65% | Global parametric insurance benchmark (Swiss Re, 2023) |
+| Expected disruption events per partner per year | 18–24 days | IMD event frequency analysis — top 10 Indian cities, 2019–2024 |
+| Average income lost per disruption day | ₹420–₹720 | 8–15 runs/hr × Zepto/Blinkit per-run rates × disruption duration |
+| Average claim payout per event | ₹380 | Blended across all 3 tiers and disruption types |
+| Claim frequency per active policy per week | 0.09 | ~1 claim per 11 weeks per partner at full exposure |
+| Expense ratio (ops + tech + distribution) | 22% | Estimate based on zero-CAC B2B distribution model |
+| Profit / surplus margin | 13–20% | Residual after loss ratio + expense ratio |
+
+### Weekly Premium Break-Even Analysis
+
+```
+MINIMUM VIABLE WEEKLY PREMIUM (Standard Tier — ₹59/week target):
+
+Expected Weekly Payout per Policy  = Claim Frequency × Avg Payout
+                                   = 0.09 × ₹380
+                                   = ₹34.20
+
+Required Premium (at 65% LR)       = ₹34.20 / 0.65
+                                   = ₹52.60  ← break-even floor
+
+Add expense ratio (22%)            = ₹52.60 / (1 - 0.22)
+                                   = ₹67.40  ← fully loaded cost
+
+Standard tier premium set at ₹59/week — below fully loaded cost intentionally
+during Year 1 to drive adoption. Viable at scale with B2B distribution
+eliminating marginal CAC.
+
+PRO TIER (₹89/week):
+Expected payout = 0.13 × ₹620 = ₹80.60
+Required at 65% LR = ₹124 → subsidised in Year 1 at ₹89
+Reaches sustainability at 10,000+ policies due to risk pooling.
+```
+
+### Loss Ratio Monitoring
+
+RapidCover monitors loss ratio at three levels:
+
+| Level | Frequency | Action Trigger |
+|-------|-----------|----------------|
+| Zone-level loss ratio | Weekly | LR > 80% in any zone → automatic premium repricing next Monday |
+| City-level loss ratio | Monthly | LR > 75% city-wide → reinsurance threshold review |
+| Product-level loss ratio | Quarterly | LR > 70% product-wide → IRDAI filing + pricing committee review |
+
+### Claims Reserve Methodology
+
+RapidCover maintains a rolling **Incurred But Not Reported (IBNR)** reserve using the Bornhuetter-Ferguson method adapted for parametric products:
+
+```
+Weekly Reserve Requirement = 
+  (Active Policies × Expected Claim Frequency × Avg Payout)
+  + IBNR Buffer (15% of expected weekly liability)
+  + Catastrophe Reserve (5% of gross premium collected)
+
+Example (10,000 active policies, Standard tier):
+  Base liability     = 10,000 × 0.09 × ₹380     = ₹3,42,000 / week
+  IBNR buffer (15%)  = ₹3,42,000 × 0.15          = ₹51,300
+  Cat reserve (5%)   = (10,000 × ₹59) × 0.05     = ₹29,500
+  ─────────────────────────────────────────────────────────────
+  Total weekly reserve requirement                = ₹4,22,800
+```
+
+### Correlation Risk & Catastrophe Scenario
+
+The primary risk in a Q-Commerce parametric product is **zone-level correlation** — a single flood event hitting multiple partners in the same dark store zone simultaneously.
+
+| Scenario | Affected Partners | Estimated Payout | % of Weekly Premium Pool |
+|----------|------------------|-----------------|--------------------------|
+| Single zone flood (BLR-047) | 180 partners | ₹68,400 | 11.5% (manageable) |
+| City-wide flood (all Bangalore zones) | 2,400 partners | ₹9,12,000 | 153% → **reinsurance trigger** |
+| Multi-city cyclone (Mumbai + Chennai) | 6,000 partners | ₹22,80,000 | **Requires treaty reinsurance** |
+
+**Mitigation:** RapidCover caps single-event city-level payouts at 120% of that city's weekly premium pool. Above this threshold, a proportional reduction applies — disclosed to partners at onboarding. This is standard parametric practice (Caribbean CCRIF model).
+
+### Year 1 Financial Projections (Bangalore + Mumbai + Delhi Pilot)
+
+| Quarter | Active Policies | Gross Premium | Expected Claims | Loss Ratio | Net Position |
+|---------|----------------|---------------|-----------------|------------|--------------|
+| Q1 | 5,000 | ₹76.7L | ₹49.8L | 65% | −₹16.9L (investment phase) |
+| Q2 | 12,000 | ₹1.84Cr | ₹1.10Cr | 60% | −₹8.1L |
+| Q3 | 20,000 | ₹3.07Cr | ₹1.72Cr | 56% | +₹22.3L |
+| Q4 | 25,000 | ₹3.84Cr | ₹2.11Cr | 55% | +₹48.6L |
+| **Year 1** | **25,000** | **₹9.11Cr** | **₹5.42Cr** | **59.5%** | **+₹45.9L** |
+
+> Note: Year 1 operates below break-even in Q1–Q2 intentionally — standard loss leader strategy for parametric market entry. B2B distribution via Zepto integration eliminates CAC, making this viable.
 
 ---
 
