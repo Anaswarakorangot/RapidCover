@@ -11,6 +11,15 @@ import api from '../services/api';
 import { useAuth } from './AuthContext';
 import { NotificationContext } from './NotificationContextValue';
 
+// Map notification types → correct frontend routes
+const NOTIFICATION_ROUTES = {
+  claim_created: '/claims',
+  claim_approved: '/claims',
+  claim_paid: '/claims',
+  claim_rejected: '/claims',
+  trigger_alert: '/',
+};
+
 export function NotificationProvider({ children }) {
   const { isAuthenticated, user } = useAuth();
   const [isSupported, setIsSupported] = useState(false);
@@ -64,25 +73,33 @@ export function NotificationProvider({ children }) {
         setLoading(false);
       }
     };
-
     init();
   }, [syncNotificationState, user?.id]);
 
+  // Listen for SW messages → navigate to the correct route on notification click
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleMessage = (event) => {
+      if (event.data?.type === 'NOTIFICATION_CLICK') {
+        const { notificationType, url } = event.data;
+        const route = NOTIFICATION_ROUTES[notificationType] || url || '/';
+        window.location.href = route;
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleMessage);
+  }, []);
+
   const enableNotifications = useCallback(async () => {
-    if (!isSupported) {
-      throw new Error('Push notifications not supported');
-    }
+    if (!isSupported) throw new Error('Push notifications not supported');
 
     setLoading(true);
     try {
       const subscriptionData = await subscribeToPush();
       setPermission(getPermissionState());
-
-      // Send subscription to backend
-      if (isAuthenticated) {
-        await api.subscribePush(subscriptionData);
-      }
-
+      if (isAuthenticated) await api.subscribePush(subscriptionData);
       await syncNotificationState();
       return true;
     } catch (error) {
@@ -98,13 +115,7 @@ export function NotificationProvider({ children }) {
     try {
       const currentSubscription = await getCurrentSubscription();
       const endpoint = currentSubscription?.endpoint || null;
-
-      // Unsubscribe from backend for this device
-      if (isAuthenticated) {
-        await api.unsubscribePush(endpoint);
-      }
-
-      // Unsubscribe from browser
+      if (isAuthenticated) await api.unsubscribePush(endpoint);
       await unsubscribeFromPush();
       await syncNotificationState();
       return true;
@@ -113,14 +124,7 @@ export function NotificationProvider({ children }) {
     }
   }, [isAuthenticated, syncNotificationState]);
 
-  const value = {
-    isSupported,
-    permission,
-    isSubscribed,
-    loading,
-    enableNotifications,
-    disableNotifications,
-  };
+  const value = { isSupported, permission, isSubscribed, loading, enableNotifications, disableNotifications };
 
   return (
     <NotificationContext.Provider value={value}>
