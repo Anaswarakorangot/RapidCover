@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   isPushSupported,
   getPermissionState,
@@ -10,6 +11,26 @@ import {
 import api from '../services/api';
 import { useAuth } from './AuthContext';
 import { NotificationContext } from './NotificationContextValue';
+
+// Map notification types to correct frontend routes
+const NOTIFICATION_ROUTES = {
+  claim_created: '/claims',
+  claim_approved: '/claims',
+  claim_paid: '/claims',
+  claim_rejected: '/claims',
+  trigger_alert: '/',
+  default: '/',
+};
+
+function getRouteForNotification(type, claimId) {
+  const base = NOTIFICATION_ROUTES[type] || NOTIFICATION_ROUTES.default;
+  // If we have a specific claim ID, route to claims page
+  // (detail modal will be opened by the user from there)
+  if (claimId && base === '/claims') {
+    return `/claims`;
+  }
+  return base;
+}
 
 export function NotificationProvider({ children }) {
   const { isAuthenticated, user } = useAuth();
@@ -64,9 +85,27 @@ export function NotificationProvider({ children }) {
         setLoading(false);
       }
     };
-
     init();
   }, [syncNotificationState, user?.id]);
+
+  // Listen for service worker messages to handle notification clicks with routing
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleMessage = (event) => {
+      if (event.data?.type === 'NOTIFICATION_CLICK') {
+        const { notificationType, claimId, url } = event.data;
+        const route = notificationType
+          ? getRouteForNotification(notificationType, claimId)
+          : url || '/';
+        // Use window.location for SW message-driven navigation (outside React Router context)
+        window.location.href = route;
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleMessage);
+  }, []);
 
   const enableNotifications = useCallback(async () => {
     if (!isSupported) {
@@ -78,7 +117,6 @@ export function NotificationProvider({ children }) {
       const subscriptionData = await subscribeToPush();
       setPermission(getPermissionState());
 
-      // Send subscription to backend
       if (isAuthenticated) {
         await api.subscribePush(subscriptionData);
       }
@@ -99,12 +137,10 @@ export function NotificationProvider({ children }) {
       const currentSubscription = await getCurrentSubscription();
       const endpoint = currentSubscription?.endpoint || null;
 
-      // Unsubscribe from backend for this device
       if (isAuthenticated) {
         await api.unsubscribePush(endpoint);
       }
 
-      // Unsubscribe from browser
       await unsubscribeFromPush();
       await syncNotificationState();
       return true;

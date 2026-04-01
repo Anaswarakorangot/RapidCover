@@ -1,16 +1,46 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import json
 
 from app.database import get_db
 from app.models.partner import Partner
 from app.models.policy import Policy
 from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent
-from app.schemas.claim import ClaimResponse, ClaimListResponse, ClaimSummary
+from app.schemas.claim import ClaimResponse, ClaimListResponse, ClaimSummary, PayoutMetadata
 from app.services.auth import get_current_partner
+from app.services.payout_service import process_payout, get_transaction_log
 
 router = APIRouter(prefix="/claims", tags=["claims"])
+
+
+def _build_claim_response(claim: Claim, trigger: TriggerEvent | None) -> ClaimResponse:
+    """Build a ClaimResponse with payout metadata extracted from validation_data."""
+    payout_metadata = None
+    if claim.validation_data:
+        try:
+            vd = json.loads(claim.validation_data)
+            pc = vd.get("payout_calculation")
+            if pc:
+                payout_metadata = PayoutMetadata(**{k: pc.get(k) for k in PayoutMetadata.model_fields})
+        except Exception:
+            pass
+
+    return ClaimResponse(
+        id=claim.id,
+        policy_id=claim.policy_id,
+        trigger_event_id=claim.trigger_event_id,
+        amount=claim.amount,
+        status=claim.status,
+        fraud_score=claim.fraud_score,
+        upi_ref=claim.upi_ref,
+        created_at=claim.created_at,
+        paid_at=claim.paid_at,
+        trigger_type=trigger.trigger_type if trigger else None,
+        trigger_started_at=trigger.started_at if trigger else None,
+        payout_metadata=payout_metadata,
+    )
 
 
 @router.get("", response_model=ClaimListResponse)
@@ -51,20 +81,7 @@ def get_claims(
     claim_responses = []
     for claim in claims:
         trigger = db.query(TriggerEvent).filter(TriggerEvent.id == claim.trigger_event_id).first()
-        claim_response = ClaimResponse(
-            id=claim.id,
-            policy_id=claim.policy_id,
-            trigger_event_id=claim.trigger_event_id,
-            amount=claim.amount,
-            status=claim.status,
-            fraud_score=claim.fraud_score,
-            upi_ref=claim.upi_ref,
-            created_at=claim.created_at,
-            paid_at=claim.paid_at,
-            trigger_type=trigger.trigger_type if trigger else None,
-            trigger_started_at=trigger.started_at if trigger else None,
-        )
-        claim_responses.append(claim_response)
+        claim_responses.append(_build_claim_response(claim, trigger))
 
     return ClaimListResponse(
         claims=claim_responses,
@@ -155,16 +172,38 @@ def get_claim(
 
     trigger = db.query(TriggerEvent).filter(TriggerEvent.id == claim.trigger_event_id).first()
 
-    return ClaimResponse(
-        id=claim.id,
-        policy_id=claim.policy_id,
-        trigger_event_id=claim.trigger_event_id,
-        amount=claim.amount,
-        status=claim.status,
-        fraud_score=claim.fraud_score,
-        upi_ref=claim.upi_ref,
-        created_at=claim.created_at,
-        paid_at=claim.paid_at,
-        trigger_type=trigger.trigger_type if trigger else None,
-        trigger_started_at=trigger.started_at if trigger else None,
+    return _build_claim_response(claim, trigger)
+
+
+@router.get("/{claim_id}/transaction")
+def get_claim_transaction(
+    claim_id: int,
+    partner: Partner = Depends(get_current_partner),
+    db: Session = Depends(get_db),
+):
+    """Get the transaction log for a paid claim."""
+    policy_ids = [p.id for p in db.query(Policy).filter(Policy.partner_id == partner.id).all()]
+
+    claim = (
+        db.query(Claim)
+        .filter(
+            Claim.id == claim_id,
+            Claim.policy_id.in_(policy_ids),
+        )
+        .first()
     )
+
+    if not claim:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Claim not found",
+        )
+
+    log = get_transaction_log(claim)
+    if not log:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transaction log not available for this claim",
+        )
+
+    return {"claim_id": claim_id, "transaction_log": log}

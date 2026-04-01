@@ -5,6 +5,19 @@ from app.models.claim import ClaimStatus
 from app.models.trigger_event import TriggerType
 
 
+class PayoutMetadata(BaseModel):
+    """Structured payout calculation details."""
+    disruption_hours: Optional[float] = None
+    hourly_rate: Optional[float] = None
+    severity: Optional[int] = None
+    severity_multiplier: Optional[float] = None
+    base_payout: Optional[float] = None
+    adjusted_payout: Optional[float] = None
+    final_payout: Optional[float] = None
+    trigger_type: Optional[str] = None
+    zone_id: Optional[int] = None
+
+
 class ClaimResponse(BaseModel):
     id: int
     policy_id: int
@@ -19,6 +32,9 @@ class ClaimResponse(BaseModel):
     # Nested trigger event info
     trigger_type: Optional[TriggerType] = None
     trigger_started_at: Optional[datetime] = None
+
+    # Payout metadata (populated when available)
+    payout_metadata: Optional[PayoutMetadata] = None
 
     model_config = {"from_attributes": True}
 

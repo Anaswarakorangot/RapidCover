@@ -38,11 +38,9 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests
   if (request.method !== 'GET') return;
 
-  // In local dev, avoid serving cached Vite assets. Otherwise stale modules can
-  // blank the app after file moves/renames until the cache is manually cleared.
+  // In local dev, avoid serving cached Vite assets
   if (self.location.hostname === 'localhost' && self.location.port === '5173') {
     event.respondWith(fetch(request));
     return;
@@ -53,7 +51,6 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Clone and cache successful responses
           if (response.ok) {
             const responseClone = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
@@ -62,10 +59,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => {
-          // Fallback to cache if network fails
-          return caches.match(request);
-        })
+        .catch(() => caches.match(request))
     );
     return;
   }
@@ -74,7 +68,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) {
-        // Return cached, but also update cache in background
         fetch(request).then((response) => {
           if (response.ok) {
             caches.open(CACHE_NAME).then((cache) => {
@@ -134,24 +127,44 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Notification click event
+// Notification click event - correct routing based on notification type
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const url = event.notification.data?.url || '/';
+  const notificationData = event.notification.data || {};
+  const notificationType = notificationData.type;
+  const claimId = notificationData.claim_id;
+
+  // Determine the correct route based on notification type
+  const ROUTE_MAP = {
+    claim_created: '/claims',
+    claim_approved: '/claims',
+    claim_paid: '/claims',
+    claim_rejected: '/claims',
+    trigger_alert: '/',
+  };
+
+  const targetRoute = ROUTE_MAP[notificationType] || notificationData.url || '/';
+  const targetUrl = self.location.origin + targetRoute;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Check if there's already a window open
+      // Try to find an existing open window and navigate it
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.navigate(url);
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          // Post message to app for in-app navigation (React Router)
+          client.postMessage({
+            type: 'NOTIFICATION_CLICK',
+            notificationType,
+            claimId,
+            url: targetRoute,
+          });
           return client.focus();
         }
       }
-      // Open new window if none found
+      // No window open - open a new one
       if (clients.openWindow) {
-        return clients.openWindow(url);
+        return clients.openWindow(targetUrl);
       }
     })
   );

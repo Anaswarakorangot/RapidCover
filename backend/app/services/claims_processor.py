@@ -27,6 +27,7 @@ from app.services.notifications import (
     notify_claim_paid,
     notify_claim_rejected,
 )
+from app.services.payout_service import process_payout, generate_upi_ref
 from app.config import get_settings
 
 
@@ -213,14 +214,29 @@ def process_trigger_event(
         else:
             status = ClaimStatus.PENDING
 
-        # Build validation data
+        # Build validation data with rich payout metadata
         validation_data = {
             "fraud_analysis": fraud_result,
             "daily_limit_check": {"within_limit": within_daily, "remaining": daily_remaining},
             "payout_calculation": {
                 "disruption_hours": disruption_hours or DEFAULT_DISRUPTION_HOURS,
                 "hourly_rate": HOURLY_PAYOUT_RATES.get(trigger_event.trigger_type, 50),
-                "severity_multiplier": 1.0 + (trigger_event.severity - 1) * 0.125,
+                "severity": trigger_event.severity,
+                "severity_multiplier": round(1.0 + (trigger_event.severity - 1) * 0.125, 3),
+                "base_payout": round(
+                    HOURLY_PAYOUT_RATES.get(trigger_event.trigger_type, 50)
+                    * (disruption_hours or DEFAULT_DISRUPTION_HOURS),
+                    2,
+                ),
+                "adjusted_payout": round(
+                    HOURLY_PAYOUT_RATES.get(trigger_event.trigger_type, 50)
+                    * (disruption_hours or DEFAULT_DISRUPTION_HOURS)
+                    * (1.0 + (trigger_event.severity - 1) * 0.125),
+                    2,
+                ),
+                "final_payout": payout,
+                "trigger_type": trigger_event.trigger_type.value,
+                "zone_id": zone_id,
             },
             "processed_at": datetime.utcnow().isoformat(),
         }
@@ -235,14 +251,34 @@ def process_trigger_event(
             validation_data=json.dumps(validation_data),
         )
 
-        # Auto-payout for demo mode: immediately pay approved claims
+        # Auto-payout for demo mode: use payout_service for structured payout
         settings = get_settings()
         if settings.auto_payout_enabled and claim.status == ClaimStatus.APPROVED:
+            db.add(claim)
+            db.flush()  # Get claim.id before calling payout_service
+            upi_ref = generate_upi_ref(policy.id, claim.id)
             claim.status = ClaimStatus.PAID
-            claim.upi_ref = f"RAPID{policy.id:06d}{int(datetime.utcnow().timestamp())}"
+            claim.upi_ref = upi_ref
             claim.paid_at = datetime.utcnow()
-
-        db.add(claim)
+            # Merge transaction log into validation_data
+            import json as _json
+            vd = _json.loads(claim.validation_data)
+            vd["transaction_log"] = {
+                "ref": upi_ref,
+                "channel": "UPI",
+                "provider": "RapidCover",
+                "amount": claim.amount,
+                "currency": "INR",
+                "status": "SUCCESS",
+                "initiated_at": datetime.utcnow().isoformat(),
+                "completed_at": datetime.utcnow().isoformat(),
+                "auto_payout": True,
+            }
+            vd["payout_status"] = "SUCCESS"
+            vd["paid_at"] = datetime.utcnow().isoformat()
+            claim.validation_data = _json.dumps(vd)
+        else:
+            db.add(claim)
         created_claims.append(claim)
 
     if created_claims:
