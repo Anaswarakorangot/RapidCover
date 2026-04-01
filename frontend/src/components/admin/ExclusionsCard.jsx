@@ -1,13 +1,13 @@
 export default function ExclusionsCard() {
   const exclusions = [
-    { icon: '⚔️', label: 'War & armed conflict', detail: 'Permanently excluded' },
-    { icon: '🦠', label: 'Pandemic / epidemic declarations', detail: 'Government-declared only' },
-    { icon: '☢️', label: 'Nuclear / radioactive events', detail: 'Permanently excluded' },
-    { icon: '⏱️', label: 'Events under 45 minutes', detail: 'De minimis threshold' },
-    { icon: '⚙️', label: 'Platform operational decisions', detail: 'Scheduled maintenance, algorithm changes' },
-    { icon: '🚷', label: 'Self-inflicted loss', detail: 'Voluntary offline by worker' },
-    { icon: '🏥', label: 'Health / accident / life', detail: 'Strictly out of scope' },
-    { icon: '🚗', label: 'Vehicle damage', detail: 'Not covered under parametric model' },
+    { icon: '⚔️', label: 'War & armed conflict', detail: 'Permanently excluded', attempted: 0 },
+    { icon: '🦠', label: 'Pandemic / epidemic declarations', detail: 'Government-declared only', attempted: 0 },
+    { icon: '☢️', label: 'Nuclear / radioactive events', detail: 'Permanently excluded', attempted: 0 },
+    { icon: '⏱️', label: 'Events under 45 minutes', detail: 'De minimis threshold', attempted: 3 },
+    { icon: '⚙️', label: 'Platform operational decisions', detail: 'Scheduled maintenance, algorithm changes', attempted: 1 },
+    { icon: '🚷', label: 'Self-inflicted loss', detail: 'Voluntary offline by worker', attempted: 0 },
+    { icon: '🏥', label: 'Health / accident / life', detail: 'Strictly out of scope', attempted: 0 },
+    { icon: '🚗', label: 'Vehicle damage', detail: 'Not covered under parametric model', attempted: 0 },
   ];
 
   return (
@@ -23,6 +23,9 @@ export default function ExclusionsCard() {
               <span className="exclusion-label">{e.label}</span>
               <span className="exclusion-detail">{e.detail}</span>
             </div>
+            <span className={`exclusion-attempted ${e.attempted > 0 ? 'exclusion-attempted--active' : ''}`}>
+              {e.attempted} blocked
+            </span>
           </div>
         ))}
       </div>
