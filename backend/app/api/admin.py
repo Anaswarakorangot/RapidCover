@@ -528,6 +528,36 @@ def clear_zone_conditions(zone_id: int, db: Session = Depends(get_db)):
     }
 
 
+# Auto-renewal endpoint
+@router.post("/process-auto-renewals")
+def process_auto_renewals_endpoint(db: Session = Depends(get_db)):
+    """
+    Process auto-renewals for all eligible policies.
+
+    Finds policies where:
+    - auto_renew = True
+    - Expiring within 24 hours OR in grace period
+    - Not already renewed
+
+    Creates new renewal policies with 5% loyalty discount.
+    In production, this would run as a scheduled job (e.g., hourly).
+    """
+    from app.services.policy_lifecycle import process_auto_renewals
+
+    results = process_auto_renewals(db)
+
+    renewed_count = sum(1 for r in results if r.get("status") == "renewed")
+    failed_count = sum(1 for r in results if r.get("status") == "failed")
+
+    return {
+        "message": f"Auto-renewal processing complete",
+        "total_processed": len(results),
+        "renewed": renewed_count,
+        "failed": failed_count,
+        "details": results,
+    }
+
+
 @router.post("/simulate/reset")
 def reset_all_simulations():
     """Reset all simulated conditions across all zones."""

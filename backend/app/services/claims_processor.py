@@ -27,6 +27,7 @@ from app.services.notifications import (
     notify_claim_paid,
     notify_claim_rejected,
 )
+from app.services.payout_service import generate_upi_ref
 from app.config import get_settings
 
 
@@ -149,9 +150,17 @@ def get_eligible_policies(zone_id: int, db: Session) -> list[tuple[Policy, Partn
     """
     Get all active policies for partners in a zone.
 
+    Includes policies that are:
+    - Currently active (not expired)
+    - Within the 48-hour grace period (expired but within grace window)
+
     Returns list of (Policy, Partner) tuples.
     """
     now = datetime.utcnow()
+
+    # Grace period is 48 hours after expiry
+    GRACE_PERIOD_HOURS = 48
+    grace_cutoff = now - timedelta(hours=GRACE_PERIOD_HOURS)
 
     results = (
         db.query(Policy, Partner)
@@ -161,7 +170,8 @@ def get_eligible_policies(zone_id: int, db: Session) -> list[tuple[Policy, Partn
             Partner.is_active == True,
             Policy.is_active == True,
             Policy.starts_at <= now,
-            Policy.expires_at > now,
+            # Include policies in grace period (expired within last 48 hours)
+            Policy.expires_at > grace_cutoff,
         )
         .all()
     )
@@ -213,14 +223,23 @@ def process_trigger_event(
         else:
             status = ClaimStatus.PENDING
 
-        # Build validation data
+        # Build validation data with rich payout metadata
+        _hours = disruption_hours or DEFAULT_DISRUPTION_HOURS
+        _rate = HOURLY_PAYOUT_RATES.get(trigger_event.trigger_type, 50)
+        _sev_mult = round(1.0 + (trigger_event.severity - 1) * 0.125, 3)
         validation_data = {
             "fraud_analysis": fraud_result,
             "daily_limit_check": {"within_limit": within_daily, "remaining": daily_remaining},
             "payout_calculation": {
-                "disruption_hours": disruption_hours or DEFAULT_DISRUPTION_HOURS,
-                "hourly_rate": HOURLY_PAYOUT_RATES.get(trigger_event.trigger_type, 50),
-                "severity_multiplier": 1.0 + (trigger_event.severity - 1) * 0.125,
+                "disruption_hours": _hours,
+                "hourly_rate": _rate,
+                "severity": trigger_event.severity,
+                "severity_multiplier": _sev_mult,
+                "base_payout": round(_rate * _hours, 2),
+                "adjusted_payout": round(_rate * _hours * _sev_mult, 2),
+                "final_payout": payout,
+                "trigger_type": trigger_event.trigger_type.value,
+                "zone_id": zone_id,
             },
             "processed_at": datetime.utcnow().isoformat(),
         }
@@ -235,12 +254,28 @@ def process_trigger_event(
             validation_data=json.dumps(validation_data),
         )
 
-        # Auto-payout for demo mode: immediately pay approved claims
+        # Auto-payout for demo mode: use payout_service for structured UPI ref + transaction log
         settings = get_settings()
         if settings.auto_payout_enabled and claim.status == ClaimStatus.APPROVED:
+            upi_ref = generate_upi_ref(policy.id, 0)  # claim.id not yet assigned; will be updated after flush
+            vd = json.loads(claim.validation_data)
+            vd["transaction_log"] = {
+                "ref": upi_ref,
+                "channel": "UPI",
+                "provider": "RapidCover",
+                "amount": claim.amount,
+                "currency": "INR",
+                "status": "SUCCESS",
+                "initiated_at": datetime.utcnow().isoformat(),
+                "completed_at": datetime.utcnow().isoformat(),
+                "auto_payout": True,
+            }
+            vd["payout_status"] = "SUCCESS"
+            vd["paid_at"] = datetime.utcnow().isoformat()
             claim.status = ClaimStatus.PAID
-            claim.upi_ref = f"RAPID{policy.id:06d}{int(datetime.utcnow().timestamp())}"
+            claim.upi_ref = upi_ref
             claim.paid_at = datetime.utcnow()
+            claim.validation_data = json.dumps(vd)
 
         db.add(claim)
         created_claims.append(claim)

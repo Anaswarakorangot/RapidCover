@@ -1,158 +1,111 @@
 // RapidCover Service Worker
-// Handles caching and push notifications
 
 const CACHE_NAME = 'rapidcover-v2';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/icon-192.png',
-  '/icon-512.png',
-];
+const STATIC_ASSETS = ['/', '/index.html', '/icon-192.png', '/icon-512.png'];
 
-// Install event - cache static assets
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)));
   self.skipWaiting();
 });
 
-// Activate event - clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
-      );
-    })
+    caches.keys().then(names =>
+      Promise.all(names.filter(n => n !== CACHE_NAME).map(n => caches.delete(n)))
+    )
   );
   self.clients.claim();
 });
 
-// Fetch event - network first for API, cache first for assets
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
-
-  // Skip non-GET requests
   if (request.method !== 'GET') return;
 
-  // In local dev, avoid serving cached Vite assets. Otherwise stale modules can
-  // blank the app after file moves/renames until the cache is manually cleared.
   if (self.location.hostname === 'localhost' && self.location.port === '5173') {
     event.respondWith(fetch(request));
     return;
   }
 
-  // API requests: network first
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Clone and cache successful responses
-          if (response.ok) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          // Fallback to cache if network fails
-          return caches.match(request);
-        })
+      fetch(request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(request))
     );
     return;
   }
 
-  // Static assets: cache first
   event.respondWith(
-    caches.match(request).then((cached) => {
+    caches.match(request).then(cached => {
       if (cached) {
-        // Return cached, but also update cache in background
-        fetch(request).then((response) => {
-          if (response.ok) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, response);
-            });
-          }
+        fetch(request).then(res => {
+          if (res.ok) caches.open(CACHE_NAME).then(c => c.put(request, res));
         });
         return cached;
       }
-      return fetch(request).then((response) => {
-        if (response.ok) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
+      return fetch(request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(request, clone));
         }
-        return response;
+        return res;
       });
     })
   );
 });
 
-// Push notification event
+// Push event
 self.addEventListener('push', (event) => {
-  if (!event.data) {
-    console.log('Push event with no data');
-    return;
-  }
-
+  if (!event.data) return;
   let data;
-  try {
-    data = event.data.json();
-  } catch (e) {
-    data = {
-      title: 'RapidCover',
-      body: event.data.text(),
-      icon: '/icon-192.png',
-    };
-  }
-
-  const options = {
-    body: data.body || '',
-    icon: data.icon || '/icon-192.png',
-    badge: '/icon-192.png',
-    vibrate: [100, 50, 100],
-    data: {
-      url: data.url || '/',
-      claim_id: data.claim_id,
-      type: data.type,
-    },
-    tag: data.tag || 'rapidcover-notification',
-    renotify: true,
-  };
+  try { data = event.data.json(); }
+  catch (e) { data = { title: 'RapidCover', body: event.data.text(), icon: '/icon-192.png' }; }
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'RapidCover', options)
+    self.registration.showNotification(data.title || 'RapidCover', {
+      body: data.body || '',
+      icon: data.icon || '/icon-192.png',
+      badge: '/icon-192.png',
+      vibrate: [100, 50, 100],
+      data: { url: data.url || '/', claim_id: data.claim_id, type: data.type },
+      tag: data.tag || 'rapidcover-notification',
+      renotify: true,
+    })
   );
 });
 
-// Notification click event
+// Notification click — route correctly based on type, message open app window
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const url = event.notification.data?.url || '/';
+  const ROUTE_MAP = {
+    claim_created: '/claims',
+    claim_approved: '/claims',
+    claim_paid: '/claims',
+    claim_rejected: '/claims',
+    trigger_alert: '/',
+  };
+
+  const notifData = event.notification.data || {};
+  const notificationType = notifData.type;
+  const targetRoute = ROUTE_MAP[notificationType] || notifData.url || '/';
+  const targetUrl = self.location.origin + targetRoute;
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Check if there's already a window open
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.navigate(url);
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          // Tell the React app to navigate via React Router
+          client.postMessage({ type: 'NOTIFICATION_CLICK', notificationType, url: targetRoute });
           return client.focus();
         }
       }
-      // Open new window if none found
-      if (clients.openWindow) {
-        return clients.openWindow(url);
-      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
     })
   );
 });

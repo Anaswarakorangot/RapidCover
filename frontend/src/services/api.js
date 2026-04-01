@@ -125,6 +125,62 @@ class ApiService {
     });
   }
 
+  async getRenewalQuote(policyId, tier = null) {
+    const query = tier ? `?tier=${encodeURIComponent(tier)}` : '';
+    return this.request(`/policies/${policyId}/renewal-quote${query}`);
+  }
+
+  async renewPolicy(policyId, tier = null, autoRenew = true) {
+    return this.request(`/policies/${policyId}/renew`, {
+      method: 'POST',
+      body: { tier, auto_renew: autoRenew },
+    });
+  }
+
+  async toggleAutoRenew(policyId, autoRenew) {
+    return this.request(`/policies/${policyId}/auto-renew`, {
+      method: 'PATCH',
+      body: { auto_renew: autoRenew },
+    });
+  }
+
+  async downloadCertificate(policyId) {
+    const url = `${this.baseUrl}/policies/${policyId}/certificate`;
+    const token = this.getToken();
+
+    const response = await fetch(url, {
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Failed to download certificate');
+    }
+
+    // Get filename from Content-Disposition header
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = 'policy_certificate.pdf';
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="(.+)"/);
+      if (match) {
+        filename = match[1];
+      }
+    }
+
+    // Download the blob
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  }
+
   // Claims
   async getClaims(page = 1, pageSize = 10) {
     return this.request(`/claims?page=${page}&page_size=${pageSize}`);
@@ -222,6 +278,10 @@ class ApiService {
 
   async payoutClaim(claimId) {
     return this.request(`/admin/claims/${claimId}/payout`, { method: 'POST' });
+  }
+
+  async processAutoRenewals() {
+    return this.request('/admin/process-auto-renewals', { method: 'POST' });
   }
 
   // Push Notifications

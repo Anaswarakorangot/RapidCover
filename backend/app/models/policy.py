@@ -11,6 +11,13 @@ class PolicyTier(str, enum.Enum):
     PRO = "pro"
 
 
+class PolicyStatus(str, enum.Enum):
+    ACTIVE = "active"
+    GRACE_PERIOD = "grace_period"
+    LAPSED = "lapsed"
+    CANCELLED = "cancelled"
+
+
 # Tier configuration
 TIER_CONFIG = {
     PolicyTier.FLEX: {
@@ -50,9 +57,17 @@ class Policy(Base):
     is_active = Column(Boolean, default=True)
     auto_renew = Column(Boolean, default=True)
 
+    # Policy lifecycle status
+    status = Column(Enum(PolicyStatus), default=PolicyStatus.ACTIVE)
+    grace_ends_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Renewal chain tracking
+    renewed_from_id = Column(Integer, ForeignKey("policies.id"), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     partner = relationship("Partner", back_populates="policies")
     claims = relationship("Claim", back_populates="policy")
+    renewed_from = relationship("Policy", remote_side="Policy.id", backref="renewed_to")
