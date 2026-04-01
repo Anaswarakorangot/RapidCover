@@ -75,6 +75,71 @@ const styles = `
     box-shadow: 0 4px 32px rgba(0,0,0,0.08);
   }
 
+  /* ── Step Progress ── */
+  .reg-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 24px;
+  }
+
+  .reg-step-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Nunito', sans-serif;
+    font-size: 12px;
+    font-weight: 800;
+    border: 2px solid var(--border);
+    background: var(--gray-bg);
+    color: var(--text-light);
+    flex-shrink: 0;
+    transition: all 0.25s ease;
+  }
+
+  .reg-step-dot.active {
+    background: var(--green-primary);
+    border-color: var(--green-primary);
+    color: var(--white);
+    box-shadow: 0 3px 10px rgba(61,184,92,0.4);
+  }
+
+  .reg-step-dot.done {
+    background: var(--green-light);
+    border-color: var(--green-primary);
+    color: var(--green-dark);
+  }
+
+  .reg-step-line {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    margin: 0 4px;
+    transition: background 0.25s ease;
+  }
+
+  .reg-step-line.done { background: var(--green-primary); }
+
+  .reg-step-label {
+    font-size: 10px;
+    color: var(--text-light);
+    text-align: center;
+    margin-bottom: 18px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+
+  .reg-step-label span {
+    color: var(--green-primary);
+  }
+
+  /* ── Existing styles ── */
   .reg-title {
     font-family: 'Nunito', sans-serif;
     font-weight: 900;
@@ -229,6 +294,46 @@ const styles = `
   .reg-btn:active { transform: scale(0.97); }
   .reg-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
+  .reg-btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .reg-btn-back {
+    flex: 1;
+    padding: 16px;
+    background: var(--gray-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    color: var(--text-mid);
+    font-family: 'Nunito', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .reg-btn-back:hover { background: var(--border); }
+
+  .reg-btn-next {
+    flex: 2;
+    padding: 16px;
+    background: var(--green-primary);
+    border: none;
+    border-radius: 16px;
+    color: var(--white);
+    font-family: 'Nunito', sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(61,184,92,0.35);
+    transition: transform 0.15s ease, opacity 0.15s;
+  }
+
+  .reg-btn-next:active { transform: scale(0.97); }
+  .reg-btn-next:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
   .reg-btn .spinner {
     display: inline-block;
     width: 16px;
@@ -266,6 +371,125 @@ const styles = `
     text-decoration: none;
     font-family: 'Nunito', sans-serif;
   }
+
+  /* ── KYC Step ── */
+  .reg-kyc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff8e1;
+    border: 1.5px solid #f6cc3c;
+    border-radius: 10px;
+    padding: 7px 12px;
+    font-size: 12px;
+    color: #92610a;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    margin-bottom: 18px;
+  }
+
+  .reg-file-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 13px 16px;
+    border: 1.5px dashed var(--border);
+    border-radius: 14px;
+    background: var(--gray-bg);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-mid);
+    font-family: 'DM Sans', sans-serif;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .reg-file-label:hover {
+    border-color: var(--green-primary);
+    background: var(--green-light);
+    color: var(--green-dark);
+  }
+
+  .reg-file-label.has-file {
+    border-color: var(--green-primary);
+    background: var(--green-light);
+    color: var(--green-dark);
+  }
+
+  .reg-file-input { display: none; }
+
+  /* ── UPI Step ── */
+  .reg-upi-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--green-light);
+    border: 1.5px solid #b6dfc0;
+    border-radius: 10px;
+    padding: 7px 12px;
+    font-size: 12px;
+    color: var(--green-dark);
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    margin-bottom: 18px;
+  }
+
+  /* ── Review Step ── */
+  .reg-review-section {
+    background: var(--gray-bg);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+
+  .reg-review-section-title {
+    font-family: 'Nunito', sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 10px;
+  }
+
+  .reg-review-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .reg-review-row:last-child { border-bottom: none; }
+
+  .reg-review-key {
+    color: var(--text-light);
+    font-size: 12px;
+  }
+
+  .reg-review-val {
+    color: var(--text-dark);
+    font-weight: 600;
+    font-family: 'Nunito', sans-serif;
+    text-align: right;
+    max-width: 60%;
+    word-break: break-all;
+  }
+
+  .reg-review-val.missing {
+    color: var(--text-light);
+    font-weight: 400;
+    font-style: italic;
+  }
+
+  .reg-review-val.badge {
+    background: var(--green-light);
+    color: var(--green-dark);
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 11px;
+  }
 `;
 
 const PLATFORMS = [
@@ -273,12 +497,42 @@ const PLATFORMS = [
   { value: 'blinkit', label: 'Blinkit' },
 ];
 
+const STEPS = [
+  { id: 'basic', label: 'Basic Info' },
+  { id: 'kyc', label: 'KYC' },
+  { id: 'upi', label: 'UPI' },
+  { id: 'review', label: 'Review' },
+];
+
+// ─── UPI Validator ───────────────────────────────────────────
+function validateUPI(upi) {
+  return /^[\w.\-]{3,}@[\w]{3,}$/.test(upi.trim());
+}
+
+// ─── Aadhaar Validator (mock: 12 digits) ─────────────────────
+function validateAadhaar(val) {
+  return /^\d{12}$/.test(val.replace(/\s/g, ''));
+}
+
+// ─── PAN Validator (standard format) ─────────────────────────
+function validatePAN(val) {
+  return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val.trim().toUpperCase());
+}
+
 export function Register() {
   const navigate = useNavigate();
 
+  const [step, setStep] = useState(0); // 0=basic, 1=kyc, 2=upi, 3=review
+
   const [formData, setFormData] = useState({
+    // Basic
     phone: '', name: '', platform: 'zepto', partner_id: '', zone_id: '',
+    // KYC
+    aadhaarNumber: '', panNumber: '', aadhaarFile: null,
+    // UPI
+    upiId: '',
   });
+
   const [zones, setZones] = useState([]);
   const [zonesLoading, setZonesLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -336,8 +590,12 @@ export function Register() {
   }
 
   function handleChange(e) {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    const { name, value, files } = e.target;
+    if (name === 'aadhaarFile') {
+      setFormData((prev) => ({ ...prev, aadhaarFile: files[0] || null }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
     if (name === 'platform') { setPartnerIdStatus('idle'); setPartnerIdMessage(''); }
   }
 
@@ -350,22 +608,60 @@ export function Register() {
       const result = await api.validatePartnerId(partnerId, formData.platform);
       setPartnerIdStatus(result.valid ? 'valid' : 'invalid');
       setPartnerIdMessage(result.message);
-    } catch (err) {
+    } catch {
       setPartnerIdStatus('invalid');
       setPartnerIdMessage('Unable to verify partner ID');
     }
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  // ── Step navigation ──────────────────────────────────────────
+  function canProceedFromBasic() {
+    return formData.name.trim() && formData.phone.trim();
+  }
+
+  function canProceedFromKyc() {
+    // KYC is optional (mock) — allow skip, but validate if filled
+    const aadhaarFilled = formData.aadhaarNumber.trim();
+    const panFilled = formData.panNumber.trim();
+    if (aadhaarFilled && !validateAadhaar(aadhaarFilled)) return false;
+    if (panFilled && !validatePAN(panFilled)) return false;
+    return true;
+  }
+
+  function canProceedFromUpi() {
+    // UPI is optional — allow skip, but validate if filled
+    if (!formData.upiId.trim()) return true;
+    return validateUPI(formData.upiId);
+  }
+
+  function goNext() {
+    setError('');
+    setStep((s) => s + 1);
+  }
+
+  function goBack() {
+    setError('');
+    setStep((s) => s - 1);
+  }
+
+  async function handleSubmit() {
     setError('');
     setLoading(true);
     try {
       const cleanData = {
-        ...formData,
         phone: formData.phone.replace(/\s/g, ''),
+        name: formData.name.trim(),
+        platform: formData.platform,
         partner_id: formData.partner_id.trim() || null,
         zone_id: formData.zone_id ? parseInt(formData.zone_id, 10) : null,
+        // KYC (mock fields — send as strings)
+        kyc: {
+          aadhaar_number: formData.aadhaarNumber.replace(/\s/g, '') || null,
+          pan_number: formData.panNumber.trim().toUpperCase() || null,
+          kyc_status: formData.aadhaarNumber ? 'pending' : 'skipped',
+        },
+        // UPI
+        upi_id: formData.upiId.trim() || null,
       };
       await api.register(cleanData);
       navigate('/login');
@@ -377,8 +673,392 @@ export function Register() {
     }
   }
 
+  // ── Derived UI ───────────────────────────────────────────────
   const pidInputClass = `reg-input${partnerIdStatus === 'valid' ? ' valid' : partnerIdStatus === 'invalid' ? ' invalid' : ''}`;
   const pidIcon = partnerIdStatus === 'checking' ? '⏳' : partnerIdStatus === 'valid' ? '✓' : partnerIdStatus === 'invalid' ? '✗' : null;
+
+  const upiValid = formData.upiId.trim() ? validateUPI(formData.upiId) : null;
+  const aadhaarValid = formData.aadhaarNumber.trim() ? validateAadhaar(formData.aadhaarNumber) : null;
+  const panValid = formData.panNumber.trim() ? validatePAN(formData.panNumber) : null;
+
+  const selectedZone = zones.find((z) => String(z.id) === String(formData.zone_id));
+
+  // ── Step Indicator ───────────────────────────────────────────
+  function StepProgress() {
+    return (
+      <>
+        <div className="reg-steps">
+          {STEPS.map((s, i) => (
+            <>
+              <div
+                key={s.id}
+                className={`reg-step-dot${i === step ? ' active' : i < step ? ' done' : ''}`}
+              >
+                {i < step ? '✓' : i + 1}
+              </div>
+              {i < STEPS.length - 1 && (
+                <div key={`line-${i}`} className={`reg-step-line${i < step ? ' done' : ''}`} />
+              )}
+            </>
+          ))}
+        </div>
+        <div className="reg-step-label">
+          Step {step + 1} of {STEPS.length} — <span>{STEPS[step].label}</span>
+        </div>
+      </>
+    );
+  }
+
+  // ── STEP 0: Basic Info ───────────────────────────────────────
+  function StepBasic() {
+    return (
+      <>
+        <div className="reg-title">Create Account</div>
+        <div className="reg-subtitle">Get income protection in minutes.</div>
+
+        <div className="reg-field">
+          <label className="reg-label">Full Name</label>
+          <input className="reg-input" name="name" placeholder="Enter your name"
+            value={formData.name} onChange={handleChange} />
+        </div>
+
+        <div className="reg-field">
+          <label className="reg-label">Phone Number</label>
+          <input className="reg-input" name="phone" type="tel" placeholder="+91 9876543210"
+            value={formData.phone} onChange={handleChange} />
+        </div>
+
+        <div className="reg-field">
+          <label className="reg-label">Platform</label>
+          <div className="reg-select-wrap">
+            <select className="reg-input" name="platform" value={formData.platform} onChange={handleChange}>
+              {PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="reg-field">
+          <label className="reg-label">
+            Partner ID <span className="reg-label-hint">(optional)</span>
+          </label>
+          <div className="reg-input-wrap">
+            <input
+              className={pidInputClass}
+              type="text" name="partner_id"
+              placeholder={formData.platform === 'zepto' ? 'ZPT123456' : 'BLK123456'}
+              value={formData.partner_id}
+              onChange={handleChange}
+              onBlur={validatePartnerId}
+              style={{ paddingRight: pidIcon ? '40px' : '16px' }}
+            />
+            {pidIcon && (
+              <span className="reg-input-icon"
+                style={{ color: partnerIdStatus === 'valid' ? 'var(--green-primary)' : 'var(--warning)' }}>
+                {pidIcon}
+              </span>
+            )}
+          </div>
+          <div className={`reg-hint${partnerIdMessage ? ` ${partnerIdStatus}` : ''}`}>
+            {partnerIdMessage || `Your ${formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'} partner ID`}
+          </div>
+        </div>
+
+        <div className="reg-field">
+          <label className="reg-label">Dark Store Zone</label>
+          <button type="button" className="reg-gps-btn" onClick={detectLocation}
+            disabled={gpsStatus === 'loading' || zonesLoading}>
+            {gpsStatus === 'loading'
+              ? <><span>⏳</span> Detecting location...</>
+              : <><span>📍</span> Detect My Zone</>}
+          </button>
+
+          {gpsStatus === 'success' && detectedZone && (
+            <div className="reg-status success">✓ Detected: {detectedZone.zone.name} ({detectedZone.distance_km} km away)</div>
+          )}
+          {gpsStatus === 'too_far' && detectedZone && (
+            <div className="reg-status warning">No zones near you. Nearest: {detectedZone.zone.name} ({detectedZone.distance_km} km). Select manually.</div>
+          )}
+          {gpsStatus === 'denied' && (
+            <div className="reg-status warning">Location access denied. Select zone manually.</div>
+          )}
+          {gpsStatus === 'error' && (
+            <div className="reg-status error">Could not detect location. Select zone manually.</div>
+          )}
+
+          <div className="reg-select-wrap">
+            <select className="reg-input" name="zone_id" value={formData.zone_id}
+              onChange={handleChange} disabled={zonesLoading}>
+              {zonesLoading ? <option value="">Loading zones...</option>
+                : zones.length === 0 ? <option value="">No zones available — contact admin</option>
+                  : <>
+                    <option value="">Select your zone</option>
+                    {zones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.city} - {zone.name} ({zone.code})
+                      </option>
+                    ))}
+                  </>
+              }
+            </select>
+          </div>
+
+          <div className="reg-hint">
+            {gpsStatus === 'success' ? 'Zone auto-detected. You can change it if needed.'
+              : gpsStatus === 'too_far' ? 'Select from available zones below'
+                : 'Use GPS detection or choose manually'}
+          </div>
+        </div>
+
+        {error && <div className="reg-error">{error}</div>}
+
+        <button
+          className="reg-btn"
+          onClick={goNext}
+          disabled={!canProceedFromBasic()}
+        >
+          Continue →
+        </button>
+      </>
+    );
+  }
+
+  // ── STEP 1: KYC ─────────────────────────────────────────────
+  function StepKyc() {
+    return (
+      <>
+        <div className="reg-title">KYC Verification</div>
+        <div className="reg-subtitle">Quick identity check — you can skip for now.</div>
+
+        <div className="reg-kyc-badge">
+          🔒 Mock KYC — No real data is stored
+        </div>
+
+        {/* Aadhaar */}
+        <div className="reg-field">
+          <label className="reg-label">Aadhaar Number <span className="reg-label-hint">(optional)</span></label>
+          <div className="reg-input-wrap">
+            <input
+              className={`reg-input${aadhaarValid === true ? ' valid' : aadhaarValid === false ? ' invalid' : ''}`}
+              name="aadhaarNumber"
+              placeholder="1234 5678 9012"
+              maxLength={14}
+              value={formData.aadhaarNumber}
+              onChange={handleChange}
+            />
+            {aadhaarValid !== null && (
+              <span className="reg-input-icon" style={{ color: aadhaarValid ? 'var(--green-primary)' : 'var(--warning)' }}>
+                {aadhaarValid ? '✓' : '✗'}
+              </span>
+            )}
+          </div>
+          <div className={`reg-hint${aadhaarValid === false ? ' invalid' : aadhaarValid === true ? ' valid' : ''}`}>
+            {aadhaarValid === false ? 'Must be 12 digits'
+              : aadhaarValid === true ? 'Looks good!'
+                : '12-digit Aadhaar number'}
+          </div>
+        </div>
+
+        {/* PAN */}
+        <div className="reg-field">
+          <label className="reg-label">PAN Number <span className="reg-label-hint">(optional)</span></label>
+          <div className="reg-input-wrap">
+            <input
+              className={`reg-input${panValid === true ? ' valid' : panValid === false ? ' invalid' : ''}`}
+              name="panNumber"
+              placeholder="ABCDE1234F"
+              maxLength={10}
+              value={formData.panNumber}
+              onChange={(e) => handleChange({ target: { name: 'panNumber', value: e.target.value.toUpperCase() } })}
+            />
+            {panValid !== null && (
+              <span className="reg-input-icon" style={{ color: panValid ? 'var(--green-primary)' : 'var(--warning)' }}>
+                {panValid ? '✓' : '✗'}
+              </span>
+            )}
+          </div>
+          <div className={`reg-hint${panValid === false ? ' invalid' : panValid === true ? ' valid' : ''}`}>
+            {panValid === false ? 'Format: ABCDE1234F'
+              : panValid === true ? 'Valid PAN format'
+                : 'e.g. ABCDE1234F'}
+          </div>
+        </div>
+
+        {/* Aadhaar Doc Upload (mock) */}
+        <div className="reg-field">
+          <label className="reg-label">Upload Aadhaar <span className="reg-label-hint">(optional)</span></label>
+          <label className={`reg-file-label${formData.aadhaarFile ? ' has-file' : ''}`} htmlFor="aadhaarFileInput">
+            <span>{formData.aadhaarFile ? '✅' : '📎'}</span>
+            <span>{formData.aadhaarFile ? formData.aadhaarFile.name : 'Tap to upload Aadhaar (image/PDF)'}</span>
+          </label>
+          <input
+            id="aadhaarFileInput"
+            className="reg-file-input"
+            type="file"
+            name="aadhaarFile"
+            accept="image/*,.pdf"
+            onChange={handleChange}
+          />
+          <div className="reg-hint">JPEG, PNG or PDF · Max 5MB · Mock upload</div>
+        </div>
+
+        {error && <div className="reg-error">{error}</div>}
+
+        <div className="reg-btn-row">
+          <button className="reg-btn-back" onClick={goBack}>← Back</button>
+          <button
+            className="reg-btn-next"
+            onClick={goNext}
+            disabled={!canProceedFromKyc()}
+          >
+            Continue →
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  // ── STEP 2: UPI ─────────────────────────────────────────────
+  function StepUpi() {
+    return (
+      <>
+        <div className="reg-title">Link UPI ID</div>
+        <div className="reg-subtitle">For faster claim payouts — optional.</div>
+
+        <div className="reg-upi-badge">
+          💳 UPI payouts come directly to your account
+        </div>
+
+        <div className="reg-field">
+          <label className="reg-label">UPI ID <span className="reg-label-hint">(optional)</span></label>
+          <div className="reg-input-wrap">
+            <input
+              className={`reg-input${upiValid === true ? ' valid' : upiValid === false ? ' invalid' : ''}`}
+              name="upiId"
+              placeholder="yourname@upi"
+              value={formData.upiId}
+              onChange={handleChange}
+            />
+            {upiValid !== null && (
+              <span className="reg-input-icon" style={{ color: upiValid ? 'var(--green-primary)' : 'var(--warning)' }}>
+                {upiValid ? '✓' : '✗'}
+              </span>
+            )}
+          </div>
+          <div className={`reg-hint${upiValid === false ? ' invalid' : upiValid === true ? ' valid' : ''}`}>
+            {upiValid === false ? 'Invalid format — try yourname@okhdfcbank'
+              : upiValid === true ? 'Valid UPI ID ✓'
+                : 'e.g. name@okaxis, phone@ybl, name@upi'}
+          </div>
+        </div>
+
+        <div className="reg-status" style={{ background: 'var(--gray-bg)', color: 'var(--text-mid)', marginTop: 4 }}>
+          ℹ️ You can also add or update your UPI ID later from your Profile.
+        </div>
+
+        {error && <div className="reg-error">{error}</div>}
+
+        <div className="reg-btn-row">
+          <button className="reg-btn-back" onClick={goBack}>← Back</button>
+          <button
+            className="reg-btn-next"
+            onClick={goNext}
+            disabled={!canProceedFromUpi()}
+          >
+            Review →
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  // ── STEP 3: Review ───────────────────────────────────────────
+  function StepReview() {
+    return (
+      <>
+        <div className="reg-title">Review & Confirm</div>
+        <div className="reg-subtitle">Double-check before creating your account.</div>
+
+        {/* Basic Info */}
+        <div className="reg-review-section">
+          <div className="reg-review-section-title">Basic Info</div>
+          <div className="reg-review-row">
+            <span className="reg-review-key">Name</span>
+            <span className="reg-review-val">{formData.name || <span className="missing">—</span>}</span>
+          </div>
+          <div className="reg-review-row">
+            <span className="reg-review-key">Phone</span>
+            <span className="reg-review-val">{formData.phone || <span className="missing">—</span>}</span>
+          </div>
+          <div className="reg-review-row">
+            <span className="reg-review-key">Platform</span>
+            <span className="reg-review-val badge">{PLATFORMS.find(p => p.value === formData.platform)?.label}</span>
+          </div>
+          <div className="reg-review-row">
+            <span className="reg-review-key">Partner ID</span>
+            <span className={`reg-review-val${!formData.partner_id ? ' missing' : ''}`}>
+              {formData.partner_id || 'Not provided'}
+            </span>
+          </div>
+          <div className="reg-review-row">
+            <span className="reg-review-key">Zone</span>
+            <span className={`reg-review-val${!selectedZone ? ' missing' : ''}`}>
+              {selectedZone ? `${selectedZone.city} - ${selectedZone.name}` : 'Not selected'}
+            </span>
+          </div>
+        </div>
+
+        {/* KYC */}
+        <div className="reg-review-section">
+          <div className="reg-review-section-title">KYC</div>
+          <div className="reg-review-row">
+            <span className="reg-review-key">Aadhaar</span>
+            <span className={`reg-review-val${!formData.aadhaarNumber ? ' missing' : ''}`}>
+              {formData.aadhaarNumber
+                ? `••••  ••••  ${formData.aadhaarNumber.replace(/\s/g, '').slice(-4)}`
+                : 'Skipped'}
+            </span>
+          </div>
+          <div className="reg-review-row">
+            <span className="reg-review-key">PAN</span>
+            <span className={`reg-review-val${!formData.panNumber ? ' missing' : ''}`}>
+              {formData.panNumber || 'Skipped'}
+            </span>
+          </div>
+          <div className="reg-review-row">
+            <span className="reg-review-key">Aadhaar Doc</span>
+            <span className={`reg-review-val${!formData.aadhaarFile ? ' missing' : ''}`}>
+              {formData.aadhaarFile ? `✅ ${formData.aadhaarFile.name}` : 'Not uploaded'}
+            </span>
+          </div>
+        </div>
+
+        {/* UPI */}
+        <div className="reg-review-section">
+          <div className="reg-review-section-title">UPI</div>
+          <div className="reg-review-row">
+            <span className="reg-review-key">UPI ID</span>
+            <span className={`reg-review-val${!formData.upiId ? ' missing' : ''}`}>
+              {formData.upiId || 'Not linked'}
+            </span>
+          </div>
+        </div>
+
+        {error && <div className="reg-error">{error}</div>}
+
+        <div className="reg-btn-row">
+          <button className="reg-btn-back" onClick={goBack}>← Back</button>
+          <button
+            className="reg-btn-next"
+            onClick={handleSubmit}
+            disabled={loading}
+          >
+            {loading && <span className="spinner" style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', marginRight: 6 }} />}
+            Create Account 🎉
+          </button>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -399,119 +1079,12 @@ export function Register() {
 
         {/* Card */}
         <div className="reg-card">
-          <div className="reg-title">Create Account</div>
-          <div className="reg-subtitle">Get income protection in minutes.</div>
+          {StepProgress()}
 
-          <form onSubmit={handleSubmit}>
-
-            {/* Full Name */}
-            <div className="reg-field">
-              <label className="reg-label">Full Name</label>
-              <input className="reg-input" name="name" placeholder="Enter your name"
-                value={formData.name} onChange={handleChange} required />
-            </div>
-
-            {/* Phone */}
-            <div className="reg-field">
-              <label className="reg-label">Phone Number</label>
-              <input className="reg-input" name="phone" type="tel" placeholder="+91 9876543210"
-                value={formData.phone} onChange={handleChange} required />
-            </div>
-
-            {/* Platform */}
-            <div className="reg-field">
-              <label className="reg-label">Platform</label>
-              <div className="reg-select-wrap">
-                <select className="reg-input" name="platform" value={formData.platform} onChange={handleChange}>
-                  {PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Partner ID */}
-            <div className="reg-field">
-              <label className="reg-label">
-                Partner ID <span className="reg-label-hint">(optional)</span>
-              </label>
-              <div className="reg-input-wrap">
-                <input
-                  className={pidInputClass}
-                  type="text" name="partner_id"
-                  placeholder={formData.platform === 'zepto' ? 'ZPT123456' : 'BLK123456'}
-                  value={formData.partner_id}
-                  onChange={handleChange}
-                  onBlur={validatePartnerId}
-                  style={{ paddingRight: pidIcon ? '40px' : '16px' }}
-                />
-                {pidIcon && (
-                  <span className="reg-input-icon"
-                    style={{ color: partnerIdStatus === 'valid' ? 'var(--green-primary)' : 'var(--warning)' }}>
-                    {pidIcon}
-                  </span>
-                )}
-              </div>
-              <div className={`reg-hint${partnerIdMessage ? ` ${partnerIdStatus}` : ''}`}>
-                {partnerIdMessage || `Your ${formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'} partner ID`}
-              </div>
-            </div>
-
-            {/* Zone */}
-            <div className="reg-field">
-              <label className="reg-label">Dark Store Zone</label>
-
-              <button type="button" className="reg-gps-btn" onClick={detectLocation}
-                disabled={gpsStatus === 'loading' || zonesLoading}>
-                {gpsStatus === 'loading'
-                  ? <><span>⏳</span> Detecting location...</>
-                  : <><span>📍</span> Detect My Zone</>}
-              </button>
-
-              {gpsStatus === 'success' && detectedZone && (
-                <div className="reg-status success">✓ Detected: {detectedZone.zone.name} ({detectedZone.distance_km} km away)</div>
-              )}
-              {gpsStatus === 'too_far' && detectedZone && (
-                <div className="reg-status warning">No zones near you. Nearest: {detectedZone.zone.name} ({detectedZone.distance_km} km). Select manually.</div>
-              )}
-              {gpsStatus === 'denied' && (
-                <div className="reg-status warning">Location access denied. Select zone manually.</div>
-              )}
-              {gpsStatus === 'error' && (
-                <div className="reg-status error">Could not detect location. Select zone manually.</div>
-              )}
-
-              <div className="reg-select-wrap">
-                <select className="reg-input" name="zone_id" value={formData.zone_id}
-                  onChange={handleChange} disabled={zonesLoading}>
-                  {zonesLoading ? <option value="">Loading zones...</option>
-                    : zones.length === 0 ? <option value="">No zones available — contact admin</option>
-                      : <>
-                        <option value="">Select your zone</option>
-                        {zones.map((zone) => (
-                          <option key={zone.id} value={zone.id}>
-                            {zone.city} - {zone.name} ({zone.code})
-                          </option>
-                        ))}
-                      </>
-                  }
-                </select>
-              </div>
-
-              <div className="reg-hint">
-                {gpsStatus === 'success' ? 'Zone auto-detected. You can change it if needed.'
-                  : gpsStatus === 'too_far' ? 'Select from available zones below'
-                    : 'Use GPS detection or choose manually'}
-              </div>
-            </div>
-
-            {error && <div className="reg-error">{error}</div>}
-
-            <button type="submit" className="reg-btn"
-              disabled={!formData.name || !formData.phone || loading}>
-              {loading && <span className="spinner" />}
-              Create Account
-            </button>
-
-          </form>
+          {step === 0 && StepBasic()}
+          {step === 1 && StepKyc()}
+          {step === 2 && StepUpi()}
+          {step === 3 && StepReview()}
         </div>
 
         <div className="reg-footer">

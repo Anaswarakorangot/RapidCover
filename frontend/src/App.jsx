@@ -64,6 +64,13 @@ function OnboardingFlowRoute() {
   );
 }
 
+// Admin Route — full-screen dark panel, no Layout wrapper
+function AdminRoute() {
+  const { loading } = useAuth();
+  if (loading) return <Loader />;
+  return <Admin />;
+}
+
 // Routes
 function AppRoutes() {
   return (
@@ -81,7 +88,7 @@ function AppRoutes() {
       <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
       <Route path="/claims" element={<ProtectedRoute><Claims /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+      <Route path="/admin" element={<AdminRoute />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
