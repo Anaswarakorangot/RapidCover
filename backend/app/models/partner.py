@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -24,6 +24,7 @@ class Partner(Base):
     __tablename__ = "partners"
 
     id = Column(Integer, primary_key=True, index=True)
+    upi_id = Column(String, nullable=True)
     phone = Column(String(15), unique=True, nullable=False, index=True)
     name = Column(String(100), nullable=False)
     aadhaar_hash = Column(String(64), nullable=True)  # SHA-256 hash of Aadhaar
@@ -39,3 +40,8 @@ class Partner(Base):
     zone = relationship("Zone", back_populates="partners")
     policies = relationship("Policy", back_populates="partner")
     push_subscriptions = relationship("PushSubscription", back_populates="partner")
+    kyc = Column(JSON, nullable=True, default=lambda: {
+        "aadhaar_number": None,
+        "pan_number":     None,
+        "kyc_status":     "skipped",
+    })
