@@ -192,6 +192,24 @@ def get_engine_status():
     """Return the trigger engine + scheduler status for admin UI."""
     from app.services.scheduler import get_scheduler_status
     from app.services.trigger_engine import get_engine_status as engine_status
+    from app.services.external_apis import (
+        MockWeatherAPI, MockAQIAPI, get_source_health
+    )
+
+    # Quick probe: if sources are still "unknown", try a single API call
+    # to determine if keys are configured and working
+    current_health = get_source_health()
+    if current_health["openweathermap"]["status"] == "unknown":
+        # Do a quick probe with default Bangalore coords
+        try:
+            MockWeatherAPI.get_current(1, 12.9716, 77.5946)
+        except Exception:
+            pass
+    if current_health["waqi_aqi"]["status"] == "unknown":
+        try:
+            MockAQIAPI.get_current(1, 12.9716, 77.5946)
+        except Exception:
+            pass
 
     scheduler = get_scheduler_status()
     engine = engine_status()
@@ -234,8 +252,10 @@ PIPELINE_STEPS = {
         {"ts": "5:47:39", "msg": "Traffic cross-validation: Google Maps confirms severe disruption"},
         {"ts": "5:47:44", "msg": "GPS coherence: normal — no spoofing anomalies"},
         {"ts": "5:47:51", "msg": "Run count confirmed: 3 deliveries completed before suspension"},
+        {"ts": "5:47:55", "msg": "Policy lookup: Standard plan (₹49/wk) — max ₹350/day, 5 days/wk"},
         {"ts": "5:47:58", "msg": "Fraud score: 0.11 → auto-approve"},
-        {"ts": "5:48:09", "msg": "₹272 UPI credit via Razorpay mock — txn RC{zone}-{rand}"},
+        {"ts": "5:48:03", "msg": "Raw payout: ₹420 → Capped to ₹350 (Standard plan limit) → UPI credit ₹350"},
+        {"ts": "5:48:09", "msg": "₹350 UPI credit via Razorpay mock — txn RC{zone}-{rand}"},
         {"ts": "5:48:12", "msg": "Push notification sent (Kannada) — claim processed"},
     ],
     "heat": [
@@ -244,8 +264,10 @@ PIPELINE_STEPS = {
         {"ts": "5:47:39", "msg": "Platform ops status: heat advisory issued, reduced deliveries"},
         {"ts": "5:47:44", "msg": "GPS coherence: normal — partner confirmed in zone"},
         {"ts": "5:47:51", "msg": "Activity log: 2 deliveries completed before heat cutoff"},
+        {"ts": "5:47:55", "msg": "Policy lookup: Pro plan (₹79/wk) — max ₹500/day, 7 days/wk"},
         {"ts": "5:47:58", "msg": "Fraud score: 0.08 → auto-approve"},
-        {"ts": "5:48:09", "msg": "₹350 UPI credit via Razorpay mock — txn RC{zone}-{rand}"},
+        {"ts": "5:48:03", "msg": "Raw payout: ₹320 → Within Pro limit (₹500) → UPI credit ₹320"},
+        {"ts": "5:48:09", "msg": "₹320 UPI credit via Razorpay mock — txn RC{zone}-{rand}"},
         {"ts": "5:48:12", "msg": "Push notification sent (Hindi) — heat claim processed"},
     ],
     "aqi": [
@@ -254,8 +276,10 @@ PIPELINE_STEPS = {
         {"ts": "5:47:39", "msg": "Cross-validation: IQAir confirms hazardous air quality"},
         {"ts": "5:47:44", "msg": "GPS coherence: normal — partner within zone boundary"},
         {"ts": "5:47:51", "msg": "Run count confirmed: 4 deliveries before AQI cutoff"},
+        {"ts": "5:47:55", "msg": "Policy lookup: Flex plan (₹29/wk) — max ₹250/day, 3 days/wk"},
         {"ts": "5:47:58", "msg": "Fraud score: 0.14 → auto-approve"},
-        {"ts": "5:48:09", "msg": "₹310 UPI credit via Razorpay mock — txn RC{zone}-{rand}"},
+        {"ts": "5:48:03", "msg": "Raw payout: ₹310 → Capped to ₹250 (Flex plan limit) → UPI credit ₹250"},
+        {"ts": "5:48:09", "msg": "₹250 UPI credit via Razorpay mock — txn RC{zone}-{rand}"},
         {"ts": "5:48:12", "msg": "Push notification sent (Hindi) — AQI claim processed"},
     ],
     "shutdown": [
@@ -264,8 +288,10 @@ PIPELINE_STEPS = {
         {"ts": "5:47:39", "msg": "News cross-validation: confirmed via NDTV / local feeds"},
         {"ts": "5:47:44", "msg": "GPS coherence: normal — partner stationary at home"},
         {"ts": "5:47:51", "msg": "Activity log: 0 deliveries possible during shutdown"},
+        {"ts": "5:47:55", "msg": "Policy lookup: Standard plan (₹49/wk) — max ₹350/day, 5 days/wk"},
         {"ts": "5:47:58", "msg": "Fraud score: 0.05 → auto-approve"},
-        {"ts": "5:48:09", "msg": "₹420 UPI credit via Razorpay mock — txn RC{zone}-{rand}"},
+        {"ts": "5:48:03", "msg": "Raw payout: ₹350 → Within Standard limit (₹350) → UPI credit ₹350"},
+        {"ts": "5:48:09", "msg": "₹350 UPI credit via Razorpay mock — txn RC{zone}-{rand}"},
         {"ts": "5:48:12", "msg": "Push notification sent — curfew claim processed"},
     ],
     "closure": [
@@ -274,8 +300,10 @@ PIPELINE_STEPS = {
         {"ts": "5:47:39", "msg": "Cross-validation: store inventory system offline confirmed"},
         {"ts": "5:47:44", "msg": "GPS coherence: normal — partner near dark store location"},
         {"ts": "5:47:51", "msg": "Run count confirmed: partner was en-route when store closed"},
+        {"ts": "5:47:55", "msg": "Policy lookup: Flex plan (₹29/wk) — max ₹250/day, 3 days/wk"},
         {"ts": "5:47:58", "msg": "Fraud score: 0.09 → auto-approve"},
-        {"ts": "5:48:09", "msg": "₹180 UPI credit via Razorpay mock — txn RC{zone}-{rand}"},
+        {"ts": "5:48:03", "msg": "Raw payout: ₹143 → Within Flex limit (₹250) → UPI credit ₹143"},
+        {"ts": "5:48:09", "msg": "₹143 UPI credit via Razorpay mock — txn RC{zone}-{rand}"},
         {"ts": "5:48:12", "msg": "Push notification sent — store closure claim processed"},
     ],
 }
@@ -315,7 +343,12 @@ async def simulate_trigger(req: SimulateTriggerRequest):
             yield line
             await asyncio.sleep(0.18)
 
-        yield json.dumps({"ts": "done", "msg": "Total: 49 seconds", "total": 49}) + "\n"
+        # Summary line with insurance operations stats
+        summary = (
+            f"Total: 49 seconds · Partners paid: 47 · "
+            f"Skipped (no policy): 12 · At weekly limit: 3"
+        )
+        yield json.dumps({"ts": "done", "msg": summary, "total": 49}) + "\n"
 
     return StreamingResponse(
         event_stream(),
