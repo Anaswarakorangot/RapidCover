@@ -3,8 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.database import init_db
+from app.database import init_db, SessionLocal
 from app.api.router import api_router
+from app.data.seed_zones import seed_zones
 # Import models so they register with SQLAlchemy Base
 from app.models import Partner, Zone, Policy, TriggerEvent, Claim
 from app.services.scheduler import start_scheduler, stop_scheduler
@@ -25,6 +26,16 @@ async def lifespan(app: FastAPI):
     print("Starting RapidCover API...")
     init_db()
     print("Database tables created.")
+    # Seed zones on every startup (idempotent - skips existing)
+    db = SessionLocal()
+    try:
+        created = seed_zones(db)
+        if created:
+            print(f"Seeded {len(created)} new zones.")
+        else:
+            print("Zones already seeded.")
+    finally:
+        db.close()
     # Start background trigger polling (every 45s)
     start_scheduler()
     print("Background trigger scheduler started.")
