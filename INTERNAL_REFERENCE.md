@@ -44,12 +44,18 @@ This implementation specifically frames the problem around dark-store delivery p
 - GPS-based zone auto-detection during registration (25km threshold)
 - OTP-based login flow with JWT session handling
 - Zone seeding and zone lookup APIs
-- Weekly policy quote generation and policy creation
+- Weekly policy quote generation and policy creation with dynamic risk-adjusted pricing
+- **Policy lifecycle management** with renewal, grace periods, auto-renewal, and cancellation
+- **Policy certificate PDF generation** for download
 - Mock trigger simulation for rain, heat, AQI, shutdown, and closure
-- Trigger storage in the database
-- Rule-based claim generation from triggers
-- Rule-based fraud scoring
-- Worker dashboard, policy screen, claims history, profile screen, and basic admin dashboard
+- **Background trigger scheduler** (45-second polling) with duration tracking
+- **Trigger engine** with de minimis rule (45 min minimum for IRDAI compliance)
+- Rule-based claim generation from triggers (zero-touch automation)
+- Rule-based fraud scoring with 6-factor weighted analysis
+- **Structured payout processing** with UPI reference generation and transaction logs
+- **PWA with push notifications** for claim status updates
+- **Service worker** for offline support and push handling
+- Worker dashboard, policy screen, claims history, profile screen, and admin dashboard
 
 ---
 
@@ -83,14 +89,22 @@ The screenshots provided with this request align with that intended roadmap. The
 
 What is real in code today:
 
-- Basic backend CRUD and workflow for partners, policies, claims, triggers, zones
-- Basic frontend app with routing and protected pages
-- OTP login, but only in development style
-- Weekly policy purchase flow
+- Complete backend CRUD and workflow for partners, policies, claims, triggers, zones, notifications
+- React frontend PWA with routing, protected pages, and push notification support
+- OTP login with JWT authentication (OTP exposed in dev mode for testing)
+- Weekly policy purchase flow with dynamic risk-adjusted pricing
+- **Policy lifecycle**: renewal (with 5% loyalty discount), grace periods (48h), auto-renewal, cancellation
+- **Policy certificate PDF generation** via reportlab
 - Mock event simulation from the admin page
-- Trigger detection against mock services
-- Claim generation and manual admin progression to payout
-- Rule-based fraud scoring
+- **Background trigger scheduler** polling every 45 seconds
+- **Trigger engine** with duration tracking and de minimis rule (45 min minimum)
+- Trigger detection against mock services (with live API fallback for weather/AQI)
+- **Zero-touch claim generation** with automatic fraud scoring and status assignment
+- **Auto-payout** available in demo mode via `AUTO_PAYOUT_ENABLED=true`
+- **Structured payout service** with UPI reference generation and transaction logging
+- Rule-based fraud scoring with 6 weighted factors
+- **Push notifications** via VAPID/pywebpush for claim events (created, approved, paid, rejected)
+- **Service worker** for PWA installation and push handling
 - Randomized zone risk scores for seeded zones
 
 ### Major differences and missing parts
@@ -101,12 +115,14 @@ The biggest gaps between the intended design and the implementation are:
 
 - Zero-touch automation is now implemented: triggers auto-create claims with fraud scoring when simulation endpoints are called
 - Optional auto-payout in demo mode via `AUTO_PAYOUT_ENABLED=true` environment variable
-- No real payout integration: payout is just a status change with a generated fake UPI reference
-- No push notification system
+- No real payout integration: payout uses structured transaction logs but no actual payment gateway (Razorpay config exists but not integrated)
+- ~~No push notification system~~ DONE - PWA push notifications implemented via VAPID/pywebpush
 - ~~No real GPS collection or zone auto-detection~~ DONE - GPS-based zone detection with 25km threshold
 - ~~No real Partner ID validation~~ DONE - Mock validation for Zepto (ZPT + 6 digits) and Blinkit (BLK + 6 digits) partner IDs
 - No KYC or Aadhaar-face verification workflow
 - No real worker activity validation from a platform partner feed
+- No rollback logic for failed payment transfers
+- No IMPS fallback if UPI fails
 
 #### AI/ML gaps
 
@@ -118,9 +134,10 @@ The biggest gaps between the intended design and the implementation are:
 
 #### Platform/PWA gaps
 
-- The frontend includes a manifest and mobile meta tags, but no service worker
-- PWA install readiness is incomplete
-- Manifest references icon files that do not exist in `frontend/public`
+- ~~The frontend includes a manifest and mobile meta tags, but no service worker~~ DONE - Service worker implemented at `frontend/public/sw.js`
+- ~~PWA install readiness is incomplete~~ DONE - PWA is installable with push notification support
+- ~~Manifest references icon files that do not exist~~ DONE - Icons exist in `frontend/public/icons/`
+- Service worker bypasses cached Vite assets on localhost to avoid stale module issues during development
 
 #### Security and operations gaps
 
@@ -271,12 +288,32 @@ The current implemented flow is:
 - `POST /api/v1/partners/verify`
 - Returns a JWT token if OTP matches
 
-#### Policy creation
+#### Policy creation and lifecycle
 
 - `GET /api/v1/policies/quotes`
-- Calculates quotes using tier config plus a risk band adjustment
+- Calculates quotes using tier config plus zone risk band adjustment
 - `POST /api/v1/policies`
 - Creates a 7-day active policy if no active policy exists
+
+**Policy Lifecycle States:**
+- `ACTIVE` - Not yet expired
+- `GRACE_PERIOD` - Expired but within 48 hours (claims still valid)
+- `LAPSED` - Past 48-hour grace period
+- `CANCELLED` - Manually cancelled
+
+**Renewal Flow:**
+- Can renew starting 2 days before expiry or during grace period
+- `GET /api/v1/policies/{id}/renewal-quote` - Get quote with 5% loyalty discount
+- `POST /api/v1/policies/{id}/renew` - Create new policy linked via `renewed_from_id`
+- Optional tier upgrade/downgrade during renewal
+
+**Auto-Renewal:**
+- `POST /api/v1/admin/process-auto-renewals` - Batch process eligible policies
+- Finds policies with `auto_renew=true` expiring within 24h or in grace period
+- Creates new policy with 5% loyalty discount
+
+**Certificate Download:**
+- `GET /api/v1/policies/{id}/certificate` - Returns PDF via reportlab
 
 #### Trigger simulation and detection
 
@@ -295,11 +332,29 @@ The current implemented flow is:
 - Claim is created with status `approved`, `pending`, or `rejected`
 - If `AUTO_PAYOUT_ENABLED=true`, approved claims are immediately marked as paid with a UPI reference
 
-#### Payout
+#### Payout (Settlement Flow)
 
-- Admin manually calls the payout action
-- Claim status changes to `paid`
-- A fake UPI reference is generated if none is supplied
+The settlement flow follows 5 steps (matching industry-standard parametric payout):
+
+1. **Trigger confirmed** - Weather/AQI API or admin simulation confirms threshold crossed
+2. **Worker eligibility check** - Active policy, correct zone, no duplicate claim, within limits
+3. **Payout calculated** - Hourly rate x disruption hours x severity multiplier, capped by tier
+4. **Transfer initiated** - UPI reference generated (currently mock, no real gateway integration)
+5. **Record updated** - Transaction log stored in `validation_data` JSON field
+
+Current payout processing:
+
+- `payout_service.py` handles structured payout with `generate_upi_ref()` and `build_transaction_log()`
+- UPI reference format: `RAPID{policy:06d}{claim:06d}{epoch%100000:05d}`
+- Transaction log includes: claim, partner, policy, trigger metadata, timestamps
+- Admin can manually call payout action, or auto-payout enabled via `AUTO_PAYOUT_ENABLED=true`
+- Push notification sent on payout completion
+
+**Missing for production:**
+- Real payment gateway integration (Razorpay config exists but unused)
+- IMPS fallback if UPI not linked
+- Rollback logic for failed transfers
+- Billing reconciliation service
 
 ### Internal processing logic summary
 
@@ -408,12 +463,15 @@ Purpose:
 
 - show basic account details
 - edit name and language preference
+- manage push notification settings
 
 Current behavior:
 
 - language can be stored
 - UI itself remains English-only
 - zone details are minimal and only show zone ID
+- **Push notification toggle** allows enabling/disabling notifications
+- UPI ID can be stored for future payout integration
 
 ### Admin
 
@@ -447,13 +505,16 @@ Assets found in the repository:
 - `frontend/public/favicon.svg`
 - `frontend/public/icons.svg`
 - `frontend/public/manifest.json`
+- `frontend/public/sw.js` - Service worker for PWA
+- `frontend/public/icons/` - PWA icons (192x192, 512x512)
 
 Observations:
 
-- `hero.png` is a stylized isometric purple layered graphic; it appears unused in the current app
+- `hero.png` is a stylized isometric purple layered graphic; may be used in onboarding
 - `react.svg` and `vite.svg` are template leftovers and appear unused
-- `manifest.json` exists, but the PWA is incomplete
-- `manifest.json` points to `/icon-192.png` and `/icon-512.png`, which are not present
+- `manifest.json` exists and PWA is functional
+- ~~`manifest.json` points to icons that don't exist~~ DONE - Icons now present in `public/icons/`
+- Service worker handles push notifications and offline caching
 
 ---
 
@@ -476,15 +537,46 @@ RapidCover/
 backend/
 ├─ requirements.txt
 ├─ README.md
+├─ .env / .env.example
 └─ app/
    ├─ main.py
    ├─ config.py
    ├─ database.py
    ├─ api/
+   │   ├─ router.py           # Main API router (v1 prefix)
+   │   ├─ partners.py         # Auth, registration, profile, partner ID validation
+   │   ├─ policies.py         # Policy CRUD, quotes, renewal, lifecycle, certificate
+   │   ├─ claims.py           # Claims listing, summary, claim details
+   │   ├─ zones.py            # Zone listing, GPS nearest zone detection
+   │   ├─ triggers.py         # Active trigger events endpoint
+   │   ├─ notifications.py    # Push subscription management
+   │   ├─ admin.py            # Admin dashboard, simulation endpoints
+   │   └─ admin_panel.py      # Admin panel stats
    ├─ models/
+   │   ├─ partner.py          # Partner (delivery person) model
+   │   ├─ zone.py             # Zone (dark store area) model
+   │   ├─ policy.py           # Insurance policy model with lifecycle
+   │   ├─ claim.py            # Claim model
+   │   ├─ trigger_event.py    # Parametric trigger event model
+   │   └─ push_subscription.py # Push notification subscription model
    ├─ schemas/
+   │   ├─ partner.py, policy.py, claim.py, zone.py, notification.py, kyc.py
    ├─ services/
+   │   ├─ auth.py             # OTP generation, JWT tokens
+   │   ├─ premium.py          # Dynamic risk-adjusted pricing
+   │   ├─ trigger_detector.py # Threshold checking (5 trigger types)
+   │   ├─ trigger_engine.py   # Duration tracking & de minimis enforcement
+   │   ├─ scheduler.py        # Background 45s polling
+   │   ├─ claims_processor.py # Auto-claim creation with fraud scoring
+   │   ├─ fraud_detector.py   # 6-factor weighted fraud scoring
+   │   ├─ payout_service.py   # UPI ref generation, transaction logs
+   │   ├─ policy_lifecycle.py # Renewal, grace period, auto-renewal
+   │   ├─ policy_certificate.py # PDF certificate generation
+   │   ├─ notifications.py    # Push notification sending (pywebpush)
+   │   ├─ external_apis.py    # Mock & live API integrations
+   │   └─ partner_validation.py # Platform ID validation
    └─ data/
+       └─ seed_zones.py       # 11 dark store zones
 ```
 
 ### Key backend files
@@ -556,6 +648,44 @@ backend/
 #### `backend/app/services/premium.py`
 
 - returns quotes based on policy tier and zone risk band
+- risk band adjustments: low (-10%), medium (0%), high (+15%), very high (+30%)
+
+#### `backend/app/services/payout_service.py`
+
+- `generate_upi_ref()` creates unique UPI transaction reference
+- `build_transaction_log()` creates structured audit trail
+- `process_payout()` handles claim -> paid transition with full logging
+- `process_bulk_payouts()` for batch processing
+- stores transaction log in `validation_data` JSON field
+
+#### `backend/app/services/policy_lifecycle.py`
+
+- `compute_policy_status()` returns status enum + timing info
+- `get_renewal_quote()` calculates 5% loyalty discount
+- `renew_policy()` creates linked policy chain
+- `process_auto_renewals()` batch renewal processing
+- Grace period: 48 hours after expiry (hardcoded)
+- Renewal window: 2 days before expiry or during grace
+
+#### `backend/app/services/notifications.py`
+
+- Push notification sending via pywebpush + VAPID
+- Event-based senders: `notify_claim_created()`, `notify_claim_approved()`, `notify_claim_paid()`, `notify_claim_rejected()`
+- Handles 404/410 responses by deactivating stale subscriptions
+
+#### `backend/app/services/trigger_engine.py`
+
+- Main scheduler entry: `check_all_triggers()`
+- In-memory duration tracking for active events
+- De minimis rule: <45 min events don't fire (IRDAI compliance)
+- Ring buffer logging (200 entries max)
+- Status via `get_engine_status()`, `get_trigger_log()`
+
+#### `backend/app/services/scheduler.py`
+
+- Background async task polling every 45 seconds
+- Calls trigger engine on zones with active policies
+- Runs as lifespan context in FastAPI app
 
 #### `backend/app/services/partner_validation.py`
 
@@ -576,15 +706,31 @@ frontend/
 ├─ package.json
 ├─ vite.config.js
 ├─ index.html
+├─ .env / .env.example
 ├─ public/
+│   ├─ sw.js                  # Service worker (push notifications)
+│   ├─ manifest.json          # PWA manifest
+│   └─ icons/                 # App icons for PWA
 └─ src/
    ├─ main.jsx
    ├─ App.jsx
    ├─ index.css
    ├─ services/
+   │   ├─ api.js              # API client with auth
+   │   └─ pushNotifications.js # Web Push API integration
    ├─ context/
+   │   ├─ AuthContext.jsx     # Global auth state
+   │   └─ NotificationContext.jsx # Push notification state
    ├─ components/
+   │   ├─ Layout.jsx          # Main layout with navigation
+   │   ├─ NotificationToggle.jsx # Enable/disable push
+   │   ├─ ui/                 # Button, Card, Input, etc.
+   │   └─ admin/              # AdminStats, TriggerPanel, ClaimsQueue
    ├─ pages/
+   │   ├─ Login.jsx, Register.jsx
+   │   ├─ Dashboard.jsx, Policy.jsx
+   │   ├─ Claims.jsx, Profile.jsx
+   │   └─ Admin.jsx
    └─ assets/
 ```
 
@@ -616,6 +762,28 @@ frontend/
 
 - primitive shared components: button, input, card
 
+#### `frontend/src/context/NotificationContext.jsx`
+
+- `isSupported` - Push support available in browser
+- `permission` - "granted" | "denied" | "default" | "unsupported"
+- `isSubscribed` - Current endpoint subscribed
+- `enableNotifications()` - Request permission, subscribe, send to backend
+- `disableNotifications()` - Unsubscribe browser, notify backend
+- Syncs on auth change and polls periodically
+
+#### `frontend/src/services/pushNotifications.js`
+
+- `subscribeToPush()` - Browser VAPID subscription
+- `unsubscribeFromPush()` - Remove subscription
+- Handles service worker registration
+
+#### `frontend/public/sw.js`
+
+- Service worker for PWA functionality
+- Handles `push` event for notifications
+- Shows notification with click handler to open `/claims`
+- Bypasses cached Vite assets on localhost (dev workaround)
+
 ---
 
 ## 7. Internal Logic
@@ -636,19 +804,35 @@ This is deterministic rule logic, not ML.
 
 ### Trigger detection
 
-Supported trigger types:
+Supported trigger types with thresholds and duration requirements:
 
-- rain
-- heat
-- AQI
-- shutdown
-- closure
+| Trigger | Threshold | Min Duration | Hourly Payout |
+|---------|-----------|--------------|---------------|
+| Rain | >55 mm/hr | 30 mins | Rs.50/hr |
+| Heat | >43 C | 4 hours | Rs.40/hr |
+| AQI | >400 | 3 hours | Rs.45/hr |
+| Shutdown | Active | 2 hours | Rs.60/hr |
+| Closure | Not open | 90 mins | Rs.55/hr |
 
-Important detail:
+**Dual detection architecture:**
 
-- the code defines threshold comments like 30 minutes or 4 hours
-- but in practice, several trigger checks fire immediately based on current simulated state
-- duration logic is mostly descriptive, not truly enforced
+1. **Scheduler-based** (`scheduler.py`):
+   - Background async task polling every 45 seconds
+   - Calls `check_all_triggers()` on zones with active policies
+   - Fetches live data from external APIs (with mock fallback)
+
+2. **Trigger Engine** (`trigger_engine.py`):
+   - In-memory event tracking: `active_events[zone_id:trigger_type]`
+   - **De minimis rule**: Events <45 mins produce NO payout (IRDAI compliance)
+   - Per-trigger duration enforcement (e.g., heat must sustain 4+ hours)
+   - When threshold breached: starts duration timer
+   - When duration met: fires TriggerEvent to DB + auto-processes claims
+   - When condition drops: clears tracker
+   - Ring buffer logging (200 entries max) via `get_trigger_log()`
+
+3. **Admin Simulation** (bypasses duration):
+   - `POST /api/v1/admin/simulate/*` endpoints
+   - Immediately creates trigger + claims for demo purposes
 
 ### Severity calculation
 
@@ -767,13 +951,15 @@ These failures are environment-specific observations from this analysis session,
 
 ### Product limitations
 
-- Not a full PWA despite manifest presence
-- No service worker
-- No push notifications
-- No real payment gateway integration
-- No real external API integrations
-- No background scheduler polling zones continuously
+- ~~Not a full PWA despite manifest presence~~ DONE - PWA is installable
+- ~~No service worker~~ DONE - Service worker at `frontend/public/sw.js`
+- ~~No push notifications~~ DONE - Push notifications via VAPID/pywebpush
+- No real payment gateway integration (Razorpay config exists but unused)
+- External APIs have live fallback for weather/AQI but default to mock
+- ~~No background scheduler polling zones continuously~~ DONE - 45-second scheduler
 - No live map or predictive analytics
+- No rollback logic for failed payment transfers
+- No billing reconciliation service
 
 ### Security limitations
 
@@ -792,10 +978,12 @@ These failures are environment-specific observations from this analysis session,
 
 ### Workflow limitations
 
-- Trigger detection is only run when simulation endpoints are called
+- ~~Trigger detection is only run when simulation endpoints are called~~ DONE - Background scheduler polls every 45s
 - Claims ARE now automatically processed when a trigger is created (zero-touch)
 - Payout can be automatic in demo mode via `AUTO_PAYOUT_ENABLED=true`
-- No audit trail or event bus exists
+- Transaction logs exist in `validation_data` but no centralized audit service
+- No event bus exists (notifications are inline, not async)
+- Trigger engine duration tracking is in-memory (lost on restart)
 
 ### Code quality and implementation issues
 
@@ -839,12 +1027,13 @@ This is the section new team members should read if they want the shortest expla
 
 ### Key mismatches
 
-- PWA claim: partially scaffolded, not actually completed
+- ~~PWA claim: partially scaffolded, not actually completed~~ DONE - PWA with push notifications working
 - AI/ML claim: represented mostly as placeholders and rules
-- instant payout claim: simulated by claim status updates (auto-payout available in demo mode)
+- instant payout claim: simulated by claim status updates (auto-payout available in demo mode); **no real payment gateway integration**
 - multilingual claim: enum and profile field exist, but content is not translated
-- zero-touch claim claim: NOW IMPLEMENTED - claims auto-created when triggers fire
+- ~~zero-touch claim claim: NOW IMPLEMENTED~~ DONE - claims auto-created when triggers fire
 - advanced admin analytics claim: not implemented
+- **Settlement flow**: Missing real UPI/IMPS/Razorpay integration, rollback logic, and billing reconciliation
 
 ### Business-rule alignment
 
@@ -867,8 +1056,8 @@ This is one of the clearest implementation-vs-plan deviations in the repository.
 1. ~~Complete the zero-touch flow~~ DONE
    Claims are now automatically processed when triggers are created. Auto-payout available via `AUTO_PAYOUT_ENABLED=true`.
 
-2. Finish the PWA layer
-   Add service worker, install flow, cache strategy, offline shell, and real icon assets.
+2. ~~Finish the PWA layer~~ DONE
+   Service worker, push notifications, and PWA install flow are implemented.
 
 3. ~~Replace manual zone selection with actual GPS-assisted onboarding~~ DONE
    GPS-based zone detection implemented with 25km threshold and fallback to manual selection.
@@ -876,8 +1065,18 @@ This is one of the clearest implementation-vs-plan deviations in the repository.
 4. Add real role separation
    Admin endpoints should require explicit admin authentication.
 
-5. Implement at least one realistic payment simulation
-   Razorpay test mode or a clearly modeled payout adapter would make the demo much stronger.
+5. **Implement real payment gateway integration**
+   - Integrate Razorpay Payout API for actual UPI/IMPS transfers
+   - Add fallback logic: Try UPI first, fall back to IMPS if UPI fails
+   - Implement rollback logic for failed mid-transfer scenarios
+   - Add billing reconciliation service to verify payouts
+
+6. **Complete the settlement flow** (5-step payout pipeline)
+   - Step 1: Trigger confirmed (DONE - trigger_engine.py)
+   - Step 2: Worker eligibility check (DONE - claims_processor.py)
+   - Step 3: Payout calculated (DONE - calculate_payout_amount)
+   - Step 4: Transfer initiated (PARTIAL - needs real gateway)
+   - Step 5: Record updated (PARTIAL - needs reconciliation)
 
 ### Engineering improvements
 
@@ -913,69 +1112,113 @@ This is one of the clearest implementation-vs-plan deviations in the repository.
 
 ## 12. Summary
 
-RapidCover is currently a solid hackathon-style prototype with a clear product idea and a surprisingly complete vertical slice for a small codebase:
+RapidCover is now a substantially complete parametric insurance prototype with most core workflows implemented:
 
-- worker registration and OTP login exist
-- weekly policy creation exists
-- mock disruptions can be simulated
-- trigger records can be created
-- claims can be generated and paid in a demo workflow
-- worker and admin dashboards exist
+- Partner registration with GPS zone detection and partner ID validation
+- OTP login with JWT authentication
+- Weekly policy creation with dynamic risk-adjusted pricing
+- Full policy lifecycle (renewal, grace period, auto-renewal, cancellation)
+- Policy certificate PDF generation
+- Background trigger scheduler with duration tracking
+- Zero-touch claim generation with fraud scoring
+- Structured payout processing with transaction logs
+- PWA with push notifications for claim status updates
+- Worker and admin dashboards
 
-However, the implementation is still much closer to a guided demo system than a finished parametric insurance platform.
+**What's working end-to-end:**
 
-The most important truth about the repository is this:
+1. Partner registers (with GPS zone detection)
+2. Purchases weekly policy (with risk-adjusted pricing)
+3. Enables push notifications
+4. Trigger fires (via scheduler or admin simulation)
+5. Claim auto-created with fraud scoring
+6. Push notification sent to partner
+7. Payout processed (mock UPI reference)
 
-- the product story is strong
-- the workflow skeleton is real
-- the backend domain model is mostly in place
-- but many of the hardest promised features are still mocked, manual, or only represented as placeholders
+**The main gap remaining is real payment integration:**
+
+The settlement flow has 5 steps, and steps 1-3 are fully implemented. Steps 4-5 (transfer initiated, record reconciled) use mock UPI references. To complete the system:
+
+- Integrate Razorpay Payout API
+- Add IMPS fallback if UPI fails
+- Implement rollback logic for failed transfers
+- Add billing reconciliation service
 
 If a new team member wants to understand the project quickly, the right mental model is:
 
-> RapidCover is a prototype of a parametric income-protection platform for Q-commerce workers, with a real full-stack demo path, but not yet a production-grade automation, payments, AI/ML, or PWA system.
+> RapidCover is a functional parametric income-protection platform for Q-commerce workers with complete automation from trigger detection to claim creation. The missing piece is real payment gateway integration - the payout flow is fully designed but uses mock UPI references instead of actual Razorpay/IMPS transfers.
 
 ---
 
 ## Appendix: Current Status Snapshot
 
-Based on the codebase plus the implementation-status screenshots, the most accurate summary is:
+Based on the codebase as of Phase 4 completion:
 
 ### Clearly implemented
 
 - Persona-driven product framing
-- Registration
-- OTP login
-- JWT auth
-- Policy creation
-- Zone seed data
-- Mock trigger APIs
-- Trigger detection
-- Claims generation (zero-touch automation)
+- Registration with GPS zone detection
+- Partner ID validation (mock)
+- OTP login with JWT auth
+- Policy creation with dynamic risk-adjusted pricing
+- Policy lifecycle (renewal, grace period, auto-renewal, cancellation)
+- Policy certificate PDF generation
+- Zone seed data (11 zones across 3 cities)
+- Mock trigger APIs with live fallback
+- Background trigger scheduler (45s polling)
+- Trigger engine with duration tracking and de minimis rule
+- Zero-touch claims generation
 - Auto-payout in demo mode
-- Basic fraud scoring
-- Basic admin dashboard
-- Basic worker dashboard
-- End-to-end simulation in demo form
+- 6-factor weighted fraud scoring
+- Structured payout service with transaction logs
+- PWA with service worker
+- Push notifications (VAPID/pywebpush)
+- Admin dashboard with simulation controls
+- Worker dashboard with active disruptions
+- End-to-end parametric insurance demo
 
 ### Partially implemented
 
-- PWA scaffolding
-- Dynamic premium engine
-- Fraud intelligence
-- Zone and disruption intelligence
+- Dynamic premium engine (rules-based, not ML)
+- Fraud intelligence (weighted rules, not ML)
+- Zone and disruption intelligence (basic stats only)
+- Settlement flow (steps 1-3 complete, step 4-5 need real gateway)
 
 ### Missing or substantially incomplete
 
 - Figma/prototype assets in repo
 - pitch/demo video artefacts in repo
-- push notifications
-- service worker
-- ~~GPS-based onboarding~~ DONE - implemented with 25km threshold
-- ~~partner-ID validation~~ DONE - mock validation with platform-specific formats
-- KYC flow
-- real payment integration
-- live map
-- loss ratio tracking
-- predictive forecasting
-- real multilingual experience
+- **Real payment gateway integration** (Razorpay config exists, not integrated)
+- **IMPS fallback** if UPI not linked
+- **Rollback logic** for failed payment transfers
+- **Billing reconciliation service**
+- KYC flow (Aadhaar verification)
+- live map visualization
+- loss ratio tracking and analytics
+- predictive forecasting (ML models)
+- real multilingual experience (enum exists, no translations)
+
+---
+
+## Appendix: Settlement Flow Status
+
+The DEVTrails reference diagram shows a 5-step settlement flow:
+
+| Step | Description | Status |
+|------|-------------|--------|
+| 1. Trigger confirmed | Oracle/weather API confirms threshold | DONE |
+| 2. Worker eligibility check | Active policy, correct zone, no duplicate | DONE |
+| 3. Payout calculated | Amount x trigger days | DONE |
+| 4. Transfer initiated | UPI/IMPS/Razorpay | MOCK ONLY |
+| 5. Record updated | Logs payout, reconciles | PARTIAL |
+
+**Payout channels referenced:**
+- UPI transfer (instant, preferred) - Config exists, not integrated
+- IMPS to bank (fallback) - Not implemented
+- Razorpay/Stripe sandbox (demo) - Config exists, not integrated
+
+**Key points from reference:**
+- Zero-touch: worker does nothing - IMPLEMENTED
+- Rollback logic: what if transfer fails - NOT IMPLEMENTED
+- Settlement time in minutes - IMPLEMENTED (mock instant)
+- Fraud check before payment - IMPLEMENTED

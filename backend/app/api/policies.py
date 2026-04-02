@@ -1,11 +1,15 @@
 from datetime import datetime, timedelta, timezone
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.database import get_db
 from app.models.partner import Partner
 from app.models.policy import Policy, PolicyStatus, TIER_CONFIG
+from app.models.claim import Claim, ClaimStatus
 from app.models.zone import Zone
 from app.schemas.policy import (
     PolicyCreate,
@@ -27,7 +31,142 @@ from app.services.policy_lifecycle import (
 )
 from app.services.policy_certificate import generate_certificate_pdf, get_certificate_filename
 
+
+# Enrollment suspension threshold
+LOSS_RATIO_SUSPENSION_THRESHOLD = 0.85  # 85% - Suspend new enrollments above this
+
+
+class ReinsuranceReviewResponse(BaseModel):
+    """Response for reinsurance review endpoint."""
+    flagged_policies: List[int]
+    total_claims_amount: float
+    review_triggered: bool
+    threshold_ratio: float
+    policies_checked: int
+
 router = APIRouter(prefix="/policies", tags=["policies"])
+
+
+@router.post("/admin/reinsurance-review", response_model=ReinsuranceReviewResponse)
+def reinsurance_review(db: Session = Depends(get_db)):
+    """
+    Admin API endpoint to flag policies for reinsurance review on day 7.
+    Flags policies where total claims > 3x weekly premium.
+    """
+    now = datetime.utcnow()
+    # Find active policies created at least 7 days ago (or around 7 days for demo)
+    day_7_cutoff = now - timedelta(days=7)
+    
+    policies = db.query(Policy).filter(
+        Policy.is_active == True,
+        Policy.created_at <= (now - timedelta(days=6))
+    ).all()
+
+    flagged_policies = []
+    total_claims_amount = 0.0
+
+    for policy in policies:
+        # Sum claims for this policy
+        claims_total = db.query(func.sum(Claim.amount)).filter(
+            Claim.policy_id == policy.id,
+            Claim.status == ClaimStatus.PAID
+        ).scalar() or 0.0
+        
+        if claims_total > (3 * policy.weekly_premium):
+            flagged_policies.append(policy.id)
+            total_claims_amount += claims_total
+            
+    return ReinsuranceReviewResponse(
+        flagged_policies=flagged_policies,
+        total_claims_amount=total_claims_amount,
+        review_triggered=len(flagged_policies) > 0,
+        threshold_ratio=3.0,
+        policies_checked=len(policies)
+    )
+
+
+def check_city_enrollment_status(partner: Partner, db: Session, days: int = 7) -> tuple[bool, str, float]:
+    """
+    Check if new enrollments are allowed in partner's city based on loss ratio.
+
+    When loss ratio exceeds 85%, new enrollments are suspended to protect
+    the insurance pool from excessive losses.
+
+    Args:
+        partner: The partner trying to enroll
+        db: Database session
+        days: Number of days to calculate loss ratio (default 7)
+
+    Returns tuple of:
+        - allowed: bool - True if enrollment is allowed
+        - reason: str - Reason if not allowed
+        - loss_ratio: float - Current loss ratio
+    """
+    if not partner.zone_id:
+        # Partner not assigned to zone, allow enrollment
+        return (True, "", 0.0)
+
+    # Get partner's zone and city
+    zone = db.query(Zone).filter(Zone.id == partner.zone_id).first()
+    if not zone:
+        return (True, "", 0.0)
+
+    city = zone.city
+    now = datetime.utcnow()
+    period_start = now - timedelta(days=days)
+
+    # Get all zones in the city
+    city_zones = db.query(Zone).filter(Zone.city.ilike(f"%{city}%")).all()
+    zone_ids = [z.id for z in city_zones]
+
+    if not zone_ids:
+        return (True, "", 0.0)
+
+    # Get partners in these zones
+    partner_ids = [
+        p[0] for p in
+        db.query(Partner.id).filter(Partner.zone_id.in_(zone_ids)).all()
+    ]
+
+    if not partner_ids:
+        return (True, "", 0.0)
+
+    # Calculate total premiums collected this period
+    total_premiums = (
+        db.query(func.sum(Policy.weekly_premium))
+        .filter(
+            Policy.partner_id.in_(partner_ids),
+            Policy.created_at >= period_start,
+            Policy.created_at <= now,
+        )
+        .scalar()
+    ) or 0.0
+
+    # Calculate total claims paid this period
+    total_claims_paid = (
+        db.query(func.sum(Claim.amount))
+        .join(Policy, Claim.policy_id == Policy.id)
+        .filter(
+            Policy.partner_id.in_(partner_ids),
+            Claim.status == ClaimStatus.PAID,
+            Claim.paid_at >= period_start,
+            Claim.paid_at <= now,
+        )
+        .scalar()
+    ) or 0.0
+
+    # Calculate loss ratio (BCR)
+    loss_ratio = total_claims_paid / total_premiums if total_premiums > 0 else 0.0
+
+    if loss_ratio > LOSS_RATIO_SUSPENSION_THRESHOLD:
+        return (
+            False,
+            f"New enrollments suspended in {city} due to high loss ratio ({loss_ratio:.1%}). "
+            f"Please try again later.",
+            loss_ratio,
+        )
+
+    return (True, "", loss_ratio)
 
 
 @router.get("/quotes", response_model=list[PolicyQuote])
@@ -50,6 +189,14 @@ def create_policy(
     db: Session = Depends(get_db),
 ):
     """Create a new insurance policy for the current partner."""
+    # Check city enrollment status (loss ratio < 85%)
+    allowed, reason, _ = check_city_enrollment_status(partner, db)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=reason,
+        )
+
     # Check for existing active policy
     existing = (
         db.query(Policy)

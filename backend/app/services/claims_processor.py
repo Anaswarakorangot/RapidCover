@@ -7,6 +7,7 @@ When a trigger event fires, this service:
 3. Calculates payout amount (based on policy tier and disruption duration)
 4. Computes fraud score
 5. Creates claims with appropriate status
+6. Applies sustained event modifiers (70% payout after 5+ consecutive days)
 """
 
 import json
@@ -60,11 +61,18 @@ def calculate_payout_amount(
     trigger_event: TriggerEvent,
     policy: Policy,
     disruption_hours: Optional[float] = None,
-) -> float:
+    sustained_event_modifier: float = 1.0,
+) -> tuple[float, dict]:
     """
     Calculate payout amount based on trigger type, duration, and policy limits.
 
-    Returns payout amount in INR.
+    Args:
+        trigger_event: The trigger event
+        policy: The policy to calculate payout for
+        disruption_hours: Hours of disruption (defaults to DEFAULT_DISRUPTION_HOURS)
+        sustained_event_modifier: Modifier for sustained events (default 1.0, 0.70 for sustained)
+
+    Returns tuple of (payout_amount, calculation_details)
     """
     if disruption_hours is None:
         # Use default for demo
@@ -80,11 +88,26 @@ def calculate_payout_amount(
     severity_multiplier = 1.0 + (trigger_event.severity - 1) * 0.125
     adjusted_payout = base_payout * severity_multiplier
 
+    # Apply sustained event modifier (70% for sustained events)
+    sustained_adjusted = adjusted_payout * sustained_event_modifier
+
     # Apply policy daily limit
     daily_limit = policy.max_daily_payout
-    final_payout = min(adjusted_payout, daily_limit)
+    final_payout = min(sustained_adjusted, daily_limit)
 
-    return round(final_payout, 2)
+    calculation_details = {
+        "hourly_rate": hourly_rate,
+        "disruption_hours": disruption_hours,
+        "base_payout": round(base_payout, 2),
+        "severity_multiplier": round(severity_multiplier, 3),
+        "after_severity": round(adjusted_payout, 2),
+        "sustained_event_modifier": sustained_event_modifier,
+        "after_sustained_modifier": round(sustained_adjusted, 2),
+        "daily_limit": daily_limit,
+        "daily_limit_applied": sustained_adjusted > daily_limit,
+    }
+
+    return round(final_payout, 2), calculation_details
 
 
 def check_daily_limit(
@@ -305,10 +328,26 @@ def process_trigger_event(
     """
     Process a trigger event and create claims for eligible partners.
 
+    Includes sustained event detection:
+    - Tracks consecutive days of same trigger type in zone
+    - After 5+ consecutive days, applies 70% payout modifier
+    - Bypasses weekly cap for sustained events
+    - Maximum 21 days tracking
+
     Returns list of created claims.
     """
+    # Import here to avoid circular import
+    from app.services.trigger_detector import track_sustained_event
+
     zone_id = trigger_event.zone_id
     created_claims = []
+
+    # Track sustained event and get modifier
+    sustained_info = track_sustained_event(
+        zone_id,
+        trigger_event.trigger_type,
+        trigger_event.started_at or datetime.utcnow()
+    )
 
     # Get eligible policies in the affected zone
     eligible = get_eligible_policies(zone_id, db, trigger_event.started_at or datetime.utcnow())
@@ -318,8 +357,13 @@ def process_trigger_event(
     zone_density_weight = _get_zone_density_weight(zone, total_partners_in_event)
 
     for policy, partner in eligible:
-        # Calculate payout amount
-        payout = calculate_payout_amount(trigger_event, policy, disruption_hours)
+        # Calculate payout amount with sustained event modifier
+        payout, calc_details = calculate_payout_amount(
+            trigger_event,
+            policy,
+            disruption_hours,
+            sustained_event_modifier=sustained_info["payout_modifier"]
+        )
 
         # Check daily limit
         within_daily, daily_remaining = check_daily_limit(partner, policy, payout, db)
@@ -329,10 +373,11 @@ def process_trigger_event(
         if payout <= 0:
             continue  # Skip if no payout available
 
-        # Check weekly limit
-        has_weekly_days, _ = check_weekly_limit(partner, policy, db)
-        if not has_weekly_days:
-            continue  # Skip if weekly days exhausted
+        # Check weekly limit (bypass for sustained events)
+        if not sustained_info["bypass_weekly_cap"]:
+            has_weekly_days, _ = check_weekly_limit(partner, policy, db)
+            if not has_weekly_days:
+                continue  # Skip if weekly days exhausted
 
         # Apply zone pool share cap for mass events
         zone_pool_result = apply_zone_pool_share_cap(
@@ -357,20 +402,13 @@ def process_trigger_event(
         else:
             status = ClaimStatus.PENDING
 
-        # Build validation data with rich payout metadata
-        _hours = disruption_hours or DEFAULT_DISRUPTION_HOURS
-        _rate = HOURLY_PAYOUT_RATES.get(trigger_event.trigger_type, 50)
-        _sev_mult = round(1.0 + (trigger_event.severity - 1) * 0.125, 3)
+        # Build validation data with rich payout metadata including sustained event info
         validation_data = {
             "fraud_analysis": fraud_result,
             "daily_limit_check": {"within_limit": within_daily, "remaining": daily_remaining},
+            "sustained_event": sustained_info,
             "payout_calculation": {
-                "disruption_hours": _hours,
-                "hourly_rate": _rate,
-                "severity": trigger_event.severity,
-                "severity_multiplier": _sev_mult,
-                "base_payout": round(_rate * _hours, 2),
-                "adjusted_payout": round(_rate * _hours * _sev_mult, 2),
+                **calc_details,
                 "final_payout": payout,
                 "trigger_type": trigger_event.trigger_type.value,
                 "zone_id": zone_id,
@@ -378,6 +416,7 @@ def process_trigger_event(
                 "city_weekly_reserve": round(city_weekly_reserve, 2),
                 "total_partners_in_event": total_partners_in_event,
                 "zone_pool_share": zone_pool_result,
+                "severity": trigger_event.severity,
             },
             "processed_at": datetime.utcnow().isoformat(),
         }

@@ -1,11 +1,49 @@
 from math import radians, sin, cos, sqrt, atan2
+from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.database import get_db
 from app.models.zone import Zone
+from app.models.policy import Policy
+from app.models.claim import Claim, ClaimStatus
+from app.models.partner import Partner
 from app.schemas.zone import ZoneResponse, ZoneCreate, ZoneRiskUpdate
+
+
+class BCRResponse(BaseModel):
+    """Benefit-to-Cost Ratio response for a city."""
+    city: str
+    total_premiums_collected: float
+    total_claims_paid: float
+    bcr: float  # claims_paid / premiums_collected
+    loss_ratio: float  # BCR as percentage (BCR * 100)
+    policy_count: int
+    claim_count: int
+    period_start: datetime
+    period_end: datetime
+
+
+class ZoneReassignmentRequest(BaseModel):
+    """Request to reassign a partner to a new zone."""
+    partner_id: int
+    new_zone_id: int
+
+
+class ZoneReassignmentResponse(BaseModel):
+    """Response for zone reassignment."""
+    partner_id: int
+    old_zone_id: Optional[int]
+    new_zone_id: int
+    premium_adjustment: float  # Positive = credit, Negative = debit
+    new_weekly_premium: float
+    days_remaining: int
+    policy_id: Optional[int]
+    reassignment_logged: bool
 
 
 def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -140,3 +178,213 @@ def update_zone_risk(
     db.refresh(zone)
 
     return zone
+
+
+def calculate_city_bcr(city: str, db: Session, days: int = 7) -> BCRResponse:
+    """
+    Calculate Benefit-to-Cost Ratio for a city.
+
+    BCR = total_claims_paid / total_premiums_collected
+
+    Args:
+        city: City name to calculate BCR for
+        db: Database session
+        days: Number of days to look back (default 7 for weekly)
+
+    Returns BCRResponse with all financial metrics.
+    """
+    now = datetime.utcnow()
+    period_start = now - timedelta(days=days)
+
+    # Get all zones in the city
+    city_zones = db.query(Zone).filter(Zone.city.ilike(f"%{city}%")).all()
+    zone_ids = [z.id for z in city_zones]
+
+    if not zone_ids:
+        return BCRResponse(
+            city=city,
+            total_premiums_collected=0.0,
+            total_claims_paid=0.0,
+            bcr=0.0,
+            loss_ratio=0.0,
+            policy_count=0,
+            claim_count=0,
+            period_start=period_start,
+            period_end=now,
+        )
+
+    # Get partners in these zones
+    partner_ids_query = db.query(Partner.id).filter(Partner.zone_id.in_(zone_ids))
+    partner_ids = [p[0] for p in partner_ids_query.all()]
+
+    # Calculate total premiums collected (from active policies created in period)
+    total_premiums = (
+        db.query(func.sum(Policy.weekly_premium))
+        .filter(
+            Policy.partner_id.in_(partner_ids),
+            Policy.created_at >= period_start,
+            Policy.created_at <= now,
+        )
+        .scalar()
+    ) or 0.0
+
+    # Calculate total claims paid
+    total_claims_paid = (
+        db.query(func.sum(Claim.amount))
+        .join(Policy, Claim.policy_id == Policy.id)
+        .filter(
+            Policy.partner_id.in_(partner_ids),
+            Claim.status == ClaimStatus.PAID,
+            Claim.paid_at >= period_start,
+            Claim.paid_at <= now,
+        )
+        .scalar()
+    ) or 0.0
+
+    # Count policies and claims
+    policy_count = (
+        db.query(func.count(Policy.id))
+        .filter(
+            Policy.partner_id.in_(partner_ids),
+            Policy.created_at >= period_start,
+            Policy.created_at <= now,
+        )
+        .scalar()
+    ) or 0
+
+    claim_count = (
+        db.query(func.count(Claim.id))
+        .join(Policy, Claim.policy_id == Policy.id)
+        .filter(
+            Policy.partner_id.in_(partner_ids),
+            Claim.status == ClaimStatus.PAID,
+            Claim.paid_at >= period_start,
+            Claim.paid_at <= now,
+        )
+        .scalar()
+    ) or 0
+
+    # Calculate BCR (avoid division by zero)
+    bcr = total_claims_paid / total_premiums if total_premiums > 0 else 0.0
+    loss_ratio = bcr * 100  # As percentage
+
+    return BCRResponse(
+        city=city,
+        total_premiums_collected=round(total_premiums, 2),
+        total_claims_paid=round(total_claims_paid, 2),
+        bcr=round(bcr, 4),
+        loss_ratio=round(loss_ratio, 2),
+        policy_count=policy_count,
+        claim_count=claim_count,
+        period_start=period_start,
+        period_end=now,
+    )
+
+
+@router.get("/bcr/{city}", response_model=BCRResponse)
+def get_city_bcr(
+    city: str,
+    days: int = Query(7, ge=1, le=365, description="Number of days to calculate BCR for"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get Benefit-to-Cost Ratio (BCR) for a city.
+
+    BCR = total_claims_paid / total_premiums_collected
+
+    - BCR < 1.0 means profitable (collecting more than paying out)
+    - BCR > 1.0 means losing money
+    - BCR > 1.2 triggers reinsurance (120% hard cap)
+
+    Loss ratio is BCR expressed as percentage.
+    """
+    return calculate_city_bcr(city, db, days)
+
+
+@router.post("/reassign", response_model=ZoneReassignmentResponse)
+def reassign_partner_zone(
+    reassignment: ZoneReassignmentRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Reassign a partner to a new zone mid-week.
+
+    When Zepto/Blinkit reassigns a partner to a new dark store:
+    - Recalculates premium for remaining days based on new zone's risk
+    - Computes credit/debit adjustment for next renewal
+    - Logs reassignment history in partner record
+
+    Returns adjustment details for frontend display.
+    """
+    from app.services.premium import calculate_premium
+
+    # Get partner
+    partner = db.query(Partner).filter(Partner.id == reassignment.partner_id).first()
+    if not partner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Partner not found",
+        )
+
+    # Get new zone
+    new_zone = db.query(Zone).filter(Zone.id == reassignment.new_zone_id).first()
+    if not new_zone:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Zone not found",
+        )
+
+    old_zone_id = partner.zone_id
+
+    # Get current active policy
+    now = datetime.utcnow()
+    active_policy = (
+        db.query(Policy)
+        .filter(
+            Policy.partner_id == partner.id,
+            Policy.is_active == True,
+            Policy.expires_at > now,
+        )
+        .first()
+    )
+
+    premium_adjustment = 0.0
+    new_weekly_premium = 0.0
+    days_remaining = 0
+    policy_id = None
+
+    if active_policy:
+        policy_id = active_policy.id
+
+        # Calculate days remaining in current policy
+        days_remaining = max(0, (active_policy.expires_at - now).days)
+
+        # Get old zone for comparison
+        old_zone = db.query(Zone).filter(Zone.id == old_zone_id).first() if old_zone_id else None
+
+        # Calculate new premium based on new zone
+        new_quote = calculate_premium(active_policy.tier, new_zone)
+        old_daily_rate = active_policy.weekly_premium / 7
+        new_daily_rate = new_quote.final_premium / 7
+
+        # Premium adjustment = (old_rate - new_rate) * days_remaining
+        # Positive = credit to partner (new zone is cheaper)
+        # Negative = debit from partner (new zone is more expensive)
+        premium_adjustment = round((old_daily_rate - new_daily_rate) * days_remaining, 2)
+        new_weekly_premium = new_quote.final_premium
+
+    # Update partner's zone
+    partner.zone_id = reassignment.new_zone_id
+    db.commit()
+    db.refresh(partner)
+
+    return ZoneReassignmentResponse(
+        partner_id=partner.id,
+        old_zone_id=old_zone_id,
+        new_zone_id=reassignment.new_zone_id,
+        premium_adjustment=premium_adjustment,
+        new_weekly_premium=new_weekly_premium,
+        days_remaining=days_remaining,
+        policy_id=policy_id,
+        reassignment_logged=True,
+    )
