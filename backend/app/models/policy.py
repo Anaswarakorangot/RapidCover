@@ -18,22 +18,25 @@ class PolicyStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-# Tier configuration
+# Tier configuration based on specification image
+# Flex:     250/day * 2 days = 500 max/week. Ratio 500/22 = 22.7 (~1:23)
+# Standard: 400/day * 3 days = 1200 max/week. Ratio 1200/33 = 36.3 (~1:36)
+# Pro:      500/day * 4 days = 2000 max/week. Ratio 2000/45 = 44.4 (~1:44)
 TIER_CONFIG = {
     PolicyTier.FLEX: {
-        "weekly_premium": 29,
+        "weekly_premium": 22,
         "max_daily_payout": 250,
-        "max_days_per_week": 3,
+        "max_days_per_week": 2,
     },
     PolicyTier.STANDARD: {
-        "weekly_premium": 49,
-        "max_daily_payout": 350,
-        "max_days_per_week": 5,
+        "weekly_premium": 33,
+        "max_daily_payout": 400,
+        "max_days_per_week": 3,
     },
     PolicyTier.PRO: {
-        "weekly_premium": 79,
+        "weekly_premium": 45,
         "max_daily_payout": 500,
-        "max_days_per_week": 7,
+        "max_days_per_week": 4,
     },
 }
 
