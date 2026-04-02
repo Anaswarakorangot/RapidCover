@@ -29,3 +29,4 @@ pywebpush>=2.0.0
 
 # PDF generation
 reportlab>=4.0.0
+razorpay>=1.4.0

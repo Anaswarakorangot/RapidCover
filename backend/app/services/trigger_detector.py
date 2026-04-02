@@ -24,6 +24,120 @@ from app.services.external_apis import (
 )
 
 
+# Sustained Event Tracking
+# Tracks consecutive days of same trigger type in same zone
+# Key format: "{zone_id}:{trigger_type}" -> list of date strings
+_sustained_events: dict[str, list[str]] = {}
+
+# Sustained event thresholds
+SUSTAINED_EVENT_THRESHOLD_DAYS = 5  # Days before sustained mode activates
+SUSTAINED_EVENT_MAX_DAYS = 21  # Maximum days for sustained payout
+SUSTAINED_EVENT_PAYOUT_MODIFIER = 0.70  # 70% payout per day in sustained mode
+
+
+def track_sustained_event(zone_id: int, trigger_type: TriggerType, event_date: datetime = None) -> dict:
+    """
+    Track consecutive trigger events for sustained event detection.
+
+    When same trigger fires 5+ consecutive days in same zone:
+    - Raises 'Sustained Event' flag
+    - Switches to 70% payout per day
+    - Bypasses weekly cap
+    - Maximum 21 days
+
+    Returns dict with:
+    - is_sustained: bool - True if 5+ consecutive days
+    - consecutive_days: int - Number of consecutive days
+    - payout_modifier: float - 1.0 normal, 0.70 for sustained
+    - max_days_reached: bool - True if 21 days reached
+    - bypass_weekly_cap: bool - True for sustained events
+    """
+    if event_date is None:
+        event_date = datetime.utcnow()
+
+    key = f"{zone_id}:{trigger_type.value}"
+    dates = _sustained_events.get(key, [])
+    date_str = event_date.strftime("%Y-%m-%d")
+
+    # Add date if not already tracked
+    if date_str not in dates:
+        dates.append(date_str)
+        dates = sorted(dates)[-SUSTAINED_EVENT_MAX_DAYS:]  # Keep last 21 days
+        _sustained_events[key] = dates
+
+    # Count consecutive days ending with today/event_date
+    consecutive = 1
+    sorted_dates = sorted(dates, reverse=True)
+
+    for i in range(len(sorted_dates) - 1):
+        curr = datetime.strptime(sorted_dates[i], "%Y-%m-%d")
+        prev = datetime.strptime(sorted_dates[i + 1], "%Y-%m-%d")
+        if (curr - prev).days == 1:
+            consecutive += 1
+        else:
+            break
+
+    is_sustained = consecutive >= SUSTAINED_EVENT_THRESHOLD_DAYS
+    max_days_reached = consecutive >= SUSTAINED_EVENT_MAX_DAYS
+
+    return {
+        "is_sustained": is_sustained,
+        "consecutive_days": consecutive,
+        "payout_modifier": SUSTAINED_EVENT_PAYOUT_MODIFIER if is_sustained else 1.0,
+        "max_days_reached": max_days_reached,
+        "bypass_weekly_cap": is_sustained,
+    }
+
+
+def get_sustained_event_info(zone_id: int, trigger_type: TriggerType) -> dict:
+    """
+    Get current sustained event info for a zone/trigger combination without modifying state.
+    """
+    key = f"{zone_id}:{trigger_type.value}"
+    dates = _sustained_events.get(key, [])
+
+    if not dates:
+        return {
+            "is_sustained": False,
+            "consecutive_days": 0,
+            "payout_modifier": 1.0,
+            "max_days_reached": False,
+            "bypass_weekly_cap": False,
+        }
+
+    # Count consecutive days
+    consecutive = 1
+    sorted_dates = sorted(dates, reverse=True)
+
+    for i in range(len(sorted_dates) - 1):
+        curr = datetime.strptime(sorted_dates[i], "%Y-%m-%d")
+        prev = datetime.strptime(sorted_dates[i + 1], "%Y-%m-%d")
+        if (curr - prev).days == 1:
+            consecutive += 1
+        else:
+            break
+
+    is_sustained = consecutive >= SUSTAINED_EVENT_THRESHOLD_DAYS
+
+    return {
+        "is_sustained": is_sustained,
+        "consecutive_days": consecutive,
+        "payout_modifier": SUSTAINED_EVENT_PAYOUT_MODIFIER if is_sustained else 1.0,
+        "max_days_reached": consecutive >= SUSTAINED_EVENT_MAX_DAYS,
+        "bypass_weekly_cap": is_sustained,
+    }
+
+
+def clear_sustained_event(zone_id: int, trigger_type: TriggerType) -> None:
+    """
+    Clear sustained event tracking for a zone/trigger combination.
+    Call when a trigger event ends or conditions normalize.
+    """
+    key = f"{zone_id}:{trigger_type.value}"
+    if key in _sustained_events:
+        del _sustained_events[key]
+
+
 def _calculate_severity(value: float, threshold: float) -> int:
     """
     Calculate severity level (1-5) based on how much the value exceeds threshold.

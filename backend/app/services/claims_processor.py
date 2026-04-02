@@ -7,13 +7,14 @@ When a trigger event fires, this service:
 3. Calculates payout amount (based on policy tier and disruption duration)
 4. Computes fraud score
 5. Creates claims with appropriate status
+6. Applies sustained event modifiers (70% payout after 5+ consecutive days)
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, text
 
 from app.models.partner import Partner
 from app.models.policy import Policy, TIER_CONFIG
@@ -21,6 +22,7 @@ from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent, TriggerType
 from app.models.zone import Zone
 from app.services.fraud_detector import calculate_fraud_score, FRAUD_THRESHOLDS
+from app.services.premium_service import calculate_zone_pool_share as apply_zone_pool_share_cap
 from app.services.notifications import (
     notify_claim_created,
     notify_claim_approved,
@@ -52,16 +54,229 @@ MIN_DISRUPTION_HOURS = {
 # Default disruption duration for demo (since we're not tracking real duration)
 DEFAULT_DISRUPTION_HOURS = 4
 
+DAY_NAMES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def _ensure_partner_runtime_metadata_table(db: Session) -> None:
+    """Create the partner runtime metadata table if it does not exist yet."""
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS partner_runtime_metadata (
+            partner_id INTEGER PRIMARY KEY,
+            pin_code TEXT NULL,
+            is_manual_offline INTEGER NOT NULL DEFAULT 0,
+            manual_offline_until TEXT NULL,
+            leave_until TEXT NULL,
+            leave_note TEXT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """))
+    db.commit()
+
+
+def _ensure_zone_coverage_metadata_table(db: Session) -> None:
+    """Create the zone coverage metadata table if it does not exist yet."""
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS zone_coverage_metadata (
+            zone_id INTEGER PRIMARY KEY,
+            pin_codes_json TEXT NULL,
+            density_weight REAL NULL,
+            ward_name TEXT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """))
+    db.commit()
+
+
+def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Parse ISO datetimes stored in auxiliary metadata tables."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def get_partner_runtime_metadata(partner_id: int, db: Session) -> dict:
+    """Fetch persisted partner runtime metadata used by the claims engine."""
+    _ensure_partner_runtime_metadata_table(db)
+    row = db.execute(
+        text("""
+            SELECT partner_id, pin_code, is_manual_offline, manual_offline_until, leave_until, leave_note, updated_at
+            FROM partner_runtime_metadata
+            WHERE partner_id = :partner_id
+        """),
+        {"partner_id": partner_id},
+    ).mappings().first()
+
+    if not row:
+        return {
+            "partner_id": partner_id,
+            "pin_code": None,
+            "is_manual_offline": False,
+            "manual_offline_until": None,
+            "leave_until": None,
+            "leave_note": None,
+            "updated_at": None,
+        }
+
+    return {
+        "partner_id": row["partner_id"],
+        "pin_code": row["pin_code"],
+        "is_manual_offline": bool(row["is_manual_offline"]),
+        "manual_offline_until": _parse_iso_datetime(row["manual_offline_until"]),
+        "leave_until": _parse_iso_datetime(row["leave_until"]),
+        "leave_note": row["leave_note"],
+        "updated_at": _parse_iso_datetime(row["updated_at"]),
+    }
+
+
+def upsert_partner_runtime_metadata(
+    partner_id: int,
+    db: Session,
+    *,
+    pin_code: Optional[str] = None,
+    is_manual_offline: Optional[bool] = None,
+    manual_offline_until: Optional[datetime] = None,
+    leave_until: Optional[datetime] = None,
+    leave_note: Optional[str] = None,
+) -> dict:
+    """Create or update partner runtime metadata."""
+    _ensure_partner_runtime_metadata_table(db)
+    existing = get_partner_runtime_metadata(partner_id, db)
+
+    payload = {
+        "partner_id": partner_id,
+        "pin_code": pin_code if pin_code is not None else existing["pin_code"],
+        "is_manual_offline": int(existing["is_manual_offline"] if is_manual_offline is None else is_manual_offline),
+        "manual_offline_until": (
+            manual_offline_until.isoformat()
+            if manual_offline_until is not None
+            else (existing["manual_offline_until"].isoformat() if existing["manual_offline_until"] else None)
+        ),
+        "leave_until": (
+            leave_until.isoformat()
+            if leave_until is not None
+            else (existing["leave_until"].isoformat() if existing["leave_until"] else None)
+        ),
+        "leave_note": leave_note if leave_note is not None else existing["leave_note"],
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
+    db.execute(
+        text("""
+            INSERT INTO partner_runtime_metadata (
+                partner_id, pin_code, is_manual_offline, manual_offline_until, leave_until, leave_note, updated_at
+            ) VALUES (
+                :partner_id, :pin_code, :is_manual_offline, :manual_offline_until, :leave_until, :leave_note, :updated_at
+            )
+            ON CONFLICT(partner_id) DO UPDATE SET
+                pin_code = excluded.pin_code,
+                is_manual_offline = excluded.is_manual_offline,
+                manual_offline_until = excluded.manual_offline_until,
+                leave_until = excluded.leave_until,
+                leave_note = excluded.leave_note,
+                updated_at = excluded.updated_at
+        """),
+        payload,
+    )
+    db.commit()
+    return get_partner_runtime_metadata(partner_id, db)
+
+
+def get_zone_coverage_metadata(zone_id: int, db: Session) -> dict:
+    """Fetch persisted pin-code and density metadata for a zone."""
+    _ensure_zone_coverage_metadata_table(db)
+    row = db.execute(
+        text("""
+            SELECT zone_id, pin_codes_json, density_weight, ward_name, updated_at
+            FROM zone_coverage_metadata
+            WHERE zone_id = :zone_id
+        """),
+        {"zone_id": zone_id},
+    ).mappings().first()
+
+    if not row:
+        return {
+            "zone_id": zone_id,
+            "pin_codes": [],
+            "density_weight": None,
+            "ward_name": None,
+            "updated_at": None,
+        }
+
+    try:
+        pin_codes = json.loads(row["pin_codes_json"]) if row["pin_codes_json"] else []
+    except json.JSONDecodeError:
+        pin_codes = []
+
+    return {
+        "zone_id": row["zone_id"],
+        "pin_codes": pin_codes,
+        "density_weight": row["density_weight"],
+        "ward_name": row["ward_name"],
+        "updated_at": _parse_iso_datetime(row["updated_at"]),
+    }
+
+
+def upsert_zone_coverage_metadata(
+    zone_id: int,
+    db: Session,
+    *,
+    pin_codes: Optional[list[str]] = None,
+    density_weight: Optional[float] = None,
+    ward_name: Optional[str] = None,
+) -> dict:
+    """Create or update zone coverage metadata."""
+    _ensure_zone_coverage_metadata_table(db)
+    existing = get_zone_coverage_metadata(zone_id, db)
+
+    normalized_pin_codes = existing["pin_codes"] if pin_codes is None else sorted({
+        str(pin).strip() for pin in pin_codes if str(pin).strip()
+    })
+    payload = {
+        "zone_id": zone_id,
+        "pin_codes_json": json.dumps(normalized_pin_codes),
+        "density_weight": density_weight if density_weight is not None else existing["density_weight"],
+        "ward_name": ward_name if ward_name is not None else existing["ward_name"],
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
+    db.execute(
+        text("""
+            INSERT INTO zone_coverage_metadata (
+                zone_id, pin_codes_json, density_weight, ward_name, updated_at
+            ) VALUES (
+                :zone_id, :pin_codes_json, :density_weight, :ward_name, :updated_at
+            )
+            ON CONFLICT(zone_id) DO UPDATE SET
+                pin_codes_json = excluded.pin_codes_json,
+                density_weight = excluded.density_weight,
+                ward_name = excluded.ward_name,
+                updated_at = excluded.updated_at
+        """),
+        payload,
+    )
+    db.commit()
+    return get_zone_coverage_metadata(zone_id, db)
+
 
 def calculate_payout_amount(
     trigger_event: TriggerEvent,
     policy: Policy,
     disruption_hours: Optional[float] = None,
-) -> float:
+    sustained_event_modifier: float = 1.0,
+) -> tuple[float, dict]:
     """
     Calculate payout amount based on trigger type, duration, and policy limits.
 
-    Returns payout amount in INR.
+    Args:
+        trigger_event: The trigger event
+        policy: The policy to calculate payout for
+        disruption_hours: Hours of disruption (defaults to DEFAULT_DISRUPTION_HOURS)
+        sustained_event_modifier: Modifier for sustained events (default 1.0, 0.70 for sustained)
+
+    Returns tuple of (payout_amount, calculation_details)
     """
     if disruption_hours is None:
         # Use default for demo
@@ -77,11 +292,26 @@ def calculate_payout_amount(
     severity_multiplier = 1.0 + (trigger_event.severity - 1) * 0.125
     adjusted_payout = base_payout * severity_multiplier
 
+    # Apply sustained event modifier (70% for sustained events)
+    sustained_adjusted = adjusted_payout * sustained_event_modifier
+
     # Apply policy daily limit
     daily_limit = policy.max_daily_payout
-    final_payout = min(adjusted_payout, daily_limit)
+    final_payout = min(sustained_adjusted, daily_limit)
 
-    return round(final_payout, 2)
+    calculation_details = {
+        "hourly_rate": hourly_rate,
+        "disruption_hours": disruption_hours,
+        "base_payout": round(base_payout, 2),
+        "severity_multiplier": round(severity_multiplier, 3),
+        "after_severity": round(adjusted_payout, 2),
+        "sustained_event_modifier": sustained_event_modifier,
+        "after_sustained_modifier": round(sustained_adjusted, 2),
+        "daily_limit": daily_limit,
+        "daily_limit_applied": sustained_adjusted > daily_limit,
+    }
+
+    return round(final_payout, 2), calculation_details
 
 
 def check_daily_limit(
@@ -146,7 +376,116 @@ def check_weekly_limit(
     return (remaining > 0, max(0, remaining))
 
 
-def get_eligible_policies(zone_id: int, db: Session) -> list[tuple[Policy, Partner]]:
+def _parse_shift_time(value: Optional[str]) -> Optional[time]:
+    """Parse HH:MM strings used in partner shift preferences."""
+    if not value:
+        return None
+    try:
+        hour, minute = value.split(":", 1)
+        return time(hour=int(hour), minute=int(minute))
+    except (ValueError, AttributeError):
+        return None
+
+
+def is_partner_available_for_trigger(
+    partner: Partner,
+    db: Session,
+    trigger_time: Optional[datetime] = None,
+) -> tuple[bool, str]:
+    """
+    Check whether the partner should be eligible when the trigger fires.
+
+    Uses existing partner activity + shift preference fields:
+    - inactive partners are excluded
+    - if shift_days are configured, the trigger day must match
+    - if shift_start / shift_end are configured, the trigger time must be in-window
+    """
+    trigger_time = trigger_time or datetime.utcnow()
+
+    if not partner.is_active:
+        return False, "partner_inactive"
+
+    runtime_metadata = get_partner_runtime_metadata(partner.id, db)
+    if runtime_metadata["is_manual_offline"]:
+        offline_until = runtime_metadata["manual_offline_until"]
+        if offline_until is None or trigger_time <= offline_until:
+            return False, "manual_offline"
+
+    leave_until = runtime_metadata["leave_until"]
+    if leave_until and trigger_time <= leave_until:
+        return False, "declared_leave"
+
+    shift_days = [str(day).strip().lower()[:3] for day in (partner.shift_days or []) if day]
+    trigger_day = DAY_NAMES[trigger_time.weekday()]
+    if shift_days and trigger_day not in shift_days:
+        return False, "outside_shift_days"
+
+    shift_start = _parse_shift_time(getattr(partner, "shift_start", None))
+    shift_end = _parse_shift_time(getattr(partner, "shift_end", None))
+    if shift_start and shift_end:
+        current_time = trigger_time.time()
+        if shift_start <= shift_end:
+            in_window = shift_start <= current_time <= shift_end
+        else:
+            # Overnight shifts like 22:00-06:00
+            in_window = current_time >= shift_start or current_time <= shift_end
+
+        if not in_window:
+            return False, "outside_shift_window"
+
+    return True, "eligible"
+
+
+def _get_zone_density_weight(zone: Optional[Zone], total_partners_in_event: int) -> float:
+    """
+    Resolve density weight from the model if present, else infer from event size.
+    """
+    model_density_weight = getattr(zone, "density_weight", None) if zone else None
+    if model_density_weight is not None:
+        return float(model_density_weight)
+
+    if total_partners_in_event < 50:
+        return 0.15
+    if total_partners_in_event <= 150:
+        return 0.35
+    return 0.50
+
+
+def calculate_city_weekly_reserve(zone_id: int, db: Session, days: int = 7) -> float:
+    """Estimate city weekly reserve from premiums collected in the recent period."""
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    if not zone:
+        return 0.0
+
+    now = datetime.utcnow()
+    period_start = now - timedelta(days=days)
+    city_zones = db.query(Zone).filter(Zone.city.ilike(f"%{zone.city}%")).all()
+    zone_ids = [z.id for z in city_zones]
+    if not zone_ids:
+        return 0.0
+
+    partner_ids = [row[0] for row in db.query(Partner.id).filter(Partner.zone_id.in_(zone_ids)).all()]
+    if not partner_ids:
+        return 0.0
+
+    total_premiums = (
+        db.query(func.sum(Policy.weekly_premium))
+        .filter(
+            Policy.partner_id.in_(partner_ids),
+            Policy.created_at >= period_start,
+            Policy.created_at <= now,
+        )
+        .scalar()
+    ) or 0.0
+
+    return float(total_premiums)
+
+
+def get_eligible_policies(
+    zone_id: int,
+    db: Session,
+    trigger_time: Optional[datetime] = None,
+) -> list[tuple[Policy, Partner]]:
     """
     Get all active policies for partners in a zone.
 
@@ -176,7 +515,24 @@ def get_eligible_policies(zone_id: int, db: Session) -> list[tuple[Policy, Partn
         .all()
     )
 
-    return results
+    trigger_time = trigger_time or now
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    eligible_results: list[tuple[Policy, Partner]] = []
+    for policy, partner in results:
+        is_available, _ = is_partner_available_for_trigger(partner, db, trigger_time)
+        if not is_available:
+            continue
+
+        if zone:
+            from app.services.trigger_engine import check_partner_pin_code_match
+
+            pin_code_match, _ = check_partner_pin_code_match(partner, zone, db)
+            if not pin_code_match:
+                continue
+
+        eligible_results.append((policy, partner))
+
+    return eligible_results
 
 
 def process_trigger_event(
@@ -187,17 +543,48 @@ def process_trigger_event(
     """
     Process a trigger event and create claims for eligible partners.
 
+    Includes sustained event detection:
+    - Tracks consecutive days of same trigger type in zone
+    - After 5+ consecutive days, applies 70% payout modifier
+    - Bypasses weekly cap for sustained events
+    - Maximum 21 days tracking
+
     Returns list of created claims.
     """
+    # Import here to avoid circular import
+    from app.services.trigger_detector import track_sustained_event
+
     zone_id = trigger_event.zone_id
     created_claims = []
 
+    # Track sustained event and get modifier
+    sustained_info = track_sustained_event(
+        zone_id,
+        trigger_event.trigger_type,
+        trigger_event.started_at or datetime.utcnow()
+    )
+
     # Get eligible policies in the affected zone
-    eligible = get_eligible_policies(zone_id, db)
+    eligible = get_eligible_policies(zone_id, db, trigger_event.started_at or datetime.utcnow())
+    total_partners_in_event = len(eligible)
+    city_weekly_reserve = calculate_city_weekly_reserve(zone_id, db)
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    zone_metadata = get_zone_coverage_metadata(zone_id, db)
+    if zone and zone_metadata["density_weight"] is not None and getattr(zone, "density_weight", None) is None:
+        setattr(zone, "density_weight", zone_metadata["density_weight"])
+    zone_density_weight = _get_zone_density_weight(zone, total_partners_in_event)
+
+    if sustained_info["max_days_reached"]:
+        return []
 
     for policy, partner in eligible:
-        # Calculate payout amount
-        payout = calculate_payout_amount(trigger_event, policy, disruption_hours)
+        # Calculate payout amount with sustained event modifier
+        payout, calc_details = calculate_payout_amount(
+            trigger_event,
+            policy,
+            disruption_hours,
+            sustained_event_modifier=sustained_info["payout_modifier"]
+        )
 
         # Check daily limit
         within_daily, daily_remaining = check_daily_limit(partner, policy, payout, db)
@@ -207,10 +594,23 @@ def process_trigger_event(
         if payout <= 0:
             continue  # Skip if no payout available
 
-        # Check weekly limit
-        has_weekly_days, _ = check_weekly_limit(partner, policy, db)
-        if not has_weekly_days:
-            continue  # Skip if weekly days exhausted
+        # Check weekly limit (bypass for sustained events)
+        if not sustained_info["bypass_weekly_cap"]:
+            has_weekly_days, _ = check_weekly_limit(partner, policy, db)
+            if not has_weekly_days:
+                continue  # Skip if weekly days exhausted
+
+        # Apply zone pool share cap for mass events
+        zone_pool_result = apply_zone_pool_share_cap(
+            calculated_payout=payout,
+            city_weekly_reserve=city_weekly_reserve,
+            zone_density_weight=zone_density_weight,
+            total_partners_in_event=total_partners_in_event,
+        )
+        payout = zone_pool_result["final_payout"]
+
+        if payout <= 0:
+            continue
 
         # Calculate fraud score
         fraud_result = calculate_fraud_score(partner, trigger_event, db)
@@ -223,23 +623,21 @@ def process_trigger_event(
         else:
             status = ClaimStatus.PENDING
 
-        # Build validation data with rich payout metadata
-        _hours = disruption_hours or DEFAULT_DISRUPTION_HOURS
-        _rate = HOURLY_PAYOUT_RATES.get(trigger_event.trigger_type, 50)
-        _sev_mult = round(1.0 + (trigger_event.severity - 1) * 0.125, 3)
+        # Build validation data with rich payout metadata including sustained event info
         validation_data = {
             "fraud_analysis": fraud_result,
             "daily_limit_check": {"within_limit": within_daily, "remaining": daily_remaining},
+            "sustained_event": sustained_info,
             "payout_calculation": {
-                "disruption_hours": _hours,
-                "hourly_rate": _rate,
-                "severity": trigger_event.severity,
-                "severity_multiplier": _sev_mult,
-                "base_payout": round(_rate * _hours, 2),
-                "adjusted_payout": round(_rate * _hours * _sev_mult, 2),
+                **calc_details,
                 "final_payout": payout,
                 "trigger_type": trigger_event.trigger_type.value,
                 "zone_id": zone_id,
+                "zone_density_weight": zone_density_weight,
+                "city_weekly_reserve": round(city_weekly_reserve, 2),
+                "total_partners_in_event": total_partners_in_event,
+                "zone_pool_share": zone_pool_result,
+                "severity": trigger_event.severity,
             },
             "processed_at": datetime.utcnow().isoformat(),
         }

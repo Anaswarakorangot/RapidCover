@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Razorpay
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
+    razorpay_account_number: str = ""
 
     # Twilio
     twilio_account_sid: str = ""

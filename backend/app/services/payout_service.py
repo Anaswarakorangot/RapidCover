@@ -2,22 +2,28 @@
 Payout service for RapidCover.
 
 Handles structured payout processing with full transaction logs,
-UPI reference generation, and payout audit trails.
+UPI reference generation, payout audit trails, and city-level caps.
 """
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
+import httpx
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.models.claim import Claim, ClaimStatus
 from app.models.policy import Policy
 from app.models.partner import Partner
+from app.models.zone import Zone
 from app.models.trigger_event import TriggerEvent, TriggerType
 from app.services.notifications import notify_claim_paid
 
 logger = logging.getLogger(__name__)
+
+# City-level hard cap configuration
+CITY_HARD_CAP_RATIO = 1.20  # 120% - Reinsurance activates above this
 
 TRIGGER_TYPE_LABELS = {
     TriggerType.RAIN: "Heavy Rain",
@@ -26,6 +32,94 @@ TRIGGER_TYPE_LABELS = {
     TriggerType.SHUTDOWN: "Civic Shutdown",
     TriggerType.CLOSURE: "Store Closure",
 }
+
+
+def check_city_hard_cap(partner: Partner, db: Session, days: int = 7) -> tuple[bool, float, float]:
+    """
+    Check if city-level payout hard cap has been reached.
+
+    Reinsurance activates when city payouts exceed 120% of premiums collected.
+
+    Args:
+        partner: The partner to check (uses their zone to determine city)
+        db: Database session
+        days: Number of days to look back (default 7 for weekly)
+
+    Returns tuple of:
+        - is_capped: bool - True if city is at/above 120% cap
+        - current_ratio: float - Current BCR ratio
+        - remaining_capacity: float - Amount in INR that can still be paid out before cap
+    """
+    if not partner.zone_id:
+        # Partner not assigned to zone, allow payout
+        return (False, 0.0, float('inf'))
+
+    # Get partner's zone and city
+    zone = db.query(Zone).filter(Zone.id == partner.zone_id).first()
+    if not zone:
+        return (False, 0.0, float('inf'))
+
+    city = zone.city
+    now = datetime.utcnow()
+    period_start = now - timedelta(days=days)
+
+    # Get all zones in the city
+    city_zones = db.query(Zone).filter(Zone.city.ilike(f"%{city}%")).all()
+    zone_ids = [z.id for z in city_zones]
+
+    if not zone_ids:
+        return (False, 0.0, float('inf'))
+
+    # Get partners in these zones
+    partner_ids = [
+        p[0] for p in
+        db.query(Partner.id).filter(Partner.zone_id.in_(zone_ids)).all()
+    ]
+
+    if not partner_ids:
+        return (False, 0.0, float('inf'))
+
+    # Calculate total premiums collected this period
+    total_premiums = (
+        db.query(func.sum(Policy.weekly_premium))
+        .filter(
+            Policy.partner_id.in_(partner_ids),
+            Policy.created_at >= period_start,
+            Policy.created_at <= now,
+        )
+        .scalar()
+    ) or 0.0
+
+    # Calculate total claims paid this period
+    total_claims_paid = (
+        db.query(func.sum(Claim.amount))
+        .join(Policy, Claim.policy_id == Policy.id)
+        .filter(
+            Policy.partner_id.in_(partner_ids),
+            Claim.status == ClaimStatus.PAID,
+            Claim.paid_at >= period_start,
+            Claim.paid_at <= now,
+        )
+        .scalar()
+    ) or 0.0
+
+    # Calculate current ratio
+    current_ratio = total_claims_paid / total_premiums if total_premiums > 0 else 0.0
+
+    # Calculate remaining capacity (up to 120% of premiums)
+    max_payout = total_premiums * CITY_HARD_CAP_RATIO
+    remaining_capacity = max(0, max_payout - total_claims_paid)
+
+    # Check if capped
+    is_capped = current_ratio >= CITY_HARD_CAP_RATIO
+
+    logger.info(
+        f"City hard cap check for {city}: "
+        f"premiums={total_premiums:.2f}, claims={total_claims_paid:.2f}, "
+        f"ratio={current_ratio:.2%}, capped={is_capped}"
+    )
+
+    return (is_capped, round(current_ratio, 4), round(remaining_capacity, 2))
 
 
 def generate_upi_ref(policy_id: int, claim_id: int) -> str:
@@ -84,11 +178,87 @@ def build_transaction_log(
         "version": "1.0",
     }
 
+from app.config import get_settings
 
-def process_payout(claim: Claim, db: Session, upi_ref: Optional[str] = None) -> tuple[bool, str, dict]:
+def process_razorpay_payout(partner: Partner, amount: float, claim_id: int) -> tuple[bool, str, dict]:
+    """Process payout via Razorpay Payout API."""
+    settings = get_settings()
+    
+    if not settings.razorpay_key_id or not settings.razorpay_key_secret or not settings.razorpay_account_number:
+        return False, "", {"error": "Razorpay keys not configured"}
+
+    auth = (settings.razorpay_key_id, settings.razorpay_key_secret)
+    base_url = "https://api.razorpay.com/v1"
+    
+    try:
+        # 1. Create contact
+        with httpx.Client(auth=auth, timeout=10.0) as client:
+            res = client.post(
+                f"{base_url}/contacts",
+                json={
+                    "name": partner.name,
+                    "contact": partner.phone,
+                    "type": "employee",
+                    "reference_id": f"partner_{partner.id}_c{claim_id}"
+                }
+            )
+            res.raise_for_status()
+            contact_id = res.json()["id"]
+
+            # 2. Create fund account (UPI)
+            res = client.post(
+                f"{base_url}/fund_accounts",
+                json={
+                    "contact_id": contact_id,
+                    "account_type": "vpa",
+                    "vpa": {
+                        "address": partner.upi_id or f"{partner.phone}@test"
+                    }
+                }
+            )
+            res.raise_for_status()
+            fund_account_id = res.json()["id"]
+
+            # 3. Create payout
+            res = client.post(
+                f"{base_url}/payouts",
+                json={
+                    "account_number": settings.razorpay_account_number,
+                    "fund_account_id": fund_account_id,
+                    "amount": int(amount * 100),
+                    "currency": "INR",
+                    "mode": "UPI",
+                    "purpose": "payout",
+                    "queue_if_low_balance": True,
+                    "reference_id": f"claim_{claim_id}",
+                    "narration": f"RapidCover Claim #{claim_id}"
+                }
+            )
+            res.raise_for_status()
+            payout_data = res.json()
+
+        return True, payout_data.get("id"), {"razorpay_response": payout_data}
+    except Exception as e:
+        logger.error(f"Razorpay payout failed: {str(e)}")
+        if isinstance(e, httpx.HTTPStatusError):
+            logger.error(f"Razorpay error body: {e.response.text}")
+            return False, "", {"error": e.response.text}
+        return False, "", {"error": str(e)}
+
+
+def process_payout(
+    claim: Claim,
+    db: Session,
+    upi_ref: Optional[str] = None,
+    skip_hard_cap_check: bool = False,
+) -> tuple[bool, str, dict]:
     """
     Process a payout for an approved claim.
+
+    Checks city-level 120% hard cap before processing unless skip_hard_cap_check=True.
+
     Returns (success, upi_ref, transaction_log).
+    On failure, upi_ref contains error reason if hard cap blocked.
     """
     if claim.status != ClaimStatus.APPROVED:
         logger.warning(f"Cannot pay claim {claim.id} with status {claim.status}")
@@ -102,19 +272,63 @@ def process_payout(claim: Claim, db: Session, upi_ref: Optional[str] = None) -> 
     if not partner:
         return False, "", {}
 
-    trigger = db.query(TriggerEvent).filter(TriggerEvent.id == claim.trigger_event_id).first()
+    # Check city-level 120% hard cap
+    if not skip_hard_cap_check:
+        is_capped, current_ratio, remaining_capacity = check_city_hard_cap(partner, db)
+        if is_capped:
+            logger.warning(
+                f"City hard cap reached for claim {claim.id}. "
+                f"Current ratio: {current_ratio:.2%}, claim amount: ₹{claim.amount}"
+            )
+            return False, f"CITY_CAP_REACHED:{current_ratio:.2%}", {
+                "error": "city_hard_cap_reached",
+                "current_ratio": current_ratio,
+                "cap_ratio": CITY_HARD_CAP_RATIO,
+                "remaining_capacity": remaining_capacity,
+                "claim_amount": claim.amount,
+            }
 
-    if not upi_ref:
-        upi_ref = generate_upi_ref(policy.id, claim.id)
+        # If claim amount exceeds remaining capacity, reduce to capacity
+        if claim.amount > remaining_capacity and remaining_capacity > 0:
+            logger.info(
+                f"Reducing claim {claim.id} from ₹{claim.amount} to ₹{remaining_capacity} "
+                f"due to city cap (ratio: {current_ratio:.2%})"
+            )
+            claim.amount = remaining_capacity
+
+    trigger = db.query(TriggerEvent).filter(TriggerEvent.id == claim.trigger_event_id).first()
 
     existing = {}
     try:
         existing = json.loads(claim.validation_data or "{}")
     except json.JSONDecodeError:
         pass
-
     payout_metadata = existing.get("payout_calculation", {})
+
+    settings = get_settings()
+    if not upi_ref:
+        if settings.razorpay_key_id and settings.razorpay_key_secret and settings.razorpay_account_number:
+            success, rp_ref, razorpay_data = process_razorpay_payout(partner, claim.amount, claim.id)
+            if success:
+                upi_ref = rp_ref
+                payout_metadata["razorpay"] = razorpay_data
+            else:
+                logger.warning(f"Razorpay failed for claim {claim.id}, falling back to default generator")
+                upi_ref = generate_upi_ref(policy.id, claim.id)
+        else:
+            upi_ref = generate_upi_ref(policy.id, claim.id)
+
     transaction_log = build_transaction_log(claim, policy, partner, trigger, upi_ref, payout_metadata)
+
+    # Add hard cap check info to transaction log
+    if not skip_hard_cap_check:
+        is_capped, current_ratio, remaining_capacity = check_city_hard_cap(partner, db)
+        transaction_log["city_cap_check"] = {
+            "current_ratio": current_ratio,
+            "cap_ratio": CITY_HARD_CAP_RATIO,
+            "remaining_capacity_after": remaining_capacity - claim.amount,
+            "checked_at": datetime.utcnow().isoformat(),
+        }
 
     existing["transaction_log"] = transaction_log
     existing["payout_status"] = "SUCCESS"
