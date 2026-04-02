@@ -13,6 +13,12 @@ from app.models.policy import Policy
 from app.models.claim import Claim, ClaimStatus
 from app.models.partner import Partner
 from app.schemas.zone import ZoneResponse, ZoneCreate, ZoneRiskUpdate
+from app.services.claims_processor import (
+    get_partner_runtime_metadata,
+    get_zone_coverage_metadata,
+    upsert_partner_runtime_metadata,
+    upsert_zone_coverage_metadata,
+)
 
 
 class BCRResponse(BaseModel):
@@ -44,6 +50,40 @@ class ZoneReassignmentResponse(BaseModel):
     days_remaining: int
     policy_id: Optional[int]
     reassignment_logged: bool
+
+
+class ZoneCoverageMetadataRequest(BaseModel):
+    """Coverage metadata for ward/pin-code matching and density weighting."""
+    pin_codes: list[str] = []
+    density_weight: Optional[float] = None
+    ward_name: Optional[str] = None
+
+
+class ZoneCoverageMetadataResponse(BaseModel):
+    zone_id: int
+    pin_codes: list[str]
+    density_weight: Optional[float] = None
+    ward_name: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
+class PartnerAvailabilityRequest(BaseModel):
+    """Runtime partner availability controls used by claims processing."""
+    pin_code: Optional[str] = None
+    is_manual_offline: Optional[bool] = None
+    manual_offline_until: Optional[datetime] = None
+    leave_until: Optional[datetime] = None
+    leave_note: Optional[str] = None
+
+
+class PartnerAvailabilityResponse(BaseModel):
+    partner_id: int
+    pin_code: Optional[str] = None
+    is_manual_offline: bool
+    manual_offline_until: Optional[datetime] = None
+    leave_until: Optional[datetime] = None
+    leave_note: Optional[str] = None
+    updated_at: Optional[datetime] = None
 
 
 def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -301,6 +341,88 @@ def get_city_bcr(
     return calculate_city_bcr(city, db, days)
 
 
+@router.get("/{zone_id}/coverage", response_model=ZoneCoverageMetadataResponse)
+def get_zone_coverage(zone_id: int, db: Session = Depends(get_db)):
+    """Get pin-code coverage and density metadata for a zone."""
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    if not zone:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Zone not found",
+        )
+
+    return ZoneCoverageMetadataResponse(**get_zone_coverage_metadata(zone_id, db))
+
+
+@router.put("/{zone_id}/coverage", response_model=ZoneCoverageMetadataResponse)
+def update_zone_coverage(
+    zone_id: int,
+    request: ZoneCoverageMetadataRequest,
+    db: Session = Depends(get_db),
+):
+    """Update ward/pin-code coverage and density metadata for a zone."""
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    if not zone:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Zone not found",
+        )
+
+    if request.density_weight is not None and not 0 <= request.density_weight <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="density_weight must be between 0 and 1",
+        )
+
+    metadata = upsert_zone_coverage_metadata(
+        zone_id,
+        db,
+        pin_codes=request.pin_codes,
+        density_weight=request.density_weight,
+        ward_name=request.ward_name,
+    )
+    return ZoneCoverageMetadataResponse(**metadata)
+
+
+@router.get("/partners/{partner_id}/availability", response_model=PartnerAvailabilityResponse)
+def get_partner_availability(partner_id: int, db: Session = Depends(get_db)):
+    """Get runtime availability controls for a partner."""
+    partner = db.query(Partner).filter(Partner.id == partner_id).first()
+    if not partner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Partner not found",
+        )
+
+    return PartnerAvailabilityResponse(**get_partner_runtime_metadata(partner_id, db))
+
+
+@router.put("/partners/{partner_id}/availability", response_model=PartnerAvailabilityResponse)
+def update_partner_availability(
+    partner_id: int,
+    request: PartnerAvailabilityRequest,
+    db: Session = Depends(get_db),
+):
+    """Update runtime availability controls for a partner."""
+    partner = db.query(Partner).filter(Partner.id == partner_id).first()
+    if not partner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Partner not found",
+        )
+
+    metadata = upsert_partner_runtime_metadata(
+        partner_id,
+        db,
+        pin_code=request.pin_code,
+        is_manual_offline=request.is_manual_offline,
+        manual_offline_until=request.manual_offline_until,
+        leave_until=request.leave_until,
+        leave_note=request.leave_note,
+    )
+    return PartnerAvailabilityResponse(**metadata)
+
+
 @router.post("/reassign", response_model=ZoneReassignmentResponse)
 def reassign_partner_zone(
     reassignment: ZoneReassignmentRequest,
@@ -374,6 +496,17 @@ def reassign_partner_zone(
         new_weekly_premium = new_quote.final_premium
 
     # Update partner's zone
+    zone_history = list(partner.zone_history or [])
+    zone_history.append({
+        "old_zone_id": old_zone_id,
+        "new_zone_id": reassignment.new_zone_id,
+        "effective_at": now.isoformat(),
+        "policy_id": policy_id,
+        "premium_adjustment": premium_adjustment,
+        "new_weekly_premium": new_weekly_premium,
+        "days_remaining": days_remaining,
+    })
+    partner.zone_history = zone_history[-50:]
     partner.zone_id = reassignment.new_zone_id
     db.commit()
     db.refresh(partner)

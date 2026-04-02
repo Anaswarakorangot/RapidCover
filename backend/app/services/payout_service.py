@@ -9,6 +9,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
+import httpx
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -177,8 +178,6 @@ def build_transaction_log(
         "version": "1.0",
     }
 
-
-import requests
 from app.config import get_settings
 
 def process_razorpay_payout(partner: Partner, amount: float, claim_id: int) -> tuple[bool, str, dict]:
@@ -193,57 +192,55 @@ def process_razorpay_payout(partner: Partner, amount: float, claim_id: int) -> t
     
     try:
         # 1. Create contact
-        res = requests.post(
-            f"{base_url}/contacts",
-            auth=auth,
-            json={
-                "name": partner.name,
-                "contact": partner.phone,
-                "type": "employee",
-                "reference_id": f"partner_{partner.id}_c{claim_id}"
-            }
-        )
-        res.raise_for_status()
-        contact_id = res.json()["id"]
-        
-        # 2. Create fund account (UPI)
-        res = requests.post(
-            f"{base_url}/fund_accounts",
-            auth=auth,
-            json={
-                "contact_id": contact_id,
-                "account_type": "vpa",
-                "vpa": {
-                    "address": f"{partner.phone}@test" # Mock UPI address
+        with httpx.Client(auth=auth, timeout=10.0) as client:
+            res = client.post(
+                f"{base_url}/contacts",
+                json={
+                    "name": partner.name,
+                    "contact": partner.phone,
+                    "type": "employee",
+                    "reference_id": f"partner_{partner.id}_c{claim_id}"
                 }
-            }
-        )
-        res.raise_for_status()
-        fund_account_id = res.json()["id"]
-        
-        # 3. Create payout
-        res = requests.post(
-            f"{base_url}/payouts",
-            auth=auth,
-            json={
-                "account_number": settings.razorpay_account_number,
-                "fund_account_id": fund_account_id,
-                "amount": int(amount * 100), # Amount in paise
-                "currency": "INR",
-                "mode": "UPI",
-                "purpose": "payout",
-                "queue_if_low_balance": True,
-                "reference_id": f"claim_{claim_id}",
-                "narration": f"RapidCover Claim #{claim_id}"
-            }
-        )
-        res.raise_for_status()
-        payout_data = res.json()
-        
+            )
+            res.raise_for_status()
+            contact_id = res.json()["id"]
+
+            # 2. Create fund account (UPI)
+            res = client.post(
+                f"{base_url}/fund_accounts",
+                json={
+                    "contact_id": contact_id,
+                    "account_type": "vpa",
+                    "vpa": {
+                        "address": partner.upi_id or f"{partner.phone}@test"
+                    }
+                }
+            )
+            res.raise_for_status()
+            fund_account_id = res.json()["id"]
+
+            # 3. Create payout
+            res = client.post(
+                f"{base_url}/payouts",
+                json={
+                    "account_number": settings.razorpay_account_number,
+                    "fund_account_id": fund_account_id,
+                    "amount": int(amount * 100),
+                    "currency": "INR",
+                    "mode": "UPI",
+                    "purpose": "payout",
+                    "queue_if_low_balance": True,
+                    "reference_id": f"claim_{claim_id}",
+                    "narration": f"RapidCover Claim #{claim_id}"
+                }
+            )
+            res.raise_for_status()
+            payout_data = res.json()
+
         return True, payout_data.get("id"), {"razorpay_response": payout_data}
     except Exception as e:
         logger.error(f"Razorpay payout failed: {str(e)}")
-        if isinstance(e, requests.exceptions.HTTPError):
+        if isinstance(e, httpx.HTTPStatusError):
             logger.error(f"Razorpay error body: {e.response.text}")
             return False, "", {"error": e.response.text}
         return False, "", {"error": str(e)}

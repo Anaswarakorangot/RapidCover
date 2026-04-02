@@ -14,7 +14,7 @@ import json
 from datetime import datetime, timedelta, time
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, text
 
 from app.models.partner import Partner
 from app.models.policy import Policy, TIER_CONFIG
@@ -55,6 +55,210 @@ MIN_DISRUPTION_HOURS = {
 DEFAULT_DISRUPTION_HOURS = 4
 
 DAY_NAMES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def _ensure_partner_runtime_metadata_table(db: Session) -> None:
+    """Create the partner runtime metadata table if it does not exist yet."""
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS partner_runtime_metadata (
+            partner_id INTEGER PRIMARY KEY,
+            pin_code TEXT NULL,
+            is_manual_offline INTEGER NOT NULL DEFAULT 0,
+            manual_offline_until TEXT NULL,
+            leave_until TEXT NULL,
+            leave_note TEXT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """))
+    db.commit()
+
+
+def _ensure_zone_coverage_metadata_table(db: Session) -> None:
+    """Create the zone coverage metadata table if it does not exist yet."""
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS zone_coverage_metadata (
+            zone_id INTEGER PRIMARY KEY,
+            pin_codes_json TEXT NULL,
+            density_weight REAL NULL,
+            ward_name TEXT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """))
+    db.commit()
+
+
+def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Parse ISO datetimes stored in auxiliary metadata tables."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def get_partner_runtime_metadata(partner_id: int, db: Session) -> dict:
+    """Fetch persisted partner runtime metadata used by the claims engine."""
+    _ensure_partner_runtime_metadata_table(db)
+    row = db.execute(
+        text("""
+            SELECT partner_id, pin_code, is_manual_offline, manual_offline_until, leave_until, leave_note, updated_at
+            FROM partner_runtime_metadata
+            WHERE partner_id = :partner_id
+        """),
+        {"partner_id": partner_id},
+    ).mappings().first()
+
+    if not row:
+        return {
+            "partner_id": partner_id,
+            "pin_code": None,
+            "is_manual_offline": False,
+            "manual_offline_until": None,
+            "leave_until": None,
+            "leave_note": None,
+            "updated_at": None,
+        }
+
+    return {
+        "partner_id": row["partner_id"],
+        "pin_code": row["pin_code"],
+        "is_manual_offline": bool(row["is_manual_offline"]),
+        "manual_offline_until": _parse_iso_datetime(row["manual_offline_until"]),
+        "leave_until": _parse_iso_datetime(row["leave_until"]),
+        "leave_note": row["leave_note"],
+        "updated_at": _parse_iso_datetime(row["updated_at"]),
+    }
+
+
+def upsert_partner_runtime_metadata(
+    partner_id: int,
+    db: Session,
+    *,
+    pin_code: Optional[str] = None,
+    is_manual_offline: Optional[bool] = None,
+    manual_offline_until: Optional[datetime] = None,
+    leave_until: Optional[datetime] = None,
+    leave_note: Optional[str] = None,
+) -> dict:
+    """Create or update partner runtime metadata."""
+    _ensure_partner_runtime_metadata_table(db)
+    existing = get_partner_runtime_metadata(partner_id, db)
+
+    payload = {
+        "partner_id": partner_id,
+        "pin_code": pin_code if pin_code is not None else existing["pin_code"],
+        "is_manual_offline": int(existing["is_manual_offline"] if is_manual_offline is None else is_manual_offline),
+        "manual_offline_until": (
+            manual_offline_until.isoformat()
+            if manual_offline_until is not None
+            else (existing["manual_offline_until"].isoformat() if existing["manual_offline_until"] else None)
+        ),
+        "leave_until": (
+            leave_until.isoformat()
+            if leave_until is not None
+            else (existing["leave_until"].isoformat() if existing["leave_until"] else None)
+        ),
+        "leave_note": leave_note if leave_note is not None else existing["leave_note"],
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
+    db.execute(
+        text("""
+            INSERT INTO partner_runtime_metadata (
+                partner_id, pin_code, is_manual_offline, manual_offline_until, leave_until, leave_note, updated_at
+            ) VALUES (
+                :partner_id, :pin_code, :is_manual_offline, :manual_offline_until, :leave_until, :leave_note, :updated_at
+            )
+            ON CONFLICT(partner_id) DO UPDATE SET
+                pin_code = excluded.pin_code,
+                is_manual_offline = excluded.is_manual_offline,
+                manual_offline_until = excluded.manual_offline_until,
+                leave_until = excluded.leave_until,
+                leave_note = excluded.leave_note,
+                updated_at = excluded.updated_at
+        """),
+        payload,
+    )
+    db.commit()
+    return get_partner_runtime_metadata(partner_id, db)
+
+
+def get_zone_coverage_metadata(zone_id: int, db: Session) -> dict:
+    """Fetch persisted pin-code and density metadata for a zone."""
+    _ensure_zone_coverage_metadata_table(db)
+    row = db.execute(
+        text("""
+            SELECT zone_id, pin_codes_json, density_weight, ward_name, updated_at
+            FROM zone_coverage_metadata
+            WHERE zone_id = :zone_id
+        """),
+        {"zone_id": zone_id},
+    ).mappings().first()
+
+    if not row:
+        return {
+            "zone_id": zone_id,
+            "pin_codes": [],
+            "density_weight": None,
+            "ward_name": None,
+            "updated_at": None,
+        }
+
+    try:
+        pin_codes = json.loads(row["pin_codes_json"]) if row["pin_codes_json"] else []
+    except json.JSONDecodeError:
+        pin_codes = []
+
+    return {
+        "zone_id": row["zone_id"],
+        "pin_codes": pin_codes,
+        "density_weight": row["density_weight"],
+        "ward_name": row["ward_name"],
+        "updated_at": _parse_iso_datetime(row["updated_at"]),
+    }
+
+
+def upsert_zone_coverage_metadata(
+    zone_id: int,
+    db: Session,
+    *,
+    pin_codes: Optional[list[str]] = None,
+    density_weight: Optional[float] = None,
+    ward_name: Optional[str] = None,
+) -> dict:
+    """Create or update zone coverage metadata."""
+    _ensure_zone_coverage_metadata_table(db)
+    existing = get_zone_coverage_metadata(zone_id, db)
+
+    normalized_pin_codes = existing["pin_codes"] if pin_codes is None else sorted({
+        str(pin).strip() for pin in pin_codes if str(pin).strip()
+    })
+    payload = {
+        "zone_id": zone_id,
+        "pin_codes_json": json.dumps(normalized_pin_codes),
+        "density_weight": density_weight if density_weight is not None else existing["density_weight"],
+        "ward_name": ward_name if ward_name is not None else existing["ward_name"],
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
+    db.execute(
+        text("""
+            INSERT INTO zone_coverage_metadata (
+                zone_id, pin_codes_json, density_weight, ward_name, updated_at
+            ) VALUES (
+                :zone_id, :pin_codes_json, :density_weight, :ward_name, :updated_at
+            )
+            ON CONFLICT(zone_id) DO UPDATE SET
+                pin_codes_json = excluded.pin_codes_json,
+                density_weight = excluded.density_weight,
+                ward_name = excluded.ward_name,
+                updated_at = excluded.updated_at
+        """),
+        payload,
+    )
+    db.commit()
+    return get_zone_coverage_metadata(zone_id, db)
 
 
 def calculate_payout_amount(
@@ -185,6 +389,7 @@ def _parse_shift_time(value: Optional[str]) -> Optional[time]:
 
 def is_partner_available_for_trigger(
     partner: Partner,
+    db: Session,
     trigger_time: Optional[datetime] = None,
 ) -> tuple[bool, str]:
     """
@@ -199,6 +404,16 @@ def is_partner_available_for_trigger(
 
     if not partner.is_active:
         return False, "partner_inactive"
+
+    runtime_metadata = get_partner_runtime_metadata(partner.id, db)
+    if runtime_metadata["is_manual_offline"]:
+        offline_until = runtime_metadata["manual_offline_until"]
+        if offline_until is None or trigger_time <= offline_until:
+            return False, "manual_offline"
+
+    leave_until = runtime_metadata["leave_until"]
+    if leave_until and trigger_time <= leave_until:
+        return False, "declared_leave"
 
     shift_days = [str(day).strip().lower()[:3] for day in (partner.shift_days or []) if day]
     trigger_day = DAY_NAMES[trigger_time.weekday()]
@@ -304,14 +519,14 @@ def get_eligible_policies(
     zone = db.query(Zone).filter(Zone.id == zone_id).first()
     eligible_results: list[tuple[Policy, Partner]] = []
     for policy, partner in results:
-        is_available, _ = is_partner_available_for_trigger(partner, trigger_time)
+        is_available, _ = is_partner_available_for_trigger(partner, db, trigger_time)
         if not is_available:
             continue
 
         if zone:
             from app.services.trigger_engine import check_partner_pin_code_match
 
-            pin_code_match, _ = check_partner_pin_code_match(partner, zone)
+            pin_code_match, _ = check_partner_pin_code_match(partner, zone, db)
             if not pin_code_match:
                 continue
 
@@ -354,7 +569,13 @@ def process_trigger_event(
     total_partners_in_event = len(eligible)
     city_weekly_reserve = calculate_city_weekly_reserve(zone_id, db)
     zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    zone_metadata = get_zone_coverage_metadata(zone_id, db)
+    if zone and zone_metadata["density_weight"] is not None and getattr(zone, "density_weight", None) is None:
+        setattr(zone, "density_weight", zone_metadata["density_weight"])
     zone_density_weight = _get_zone_density_weight(zone, total_partners_in_event)
+
+    if sustained_info["max_days_reached"]:
+        return []
 
     for policy, partner in eligible:
         # Calculate payout amount with sustained event modifier
