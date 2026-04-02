@@ -65,6 +65,21 @@ def register_partner(partner_data: PartnerCreate, db: Session = Depends(get_db))
             detail="Phone number already registered",
         )
 
+    # Convert KYC Pydantic model to dict for SQLAlchemy JSON column
+    kyc_data = getattr(partner_data, "kyc", None)
+    if kyc_data is not None and hasattr(kyc_data, "model_dump"):
+        kyc_dict = kyc_data.model_dump()
+    elif kyc_data is not None and hasattr(kyc_data, "dict"):
+        kyc_dict = kyc_data.dict()
+    elif kyc_data is not None:
+        kyc_dict = dict(kyc_data)
+    else:
+        kyc_dict = {
+            "aadhaar_number": None,
+            "pan_number":     None,
+            "kyc_status":     "skipped",
+        }
+
     partner = Partner(
         phone         = partner_data.phone,
         name          = partner_data.name,
@@ -73,11 +88,7 @@ def register_partner(partner_data: PartnerCreate, db: Session = Depends(get_db))
         zone_id       = partner_data.zone_id,
         language_pref = partner_data.language_pref,
         upi_id        = getattr(partner_data, "upi_id", None),
-        kyc           = getattr(partner_data, "kyc", None) or {
-            "aadhaar_number": None,
-            "pan_number":     None,
-            "kyc_status":     "skipped",
-        },
+        kyc           = kyc_dict,
         shift_days    = getattr(partner_data, "shift_days", None) or [],
         shift_start   = getattr(partner_data, "shift_start", None),
         shift_end     = getattr(partner_data, "shift_end", None),
@@ -153,7 +164,9 @@ def update_partner_profile(
     if hasattr(update_data, "kyc") and update_data.kyc is not None:
         existing_kyc = partner.kyc or {}
         incoming_kyc = (
-            update_data.kyc.dict(exclude_none=True)
+            update_data.kyc.model_dump(exclude_none=True)
+            if hasattr(update_data.kyc, "model_dump")
+            else update_data.kyc.dict(exclude_none=True)
             if hasattr(update_data.kyc, "dict")
             else dict(update_data.kyc)
         )
