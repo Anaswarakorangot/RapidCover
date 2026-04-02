@@ -12,7 +12,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function checkAuth() {
-    const token = api.getToken();
+    const token = localStorage.getItem('access_token');
     if (!token) {
       setLoading(false);
       return;
@@ -22,21 +22,24 @@ export function AuthProvider({ children }) {
       const profile = await api.getProfile();
       setUser(profile);
     } catch (error) {
-      api.clearToken();
+      localStorage.removeItem('access_token');
     } finally {
       setLoading(false);
     }
   }
 
   async function login(phone, otp) {
-    await api.verifyOTP(phone, otp);
+    const res = await api.verifyOtp(phone, otp);
+    if (res?.access_token) {
+      localStorage.setItem('access_token', res.access_token);
+    }
     const profile = await api.getProfile();
     setUser(profile);
     return profile;
   }
 
   function logout() {
-    api.clearToken();
+    localStorage.removeItem('access_token');
     setUser(null);
   }
 
