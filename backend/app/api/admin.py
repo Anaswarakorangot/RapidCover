@@ -33,8 +33,8 @@ from app.services.claims_processor import (
     process_trigger_event,
     approve_claim,
     reject_claim,
-    mark_as_paid,
 )
+from app.services.payout_service import process_payout
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -352,20 +352,27 @@ def payout_claim_endpoint(
     request: PayoutRequest = None,
     db: Session = Depends(get_db),
 ):
-    """Mark an approved claim as paid."""
+    """Process an approved claim payout through the payout service."""
     upi_ref = request.upi_ref if request else f"UPI{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{claim_id}"
-    claim = mark_as_paid(claim_id, db, upi_ref)
+    claim = db.query(Claim).filter(Claim.id == claim_id).first()
 
-    if not claim:
+    if not claim or claim.status != ClaimStatus.APPROVED:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Claim not found or not approved",
         )
 
+    success, payout_ref, payout_data = process_payout(claim, db, upi_ref=upi_ref)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=payout_data or {"error": "Payout processing failed"},
+        )
+
     return {
         "message": "Claim paid",
         "claim_id": claim_id,
-        "upi_ref": claim.upi_ref,
+        "upi_ref": payout_ref,
     }
 
 
