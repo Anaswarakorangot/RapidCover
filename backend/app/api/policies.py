@@ -29,7 +29,6 @@ from app.services.policy_lifecycle import (
     build_extended_response,
     GRACE_PERIOD_HOURS,
 )
-from app.services.policy_certificate import generate_certificate_pdf, get_certificate_filename
 
 
 # Enrollment suspension threshold
@@ -495,6 +494,8 @@ def download_certificate(
         zone = db.query(Zone).filter(Zone.id == partner.zone_id).first()
         if zone:
             zone_name = zone.name
+
+    from app.services.policy_certificate import generate_certificate_pdf, get_certificate_filename
 
     # Generate PDF
     pdf_bytes = generate_certificate_pdf(policy, partner, zone_name)
