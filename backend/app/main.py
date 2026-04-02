@@ -6,6 +6,7 @@ from app.config import get_settings
 from app.database import init_db, SessionLocal
 from app.api.router import api_router
 from app.data.seed_zones import seed_zones
+from app.data.seed_partner import seed_partners
 # Import models so they register with SQLAlchemy Base
 from app.models import Partner, Zone, Policy, TriggerEvent, Claim
 from app.services.scheduler import start_scheduler, stop_scheduler
@@ -29,11 +30,12 @@ async def lifespan(app: FastAPI):
     # Seed zones on every startup (idempotent - skips existing)
     db = SessionLocal()
     try:
-        created = seed_zones(db)
-        if created:
-            print(f"Seeded {len(created)} new zones.")
-        else:
-            print("Zones already seeded.")
+        created_zones = seed_zones(db)
+        if created_zones:
+            print(f"Seeded {len(created_zones)} new zones.")
+        
+        # Seed test partners
+        seed_partners(db)
     finally:
         db.close()
     # Start background trigger polling (every 45s)
