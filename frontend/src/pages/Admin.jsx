@@ -1,15 +1,25 @@
+// frontend/src/pages/Admin.jsx
+// Person 4 — fully updated admin dashboard
+// Adds: BCRPanel, StressWidget, ZoneMapPanel, FraudQueuePanel, MLStatusPanel
+// Keeps: AdminStats, TriggerPanel, ExclusionsCard (untouched — don't break what works)
+
 import { useState, useEffect } from 'react';
-import AdminStats from '../components/admin/AdminStats';
-import TriggerPanel from '../components/admin/TriggerPanel';
-import ClaimsQueue from '../components/admin/ClaimsQueue';
+import AdminStats    from '../components/admin/AdminStats';
+import TriggerPanel  from '../components/admin/TriggerPanel';
 import ExclusionsCard from '../components/admin/ExclusionsCard';
+import BCRPanel      from '../components/admin/BCRPanel';
+import ZoneMapPanel  from '../components/admin/ZoneMapPanel';
+import FraudQueuePanel from '../components/admin/FraudQueuePanel';
+import MLStatusPanel from '../components/admin/MLStatusPanel';
+import StressWidget  from '../components/StressWidget';
 import './Admin.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export function Admin() {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats]           = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [activeTab, setActiveTab]   = useState('overview');
   const [systemStatus, setSystemStatus] = useState({ level: 'green', text: 'All systems operational' });
 
   useEffect(() => {
@@ -23,11 +33,7 @@ export function Admin() {
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/admin/panel/stats`);
-      if (res.ok) {
-        setStats(await res.json());
-      } else {
-        setStats(demoStats);
-      }
+      setStats(res.ok ? await res.json() : demoStats);
     } catch {
       setStats(demoStats);
     } finally {
@@ -35,49 +41,47 @@ export function Admin() {
     }
   }
 
-  // Fix: wire system status badge to real engine state
   async function checkSystemStatus() {
     try {
       const res = await fetch(`${API_BASE}/admin/panel/engine-status`);
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) throw new Error();
       const data = await res.json();
-
       const schedulerRunning = data.scheduler?.running;
       const sources = data.data_sources || {};
-
-      // Only check real data sources (OWM, WAQI) — Zepto/Traffic/Civic are always mock
       const realSources = ['openweathermap', 'waqi_aqi'];
       const anyRealLive = realSources.some(k => sources[k]?.status === 'live');
 
-      if (!schedulerRunning) {
-        setSystemStatus({ level: 'red', text: 'Scheduler stopped' });
-      } else if (anyRealLive) {
-        setSystemStatus({ level: 'green', text: 'All systems operational' });
-      } else {
-        setSystemStatus({ level: 'amber', text: 'Running on mock data' });
-      }
+      if (!schedulerRunning)      setSystemStatus({ level: 'red',   text: 'Scheduler stopped' });
+      else if (anyRealLive)       setSystemStatus({ level: 'green', text: 'All systems operational' });
+      else                        setSystemStatus({ level: 'amber', text: 'Running on mock data' });
     } catch {
       setSystemStatus({ level: 'red', text: 'Backend unreachable' });
     }
   }
 
-  const today = new Date().toLocaleDateString('en-IN', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const today = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const statusDotClass =
     systemStatus.level === 'green' ? 'admin-status__dot--green'
     : systemStatus.level === 'amber' ? 'admin-status__dot--amber'
     : 'admin-status__dot--red';
 
+  const TABS = [
+    { id: 'overview',  label: '\u{1F4CA} Overview' },
+    { id: 'bcr',       label: '\u{1F4C9} BCR / Loss Ratio' },
+    { id: 'map',       label: '\u{1F5FA} Zone Map' },
+    { id: 'fraud',     label: '\u{1F50D} Fraud Queue' },
+    { id: 'stress',    label: '\u26A1 Stress Scenarios' },
+    { id: 'ml',        label: '\u{1F916} ML Models' },
+    { id: 'triggers',  label: '\u{1F3AF} Trigger Sim' },
+  ];
+
   if (loading) {
     return (
       <div className="admin-root">
         <div className="admin-loader">
           <div className="admin-loader__spinner" />
-          <span>Loading control panel…</span>
+          <span>Loading control panel...</span>
         </div>
       </div>
     );
@@ -97,10 +101,34 @@ export function Admin() {
         </div>
       </header>
 
-      <AdminStats stats={stats} />
-      <TriggerPanel />
-      <ClaimsQueue />
-      <ExclusionsCard />
+      {/* Tab nav */}
+      <nav className="admin-tabs">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            className={`admin-tab ${activeTab === t.id ? 'admin-tab--active' : ''}`}
+            onClick={() => setActiveTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* Tab content */}
+      <div className="admin-content">
+        {activeTab === 'overview'  && <AdminStats stats={stats} />}
+        {activeTab === 'bcr'       && <BCRPanel />}
+        {activeTab === 'map'       && <ZoneMapPanel />}
+        {activeTab === 'fraud'     && <FraudQueuePanel />}
+        {activeTab === 'stress'    && <StressWidget />}
+        {activeTab === 'ml'        && <MLStatusPanel />}
+        {activeTab === 'triggers'  && (
+          <>
+            <TriggerPanel />
+            <ExclusionsCard />
+          </>
+        )}
+      </div>
     </div>
   );
 }

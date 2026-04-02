@@ -264,7 +264,7 @@ def get_city_riqi(city: str):
             "urban_fringe": "Urban fringe - moderate flood/AQI risk, 1.25x payout uplift",
             "peri_urban":   "Peri-urban / flood-prone - poor roads, maximum 1.5x payout",
         }[band],
-        "example": f"A Rs.600 Standard payout becomes Rs.{int(600 * RIQI_PAYOUT_MULTIPLIER[band])} in {city_lower}",
+        "example": f"A Rs.400 Standard payout becomes Rs.{int(400 * RIQI_PAYOUT_MULTIPLIER[band])} in {city_lower}",
     }
 
 

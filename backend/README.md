@@ -130,9 +130,9 @@ backend/
 
 | Tier | Weekly Premium | Daily Payout | Max Days/Week |
 |------|---------------|--------------|---------------|
-| Flex | ₹29 | ₹250 | 3 |
-| Standard | ₹49 | ₹350 | 5 |
-| Pro | ₹79 | ₹500 | 7 |
+| Flex | ₹22 | ₹250 | 2 |
+| Standard | ₹33 | ₹400 | 3 |
+| Pro | ₹45 | ₹500 | 4 |
 
 Premium is adjusted based on zone risk score:
 - Low risk (0-30): 10% discount

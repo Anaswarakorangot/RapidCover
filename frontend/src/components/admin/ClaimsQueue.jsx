@@ -47,9 +47,9 @@ function getTriggerLabel(type) {
 
 // Plan tier config for display
 const PLAN_LIMITS = {
-  flex:     { label: 'Flex',     premium: 29,  maxDaily: 250, maxDays: 3, color: '#94a3b8' },
-  standard: { label: 'Standard', premium: 49,  maxDaily: 350, maxDays: 5, color: '#3b82f6' },
-  pro:      { label: 'Pro',      premium: 79,  maxDaily: 500, maxDays: 7, color: '#a855f7' },
+  flex:     { label: 'Flex',     premium: 22,  maxDaily: 250, maxDays: 2, color: '#94a3b8' },
+  standard: { label: 'Standard', premium: 33,  maxDaily: 400, maxDays: 3, color: '#3b82f6' },
+  pro:      { label: 'Pro',      premium: 45,  maxDaily: 500, maxDays: 4, color: '#a855f7' },
 };
 
 function formatClaimId(claim, index) {
@@ -61,27 +61,27 @@ function formatClaimId(claim, index) {
 const MOCK_CLAIMS = [
   {
     id: 1, partner_name: 'Manoj K', zone_name: 'BLR-047', trigger_type: 'rain',
-    amount: 350, raw_amount: 420, fraud_score: 0.82, status: 'pending', anomaly: 'gps_anomaly',
+    amount: 400, raw_amount: 400, fraud_score: 0.82, status: 'pending', anomaly: 'gps_anomaly',
     plan_type: 'standard',
   },
   {
     id: 2, partner_name: 'Raju S', zone_name: 'BLR-047', trigger_type: 'rain',
-    amount: 500, raw_amount: 600, fraud_score: 0.63, status: 'pending', anomaly: 'run_count_anomaly',
+    amount: 500, raw_amount: 500, fraud_score: 0.63, status: 'pending', anomaly: 'run_count_anomaly',
     plan_type: 'pro',
   },
   {
     id: 3, partner_name: 'Priya T', zone_name: 'MUM-021', trigger_type: 'heat',
-    amount: 250, raw_amount: 320, fraud_score: 0.09, status: 'paid', anomaly: null,
+    amount: 250, raw_amount: 250, fraud_score: 0.09, status: 'paid', anomaly: null,
     plan_type: 'flex',
   },
   {
     id: 4, partner_name: 'Arun D', zone_name: 'DEL-009', trigger_type: 'aqi',
-    amount: 250, raw_amount: 310, fraud_score: 0.91, status: 'rejected', anomaly: 'synthetic_identity',
+    amount: 250, raw_amount: 250, fraud_score: 0.91, status: 'rejected', anomaly: 'synthetic_identity',
     plan_type: 'flex',
   },
   {
     id: 5, partner_name: 'Sneha M', zone_name: 'BLR-047', trigger_type: 'shutdown',
-    amount: 350, raw_amount: 420, fraud_score: 0.12, status: 'paid', anomaly: null,
+    amount: 400, raw_amount: 400, fraud_score: 0.12, status: 'paid', anomaly: null,
     plan_type: 'standard',
   },
   {

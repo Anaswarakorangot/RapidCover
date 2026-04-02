@@ -18,6 +18,10 @@ class Zone(Base):
     # Risk score computed by ML model (0-100)
     risk_score = Column(Float, default=50.0)
 
+    # Admin controls & visibility
+    is_suspended = Column(Boolean, default=False)
+    density_band = Column(String(20), default="Medium")  # Low, Medium, High
+
     # Dark store location
     dark_store_lat = Column(Float, nullable=True)
     dark_store_lng = Column(Float, nullable=True)
