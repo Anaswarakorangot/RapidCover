@@ -303,6 +303,48 @@ class ApiService {
     const query = endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : '';
     return this.request(`/notifications/status${query}`);
   }
+
+  // ── Person 3 additions ───────────────────────────────────────────────────
+
+  // Weekly premium breakdown — all 7 factors from ml_service premium_model
+  // TODO: replace mock with real API once Person 1 adds /policies/:id/premium-breakdown
+  async getPremiumBreakdown(policyId) {
+    return {
+      base_premium: 33,
+      zone_risk: 3,
+      seasonal_index: 1.15,
+      riqi_adjustment: 1.15,
+      activity_tier_factor: 1.00,
+      loyalty_discount: 0.94,
+      platform_fee: 0,
+      total: 36,
+      tier: 'standard',
+    };
+  }
+
+  // Zone reassignment pending notification (24h accept window)
+  // TODO: replace mock once Person 1 adds /partners/me/zone-reassignment
+  async getZoneReassignment() {
+    return null; // null = no pending reassignment
+  }
+
+  // 48-hour weather alert for partner's zone
+  // TODO: replace mock once Person 1 adds /zones/:id/weather-alert
+  async getWeatherAlert(zoneId) {
+    return {
+      message: 'Heavy rain forecast Tuesday 4PM in your zone. Stay prepared.',
+    };
+  }
+
+  // Zone reassignment history for Profile page
+  // TODO: replace mock once Person 1 adds /partners/me/zone-history
+  async getZoneHistory() {
+    return [
+      { date: '2025-03-18', oldZone: 'Kondapur Central', newZone: 'Gachibowli West', premiumBefore: 33, premiumAfter: 36, reason: 'Demand rebalancing' },
+      { date: '2025-02-04', oldZone: 'HITEC City North', newZone: 'Kondapur Central', premiumBefore: 30, premiumAfter: 33, reason: 'Zone restructuring' },
+      { date: '2025-01-10', oldZone: 'Madhapur', newZone: 'HITEC City North', premiumBefore: 28, premiumAfter: 30, reason: 'Coverage area expansion' },
+    ];
+  }
 }
 
 export const api = new ApiService();
