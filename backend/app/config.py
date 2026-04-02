@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     # External APIs
     openweathermap_api_key: str = ""
+    waqi_api_key: str = ""
     cpcb_api_key: str = ""
     news_api_key: str = ""
 

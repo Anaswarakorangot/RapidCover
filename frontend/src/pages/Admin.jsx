@@ -10,9 +10,13 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 export function Admin() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [systemStatus, setSystemStatus] = useState({ level: 'green', text: 'All systems operational' });
 
   useEffect(() => {
     loadStats();
+    checkSystemStatus();
+    const statusInterval = setInterval(checkSystemStatus, 15000);
+    return () => clearInterval(statusInterval);
   }, []);
 
   async function loadStats() {
@@ -20,10 +24,8 @@ export function Admin() {
     try {
       const res = await fetch(`${API_BASE}/admin/panel/stats`);
       if (res.ok) {
-        const data = await res.json();
-        setStats(data);
+        setStats(await res.json());
       } else {
-        // Fallback demo data
         setStats(demoStats);
       }
     } catch {
@@ -33,11 +35,42 @@ export function Admin() {
     }
   }
 
+  // Fix: wire system status badge to real engine state
+  async function checkSystemStatus() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/panel/engine-status`);
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+
+      const schedulerRunning = data.scheduler?.running;
+      const sources = data.data_sources || {};
+
+      // Only check real data sources (OWM, WAQI) — Zepto/Traffic/Civic are always mock
+      const realSources = ['openweathermap', 'waqi_aqi'];
+      const anyRealLive = realSources.some(k => sources[k]?.status === 'live');
+
+      if (!schedulerRunning) {
+        setSystemStatus({ level: 'red', text: 'Scheduler stopped' });
+      } else if (anyRealLive) {
+        setSystemStatus({ level: 'green', text: 'All systems operational' });
+      } else {
+        setSystemStatus({ level: 'amber', text: 'Running on mock data' });
+      }
+    } catch {
+      setSystemStatus({ level: 'red', text: 'Backend unreachable' });
+    }
+  }
+
   const today = new Date().toLocaleDateString('en-IN', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
+
+  const statusDotClass =
+    systemStatus.level === 'green' ? 'admin-status__dot--green'
+    : systemStatus.level === 'amber' ? 'admin-status__dot--amber'
+    : 'admin-status__dot--red';
 
   if (loading) {
     return (
@@ -59,21 +92,14 @@ export function Admin() {
           <p className="admin-subtitle">RapidCover · Live · {today}</p>
         </div>
         <div className="admin-status">
-          <span className="admin-status__dot" />
-          All systems operational
+          <span className={`admin-status__dot ${statusDotClass}`} />
+          {systemStatus.text}
         </div>
       </header>
 
-      {/* Platform Health Stats */}
       <AdminStats stats={stats} />
-
-      {/* Trigger Simulation */}
       <TriggerPanel />
-
-      {/* Fraud Review Queue */}
       <ClaimsQueue />
-
-      {/* Coverage Exclusions */}
       <ExclusionsCard />
     </div>
   );

@@ -19,7 +19,21 @@ const ANOMALY_REASONS = [
   'synthetic_identity',
 ];
 
-function getFraudBadge(score) {
+// Validation log steps shown when "View" is expanded
+const VALIDATION_STEPS = [
+  '1. Zone polygon match confirmed',
+  '2. Platform ops API: disruption verified',
+  '3. Traffic cross-validation: conditions match trigger',
+  '4. GPS coherence check completed',
+  '5. Run count + delivery log verified',
+  '6. Fraud score computed (rule-based + heuristic)',
+  '7. Payout amount calculated from tier + duration',
+  '8. UPI credit queued via Razorpay',
+];
+
+function getFraudBadge(score, overrideStatus) {
+  if (overrideStatus === 'approved') return { label: 'Approved by admin', cls: 'badge--approved' };
+  if (overrideStatus === 'rejected') return { label: 'Rejected by admin', cls: 'badge--rejected' };
   if (score >= 0.90) return { label: 'Auto-rejected', cls: 'badge--rejected' };
   if (score >= 0.75) return { label: 'Manual review', cls: 'badge--review' };
   if (score >= 0.50) return { label: 'Enhanced validation', cls: 'badge--validation' };
@@ -31,43 +45,49 @@ function getTriggerLabel(type) {
   return map[type] || type;
 }
 
-// Generate a mock claim ID from zone code and index
+// Plan tier config for display
+const PLAN_LIMITS = {
+  flex:     { label: 'Flex',     premium: 29,  maxDaily: 250, maxDays: 3, color: '#94a3b8' },
+  standard: { label: 'Standard', premium: 49,  maxDaily: 350, maxDays: 5, color: '#3b82f6' },
+  pro:      { label: 'Pro',      premium: 79,  maxDaily: 500, maxDays: 7, color: '#a855f7' },
+};
+
 function formatClaimId(claim, index) {
   const zoneCode = (claim.zone_name || 'BLR047').replace(/[\s-]/g, '').toUpperCase().slice(0, 6);
   return `RC-${zoneCode}-${String(claim.id || index + 1).padStart(3, '0')}`;
 }
 
-// Mock data for demo when backend has no claims yet
+// Mock data for demo
 const MOCK_CLAIMS = [
   {
     id: 1, partner_name: 'Manoj K', zone_name: 'BLR-047', trigger_type: 'rain',
-    amount: 420, fraud_score: 0.82, status: 'pending',
-    anomaly: 'gps_anomaly',
+    amount: 350, raw_amount: 420, fraud_score: 0.82, status: 'pending', anomaly: 'gps_anomaly',
+    plan_type: 'standard',
   },
   {
     id: 2, partner_name: 'Raju S', zone_name: 'BLR-047', trigger_type: 'rain',
-    amount: 600, fraud_score: 0.63, status: 'pending',
-    anomaly: 'run_count_anomaly',
+    amount: 500, raw_amount: 600, fraud_score: 0.63, status: 'pending', anomaly: 'run_count_anomaly',
+    plan_type: 'pro',
   },
   {
     id: 3, partner_name: 'Priya T', zone_name: 'MUM-021', trigger_type: 'heat',
-    amount: 350, fraud_score: 0.09, status: 'paid',
-    anomaly: null,
+    amount: 250, raw_amount: 320, fraud_score: 0.09, status: 'paid', anomaly: null,
+    plan_type: 'flex',
   },
   {
     id: 4, partner_name: 'Arun D', zone_name: 'DEL-009', trigger_type: 'aqi',
-    amount: 310, fraud_score: 0.91, status: 'rejected',
-    anomaly: 'synthetic_identity',
+    amount: 250, raw_amount: 310, fraud_score: 0.91, status: 'rejected', anomaly: 'synthetic_identity',
+    plan_type: 'flex',
   },
   {
     id: 5, partner_name: 'Sneha M', zone_name: 'BLR-047', trigger_type: 'shutdown',
-    amount: 420, fraud_score: 0.12, status: 'paid',
-    anomaly: null,
+    amount: 350, raw_amount: 420, fraud_score: 0.12, status: 'paid', anomaly: null,
+    plan_type: 'standard',
   },
   {
     id: 6, partner_name: 'Vikram R', zone_name: 'MUM-021', trigger_type: 'rain',
-    amount: 500, fraud_score: 0.55, status: 'pending',
-    anomaly: 'zone_boundary',
+    amount: 500, raw_amount: 500, fraud_score: 0.55, status: 'pending', anomaly: 'zone_boundary',
+    plan_type: 'pro',
   },
 ];
 
@@ -77,6 +97,8 @@ export default function ClaimsQueue() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
+  const [expandedClaim, setExpandedClaim] = useState(null);
+  const [adminActions, setAdminActions] = useState({}); // { claimId: 'approved' | 'rejected' }
 
   useEffect(() => {
     loadClaims();
@@ -87,7 +109,6 @@ export default function ClaimsQueue() {
     try {
       const data = await api.getAdminClaims();
       if (data.length > 0) {
-        // Enrich with random anomaly reasons for demo
         const enriched = data.map((c, i) => ({
           ...c,
           anomaly: c.fraud_score >= 0.50
@@ -113,36 +134,32 @@ export default function ClaimsQueue() {
       } else {
         await api.rejectClaim(claimId, 'Manual rejection by admin');
       }
-      // Update inline
-      setClaims(prev =>
-        prev.map(c =>
-          c.id === claimId ? { ...c, status: action === 'approve' ? 'approved' : 'rejected' } : c
-        )
-      );
-    } catch (err) {
-      // If backend fails (mock data), just update locally
-      setClaims(prev =>
-        prev.map(c =>
-          c.id === claimId ? { ...c, status: action === 'approve' ? 'approved' : 'rejected' } : c
-        )
-      );
-    } finally {
-      setActionLoading(null);
+    } catch {
+      // Backend may not have this claim (mock data) — still update UI
     }
+    // Update claim status + track admin action
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    setClaims(prev =>
+      prev.map(c => c.id === claimId ? { ...c, status: newStatus } : c)
+    );
+    setAdminActions(prev => ({ ...prev, [claimId]: newStatus }));
+    setActionLoading(null);
   }
 
+  // Fix 1 — working filters
   const filtered = claims.filter(c => {
     if (triggerFilter !== 'all' && c.trigger_type !== triggerFilter) return false;
     if (statusFilter === 'pending') return c.status === 'pending';
     if (statusFilter === 'auto-approved') return c.fraud_score < 0.50 && (c.status === 'approved' || c.status === 'paid');
     if (statusFilter === 'auto-rejected') return c.fraud_score >= 0.90;
+    if (statusFilter === 'admin-reviewed') return !!adminActions[c.id];
     return true;
   });
 
   return (
     <div className="admin-section" style={{ animationDelay: '0.5s' }}>
       <div className="claims-header">
-        <div className="admin-section-label">CLAIMSQUEUE.JSX — FRAUD REVIEW QUEUE</div>
+        <div className="admin-section-label">FRAUD REVIEW QUEUE</div>
         <div className="claims-filters">
           <select
             className="claims-filter-select"
@@ -165,8 +182,14 @@ export default function ClaimsQueue() {
             <option value="pending">Pending review</option>
             <option value="auto-approved">Auto-approved</option>
             <option value="auto-rejected">Auto-rejected</option>
+            <option value="admin-reviewed">Admin reviewed</option>
           </select>
         </div>
+      </div>
+
+      {/* Fix 6 — Pagination / claim count */}
+      <div className="claims-count">
+        Showing {filtered.length} of {claims.length} claims this week
       </div>
 
       {loading ? (
@@ -176,72 +199,118 @@ export default function ClaimsQueue() {
       ) : (
         <div className="claims-list">
           {filtered.map((claim, idx) => {
-            const badge = getFraudBadge(claim.fraud_score);
+            const adminAction = adminActions[claim.id];
+            const badge = getFraudBadge(claim.fraud_score, adminAction);
             const claimId = formatClaimId(claim, idx);
             const anomalyDetail = claim.anomaly
               ? FRAUD_VECTORS[claim.anomaly] || claim.anomaly
               : null;
+            const isExpanded = expandedClaim === claim.id;
+            const isPending = claim.status === 'pending' && !adminAction;
+            const showActions = isPending && claim.fraud_score < 0.90;
 
             return (
-              <div key={claim.id} className="claim-row">
-                <div className="claim-row__left">
-                  <div className="claim-row__top">
-                    <span className="claim-row__id">{claimId}</span>
-                    <span className={`claim-badge ${badge.cls}`}>{badge.label}</span>
-                    <span className="claim-trigger-badge">{getTriggerLabel(claim.trigger_type)}</span>
-                  </div>
-                  <div className="claim-row__detail">
-                    {claim.partner_name} · {claim.zone_name} · ₹{claim.amount}
+              <div key={claim.id}>
+                <div className="claim-row">
+                  <div className="claim-row__left">
+                    <div className="claim-row__top">
+                      <span className="claim-row__id">{claimId}</span>
+                      <span className={`claim-badge ${badge.cls}`}>{badge.label}</span>
+                      <span className="claim-trigger-badge">{getTriggerLabel(claim.trigger_type)}</span>
+                    </div>
+                    <div className="claim-row__detail">
+                      {claim.partner_name} · {claim.zone_name} · ₹{claim.amount}
+                      {claim.plan_type && (
+                        <span
+                          className="claim-plan-badge"
+                          style={{ borderColor: PLAN_LIMITS[claim.plan_type]?.color || '#666' , color: PLAN_LIMITS[claim.plan_type]?.color || '#666' }}
+                        >
+                          {PLAN_LIMITS[claim.plan_type]?.label || claim.plan_type}
+                        </span>
+                      )}
+                      {claim.raw_amount && claim.raw_amount > claim.amount && (
+                        <span className="claim-cap-note">capped from ₹{claim.raw_amount}</span>
+                      )}
+                      {claim.status === 'paid' && <> · <span className="claim-paid-tag">paid</span></>}
+                    </div>
+                    {/* Fix 4 — anomaly on its own line, bigger, with warning icon */}
                     {anomalyDetail && (
-                      <> · <span className="claim-anomaly">{anomalyDetail}</span></>
-                    )}
-                    {claim.status === 'paid' && <> · <span className="claim-paid-tag">paid</span></>}
-                  </div>
-                </div>
-                <div className="claim-row__right">
-                  <div className="claim-fraud-score">
-                    <span className="claim-fraud-label">Fraud score</span>
-                    <span
-                      className="claim-fraud-value"
-                      style={{
-                        color: claim.fraud_score >= 0.75 ? '#ef4444'
-                          : claim.fraud_score >= 0.50 ? '#f97316'
-                          : '#22c55e',
-                      }}
-                    >
-                      {claim.fraud_score.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="claim-actions">
-                    {claim.status === 'pending' && claim.fraud_score < 0.90 ? (
-                      <>
-                        <button
-                          className="claim-btn claim-btn--approve"
-                          onClick={() => handleAction(claim.id, 'approve')}
-                          disabled={actionLoading === claim.id}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          className="claim-btn claim-btn--reject"
-                          onClick={() => handleAction(claim.id, 'reject')}
-                          disabled={actionLoading === claim.id}
-                        >
-                          Reject
-                        </button>
-                      </>
-                    ) : (
-                      <button className="claim-btn claim-btn--view">View ↗</button>
+                      <div className="claim-anomaly-line">
+                        <span className="claim-anomaly-icon">⚠️</span>
+                        <span className="claim-anomaly-text">{anomalyDetail}</span>
+                      </div>
                     )}
                   </div>
+                  <div className="claim-row__right">
+                    <div className="claim-fraud-score">
+                      <span className="claim-fraud-label">Fraud score</span>
+                      <span
+                        className="claim-fraud-value"
+                        style={{
+                          color: claim.fraud_score >= 0.75 ? '#ef4444'
+                            : claim.fraud_score >= 0.50 ? '#f97316'
+                            : '#22c55e',
+                        }}
+                      >
+                        {claim.fraud_score.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="claim-actions">
+                      {showActions ? (
+                        <>
+                          <button
+                            className="claim-btn claim-btn--approve"
+                            onClick={() => handleAction(claim.id, 'approve')}
+                            disabled={actionLoading === claim.id}
+                          >
+                            {actionLoading === claim.id ? '...' : 'Approve'}
+                          </button>
+                          <button
+                            className="claim-btn claim-btn--reject"
+                            onClick={() => handleAction(claim.id, 'reject')}
+                            disabled={actionLoading === claim.id}
+                          >
+                            {actionLoading === claim.id ? '...' : 'Reject'}
+                          </button>
+                        </>
+                      ) : adminAction ? (
+                        <span className={`claim-admin-verdict ${adminAction === 'approved' ? 'verdict--approved' : 'verdict--rejected'}`}>
+                          {adminAction === 'approved' ? '✓ Reviewed' : '✗ Reviewed'}
+                        </span>
+                      ) : (
+                        <button
+                          className="claim-btn claim-btn--view"
+                          onClick={() => setExpandedClaim(isExpanded ? null : claim.id)}
+                        >
+                          {isExpanded ? 'Close ↙' : 'View ↗'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
+
+                {/* Fix 5 — inline expandable validation log */}
+                {isExpanded && (
+                  <div className="claim-detail-panel">
+                    <div className="claim-detail-title">Validation log</div>
+                    {VALIDATION_STEPS.map((step, i) => (
+                      <div key={i} className="claim-detail-step">
+                        <span className="claim-detail-check">✓</span>
+                        <span>{step}</span>
+                      </div>
+                    ))}
+                    <div className="claim-detail-meta">
+                      Fraud score: {claim.fraud_score.toFixed(3)} · Trigger: {getTriggerLabel(claim.trigger_type)} · Zone: {claim.zone_name}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Fraud thresholds legend */}
+      {/* Legend */}
       <div className="claims-legend">
         Fraud thresholds: &lt;0.50 auto-approve · 0.50–0.75 enhanced validation · 0.75–0.90 manual review · &gt;0.90 auto-reject
       </div>

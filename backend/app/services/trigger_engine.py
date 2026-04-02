@@ -273,7 +273,13 @@ def _fire_trigger(
 ):
     """Create a TriggerEvent in the database and kick off claims processing."""
     from app.services.trigger_detector import _calculate_severity
-    from app.services.claims_processor import process_trigger_event
+    from app.services.claims_processor import (
+        process_trigger_event,
+        get_eligible_policies,
+        calculate_payout_amount,
+        check_daily_limit,
+        check_weekly_limit,
+    )
 
     # Map event type string to TriggerType enum
     type_map = {
@@ -333,12 +339,67 @@ def _fire_trigger(
              + (" [FORCE]" if force else ""),
              "critical")
 
+    # ─── Plan-based payout with detailed logging ─────────────────────────
+    # Count all partners in zone vs those with active policies
+    all_partners_in_zone = db.query(Partner).filter(
+        Partner.zone_id == zone.id, Partner.is_active == True
+    ).count()
+
+    eligible = get_eligible_policies(zone.id, db)
+    no_policy_count = all_partners_in_zone - len(eligible)
+
     # Auto-process claims for this trigger
     try:
-        claims = process_trigger_event(trigger, db)
+        claims = process_trigger_event(trigger, db, disruption_hours=duration_min / 60.0)
+
+        # Build detailed payout summary for logs
+        paid_count = len(claims)
+        weekly_limit_count = 0
+        daily_limit_count = 0
+        cap_applied_count = 0
+
+        # Check which eligible partners DIDN'T get a claim (weekly/daily limit)
+        claim_policy_ids = {c.policy_id for c in claims}
+        for policy, partner in eligible:
+            if policy.id not in claim_policy_ids:
+                has_weekly, _ = check_weekly_limit(partner, policy, db)
+                if not has_weekly:
+                    weekly_limit_count += 1
+                else:
+                    daily_limit_count += 1
+
+        # Check which claims had their payout capped
+        for claim in claims:
+            policy = db.query(Policy).filter(Policy.id == claim.policy_id).first()
+            if policy and claim.amount >= policy.max_daily_payout * 0.99:
+                cap_applied_count += 1
+
+        # Log the rich summary
+        plan_summary_parts = [f"✅ Paid: {paid_count}"]
+        if no_policy_count > 0:
+            plan_summary_parts.append(f"⛔ No policy: {no_policy_count}")
+        if weekly_limit_count > 0:
+            plan_summary_parts.append(f"📅 Weekly limit: {weekly_limit_count}")
+        if daily_limit_count > 0:
+            plan_summary_parts.append(f"💰 Daily limit: {daily_limit_count}")
+        if cap_applied_count > 0:
+            plan_summary_parts.append(f"📉 Cap applied: {cap_applied_count}")
+
         _add_log(zone.id, zone.code, event_type,
-                 f"Claims auto-processed: {len(claims)} claims created",
+                 f"Claims processed — {' · '.join(plan_summary_parts)}",
                  "info")
+
+        # Log individual claim details with plan tier
+        for claim in claims:
+            policy = db.query(Policy).filter(Policy.id == claim.policy_id).first()
+            tier_label = policy.tier.value.capitalize() if policy else "?"
+            max_payout = policy.max_daily_payout if policy else "?"
+            was_capped = " (CAPPED)" if policy and claim.amount >= policy.max_daily_payout * 0.99 else ""
+            _add_log(zone.id, zone.code, event_type,
+                     f"  → Claim #{claim.id}: ₹{claim.amount:.0f}{was_capped} [{tier_label} plan, max ₹{max_payout}/day] "
+                     f"fraud={claim.fraud_score:.2f} status={claim.status.value}",
+                     "info")
+
     except Exception as e:
         _add_log(zone.id, zone.code, event_type,
                  f"Error processing claims: {e}",
