@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { TermsModal } from '../components/ui/TermsModal';
+import { UpiSelector } from '../components/ui/UpiSelector';
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
@@ -585,10 +586,9 @@ export function Register() {
     return true;
   }
   function canProceedFromUpi() {
-    if (!formData.upiId.trim()) return true;
-    return validateUPI(formData.upiId);
+    if (!formData.upiId || !formData.upiId.trim()) return true;
+    return /^[\w.\-]{3,}@[\w]{3,}$/.test(formData.upiId);
   }
-
   function goNext() { setError(''); setStep(s => s + 1); }
   function goBack() { setError(''); setStep(s => s - 1); }
 
@@ -781,37 +781,44 @@ export function Register() {
     );
   }
 
+
   function StepUpi() {
     return (
       <>
         <div className="reg-title">Link UPI ID</div>
-        <div className="reg-subtitle">For faster claim payouts — optional.</div>
-        <div className="reg-upi-badge">💳 UPI payouts come directly to your account</div>
+        <div className="reg-subtitle">Select your bank or UPI app — optional.</div>
+        <div className="reg-upi-badge">💳 Payouts go directly to your UPI account</div>
 
         <div className="reg-field">
-          <label className="reg-label">UPI ID <span className="reg-label-hint">(optional)</span></label>
-          <div className="reg-input-wrap">
-            <input className={`reg-input${upiValid === true ? ' valid' : upiValid === false ? ' invalid' : ''}`}
-              name="upiId" placeholder="yourname@upi" value={formData.upiId} onChange={handleChange} />
-            {upiValid !== null && <span className="reg-input-icon" style={{ color: upiValid ? 'var(--green-primary)' : 'var(--warning)' }}>{upiValid ? '✓' : '✗'}</span>}
-          </div>
-          <div className={`reg-hint${upiValid === false ? ' invalid' : upiValid === true ? ' valid' : ''}`}>
-            {upiValid === false ? 'Invalid format — try yourname@okhdfcbank' : upiValid === true ? 'Valid UPI ID ✓' : 'e.g. name@okaxis, phone@ybl'}
-          </div>
+          <label className="reg-label">
+            UPI ID <span className="reg-label-hint">(optional)</span>
+          </label>
+          <UpiSelector
+            value={formData.upiId}
+            onChange={(val) => setFormData(prev => ({ ...prev, upiId: val }))}
+          />
         </div>
 
         <div className="reg-status" style={{ background: 'var(--gray-bg)', color: 'var(--text-mid)', marginTop: 4 }}>
-          ℹ️ You can also add or update your UPI ID later from your Profile.
+          ℹ️ You can add or change your UPI ID anytime from your Profile.
         </div>
 
         {error && <div className="reg-error">{error}</div>}
+
         <div className="reg-btn-row">
           <button className="reg-btn-back" onClick={goBack}>← Back</button>
-          <button className="reg-btn-next" onClick={goNext} disabled={!canProceedFromUpi()}>Review →</button>
+          <button
+            className="reg-btn-next"
+            onClick={goNext}
+            disabled={formData.upiId && !/^[\w.\-]{3,}@[\w]{3,}$/.test(formData.upiId)}
+          >
+            Review →
+          </button>
         </div>
       </>
     );
   }
+
 
   function StepReview() {
     return (
