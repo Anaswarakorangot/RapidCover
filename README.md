@@ -3,6 +3,8 @@
 # 🛵 RapidCover
 ### *Parametric Income Intelligence for India's Q-Commerce Last-Mile Warriors*
 
+[🚀 Live Demo (Render/Railway)](https://rapidcover.onrender.com) &nbsp; | &nbsp; [📽️ Pitch Video](https://youtube.com/rapidcover)
+
 <br/>
 
 > **"Last month, a flash flood hit my dark store zone at 6 PM — peak hour. Zepto suspended the entire zone. I sat outside the dark store for 3 hours waiting. Zero runs. Zero income. Nobody called. Nobody compensated. I just went home."**
@@ -39,7 +41,11 @@
 12. [Tech Stack & Architecture](#-tech-stack--architecture)
 13. [Actuarial Model](#-actuarial-model--financial-viability--pricing-basis)
 14. [Development Plan — 6 Weeks](#-development-plan--6-weeks)
-15. [Business Viability](#-business-viability)
+15. [Quick Start (One-Command Setup)](#-quick-start)
+ 16. [Environment Variables](#-environment-variables)
+ 17. [Running the Demo](#-running-the-simulation-demo)
+ 18. [Installation on Mobile](#-pwa-installation-on-android)
+ 19. [Business Viability](#-business-viability)
 
 ---
 
@@ -58,7 +64,7 @@ Dark Store Suspended → Worker has NO other pickup point → Income = ₹0
 | Flash flood (zone-level) | 4–8 hours | ₹400–₹700 | ₹0 |
 | Cyclone warning suspension | 2–4 days | ₹2,000–₹4,000 | ₹0 |
 | Extreme heat advisory | 6–10 hours | ₹500–₹900 | ₹0 |
-| Dangerous AQI breach | 3–6 hours | ₹300–₹600 | ₹0 |
+| Dangerous AQI breach | 3–6 hours | ₹250–₹500 | ₹0 |
 | Curfew / Section 144 | 1–3 days | ₹800–₹2,400 | ₹0 |
 
 No bank product covers this. No platform compensates for it. **RapidCover does — automatically, in under 10 minutes.**
@@ -143,7 +149,7 @@ PERSONALIZED WEEKLY PREMIUM =
   × Loyalty Discount                  (−6% after 4 clean weeks, −10% after 12 weeks)
 ```
 
-**Example:** Manoj (Bellandur, flood-prone, 10 hrs/day, July) → ₹71/week. Ravi (Whitefield, low-risk, 6 hrs/day, January) → ₹49/week. Same product. Fair price. Transparent breakdown shown every Monday.
+**Example:** Manoj (Bellandur, flood-prone, 10 hrs/day, July) → ₹48/week. Ravi (Whitefield, low-risk, 6 hrs/day, January) → ₹33/week. Same product. Fair price. Transparent breakdown shown every Monday.
 
 ### Why Weekly Works
 - Zepto pays partners weekly — premium aligns with earnings
@@ -608,6 +614,50 @@ The primary risk in a Q-Commerce parametric product is **zone-level correlation*
 **The Strategic Moat:** RapidCover generates the first-ever dark-store-zone operational disruption dataset for India's Q-Commerce network — suspension frequency, duration, road condition correlation, zone-level risk scores. Data that Zepto and Blinkit themselves don't have in structured form. That is the licensing and B2B opportunity that outlasts the insurance product.
 
 **Distribution:** One B2B integration with Zepto's partner app = 100,000+ workers onboarded via a single WhatsApp link. Distribution cost = ₹0 marginal.
+
+---
+
+## 🚀 Quick Start (One-Command Setup)
+
+Get your local dev environment running in a single step:
+
+```powershell
+# Backend (Python 3.10+)
+cd backend && python -m venv venv && venv\Scripts\activate
+pip install -r requirements.txt && python -m uvicorn app.main:app --port 8000
+
+# Frontend (Node.js)
+cd frontend && npm install && npm run dev
+```
+
+## ⚙️ Environment Variables
+
+Create a `.env` file in the `backend/` directory based on `.env.example`:
+
+| Key | Description | Example |
+|-----|-------------|---------|
+| `DATABASE_URL` | SQLite or PostgreSQL connection string | `postgresql://user:pass@localhost/rapidcover` |
+| `JWT_SECRET` | Secret key for auth tokens | `your-secret-key-12345` |
+| `OPENWEATHERMAP_API_KEY` | Key from OpenWeatherMap | `your-owm-api-key` |
+| `CPCB_API_KEY` | CPCB (AQI) API key | `your-cpcb-key` |
+| `AUTO_PAYOUT_ENABLED` | Toggle zero-touch automation | `true` |
+| `VAPID_PUBLIC_KEY` | Web Push public key | `BNxxxxxxxx...` |
+| `VAPID_PRIVATE_KEY` | Web Push private key | `xxxxxxxx...` |
+
+## 🧪 Running the Simulation Demo
+
+To see the parametric engine in action:
+
+1. Log in to the **Admin Dashboard** (`/admin`).
+2. Navigate to the **Trigger Sim** tab.
+3. Use the sliders to force a "Heavy Rain" or "Severe AQI" event in a specific zone.
+4. Watch the **Fraud Queue** or **Claims Queue** process the auto-payout in seconds.
+
+## 📱 PWA Installation on Android Chrome
+
+1. Open the Deployed URL in **Google Chrome** on Android.
+2. Tap the **three-dot menu** (⋮) -> Select **"Install app"**.
+3. Launch from your home screen for native-like push notifications.
 
 ---
 
