@@ -36,23 +36,23 @@ const DEMO_FRAUD_QUEUE = [
 
 const FLAG_LABELS = {
   centroid_drift:     { label: 'GPS drift', color: '#9333ea' },
-  device_fingerprint: { label: 'Device match', color: '#dc2626' },
-  claim_frequency:    { label: 'Freq spike', color: '#d97706' },
+  device_fingerprint: { label: 'Device match', color: 'var(--error)' },
+  claim_frequency:    { label: 'Freq spike', color: 'var(--warning)' },
   gps_coherence:      { label: 'GPS incoherent', color: '#0891b2' },
-  run_count_check:    { label: 'Run count', color: '#059669' },
-  zone_polygon:       { label: 'Zone mismatch', color: '#64748b' },
+  run_count_check:    { label: 'Run count', color: 'var(--green-primary)' },
+  zone_polygon:       { label: 'Zone mismatch', color: 'var(--text-light)' },
 };
 
 function scoreColor(score) {
-  if (score > 0.90) return '#dc3545';
-  if (score > 0.75) return '#fd7e14';
-  return '#ffc107';
+  if (score > 0.90) return 'var(--error)';
+  if (score > 0.75) return 'var(--warning)';
+  return '#f59e0b';
 }
 
 function scoreLabel(score) {
-  if (score > 0.90) return 'Auto-reject';
-  if (score > 0.75) return 'Manual queue';
-  return 'Enhanced check';
+  if (score > 0.90) return 'AUTO-REJECT';
+  if (score > 0.75) return 'MANUAL QUEUE';
+  return 'ENHANCED CHECK';
 }
 
 export default function FraudQueuePanel() {
@@ -128,37 +128,51 @@ export default function FraudQueuePanel() {
 
   return (
     <section className="fraud-panel">
-      <div className="fraud-panel__header">
+      <div className="fraud-panel__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
         <div>
-          <h2 className="fraud-panel__title">{'\u{1F50D}'} Fraud Queue</h2>
-          <p className="fraud-panel__subtitle">
+          <h2 className="fraud-panel__title" style={{ fontFamily: 'Nunito', fontWeight: 900, fontSize: '1.5rem', color: 'var(--text-dark)' }}>{'\u{1F50D}'} Fraud Queue</h2>
+          <p className="fraud-panel__subtitle" style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '0.4rem' }}>
             {manualQueue.length} pending manual review &nbsp;&middot;&nbsp; {autoRejected.length} auto-rejected
-            {clusters.length > 0 && <span className="fraud-cluster-badge"> &nbsp;Warning: {clusters.length} collusion cluster{clusters.length > 1 ? 's' : ''} detected</span>}
+            {clusters.length > 0 && <span className="fraud-cluster-badge" style={{ color: 'var(--error)', fontWeight: 700, marginLeft: '0.5rem' }}>{'\u26A0\uFE0F'} {clusters.length} Collision Clusters</span>}
           </p>
         </div>
 
         {/* Bulk action controls */}
-        <div className="fraud-bulk-controls">
-          <span className="fraud-bulk-selected">
-            {selected.size > 0 ? `${selected.size} selected` : ''}
+        <div className="fraud-bulk-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span className="fraud-bulk-selected" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--green-primary)' }}>
+            {selected.size > 0 ? `${selected.size} claims selected` : ''}
           </span>
-          <button className="fraud-bulk-btn fraud-bulk-btn--select-all" onClick={selectAll}>Select all</button>
+          <button 
+            className="fraud-bulk-btn" 
+            onClick={selectAll}
+            style={{ padding: '0.5rem 1rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, background: 'var(--gray-bg)', border: '1px solid var(--border)', cursor: 'pointer' }}
+          >
+            Select all
+          </button>
           {selected.size > 0 && (
             <>
-              <button className="fraud-bulk-btn fraud-bulk-btn--clear" onClick={clearSelection}>Clear</button>
-              <button
-                className="fraud-bulk-btn fraud-bulk-btn--approve"
-                onClick={() => bulkAction('approve')}
-                disabled={loading}
+              <button 
+                className="fraud-bulk-btn" 
+                onClick={clearSelection}
+                style={{ padding: '0.5rem 1rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, background: 'transparent', border: '1.5px solid var(--border)', cursor: 'pointer' }}
               >
-                Approve {selected.size}
+                Clear
               </button>
               <button
-                className="fraud-bulk-btn fraud-bulk-btn--reject"
+                className="fraud-bulk-btn"
+                onClick={() => bulkAction('approve')}
+                disabled={loading}
+                style={{ padding: '0.5rem 1rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, background: 'var(--green-primary)', color: 'white', border: 'none', cursor: 'pointer' }}
+              >
+                Approve ({selected.size})
+              </button>
+              <button
+                className="fraud-bulk-btn"
                 onClick={() => bulkAction('reject')}
                 disabled={loading}
+                style={{ padding: '0.5rem 1rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, background: 'var(--error)', color: 'white', border: 'none', cursor: 'pointer' }}
               >
-                Reject {selected.size}
+                Reject ({selected.size})
               </button>
             </>
           )}
@@ -169,19 +183,33 @@ export default function FraudQueuePanel() {
       {clusters.map(cluster => {
         const clusterClaims = queue.filter(c => c.cluster === cluster);
         return (
-          <div key={cluster} className="fraud-cluster-alert">
-            <div className="fraud-cluster-alert__info">
-              <span>🚨</span>
+          <div 
+            key={cluster} 
+            className="fraud-cluster-alert" 
+            style={{ 
+              background: '#fef2f2', 
+              border: '1.5px solid var(--error)', 
+              borderRadius: '18px', 
+              padding: '1.25rem', 
+              marginBottom: '1.5rem', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center' 
+            }}
+          >
+            <div className="fraud-cluster-alert__info" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <span style={{ fontSize: '1.75rem' }}>🚨</span>
               <div>
-                <strong>Collusion cluster detected: {cluster}</strong>
-                <p>{clusterClaims.length} claims - same zone - same event - same device profile</p>
+                <strong style={{ fontFamily: 'Nunito', fontSize: '1.1rem', color: '#991b1b' }}>Collusion cluster: {cluster}</strong>
+                <p style={{ fontSize: '0.85rem', color: '#991b1b', margin: '0.2rem 0 0' }}>{clusterClaims.length} claims · same zone · same device footprint · suspicious frequency</p>
               </div>
             </div>
             <button
-              className="fraud-bulk-btn fraud-bulk-btn--reject"
-              onClick={() => { selectCluster(cluster); }}
+                className="fraud-bulk-btn"
+                onClick={() => { selectCluster(cluster); }}
+                style={{ padding: '0.6rem 1.25rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800, background: 'var(--error)', color: 'white', border: 'none', cursor: 'pointer' }}
             >
-              Select cluster - Bulk reject
+              Bulk Select - Review
             </button>
           </div>
         );
@@ -189,33 +217,24 @@ export default function FraudQueuePanel() {
 
       {/* Queue table */}
       {queue.length === 0 ? (
-        <div className="fraud-empty">
-          <p>Fraud queue is clear</p>
-          {actionLog.length > 0 && (
-            <div className="fraud-action-log">
-              {actionLog.map((l, i) => (
-                <p key={i} className="fraud-action-log__item">
-                  {l.time} -- {l.action === 'reject' ? 'Rejected' : 'Approved'} {l.count} claim{l.count > 1 ? 's' : ''}
-                </p>
-              ))}
-            </div>
-          )}
+        <div className="fraud-empty" style={{ textAlign: 'center', padding: '4rem 0', background: 'var(--gray-bg)', borderRadius: '24px', border: '1.5px solid var(--border)' }}>
+          <p style={{ fontFamily: 'Nunito', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-mid)' }}>Queue is clear</p>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '0.5rem' }}>All suspicious claims have been processed.</p>
         </div>
       ) : (
-        <div className="fraud-table-wrapper">
-          <table className="fraud-table">
-            <thead>
+        <div className="fraud-table-wrapper" style={{ background: 'var(--white)', borderRadius: '24px', border: '1.5px solid var(--border)', overflow: 'hidden' }}>
+          <table className="fraud-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead style={{ background: 'var(--gray-bg)', borderBottom: '1.5px solid var(--border)' }}>
               <tr>
-                <th><input type="checkbox" onChange={e => e.target.checked ? selectAll() : clearSelection()} /></th>
-                <th>Claim ID</th>
-                <th>Partner</th>
-                <th>Zone</th>
-                <th>Trigger</th>
-                <th>Fraud Score</th>
-                <th>Flags</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th style={{ padding: '1rem' }}><input type="checkbox" onChange={e => e.target.checked ? selectAll() : clearSelection()} /></th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>Claim ID</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>Partner</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>Zone</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>Trigger</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>Fraud Score</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>Flags</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>Amount</th>
+                <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -225,50 +244,56 @@ export default function FraudQueuePanel() {
                 return (
                   <tr
                     key={c.claim_id}
-                    className={`fraud-table__row ${isSelected ? 'fraud-table__row--selected' : ''} ${c.cluster ? 'fraud-table__row--cluster' : ''}`}
+                    className={`fraud-table__row ${isSelected ? 'fraud-table__row--selected' : ''}`}
+                    style={{ borderBottom: '1px solid var(--border)', background: isSelected ? 'var(--green-light)' : 'transparent', transition: 'all 0.15s' }}
                   >
-                    <td>
+                    <td style={{ padding: '1rem', textAlign: 'center' }}>
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleSelect(c.claim_id)}
                       />
                     </td>
-                    <td><code className="fraud-claim-id">{c.claim_id}</code></td>
-                    <td><code>{c.partner_id}</code></td>
-                    <td>
-                      <span>{c.zone}</span>
-                      <code className="fraud-zone-code">{c.zone_code}</code>
+                    <td style={{ padding: '1rem' }}><code style={{ fontWeight: 800, color: 'var(--text-dark)' }}>{c.claim_id}</code></td>
+                    <td style={{ padding: '1rem' }}><code style={{ fontSize: '0.75rem' }}>{c.partner_id}</code></td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{c.zone}</div>
+                      <code style={{ fontSize: '0.65rem', color: 'var(--text-light)' }}>{c.zone_code}</code>
                     </td>
-                    <td>{c.trigger}</td>
-                    <td>
-                      <div className="fraud-score-cell">
-                        <span className="fraud-score-num" style={{ color }}>{c.fraud_score.toFixed(2)}</span>
-                        <span className="fraud-score-label" style={{ color }}>{scoreLabel(c.fraud_score)}</span>
+                    <td style={{ padding: '1rem', fontSize: '0.85rem' }}>{c.trigger}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 900, fontSize: '1rem', color }}>{c.fraud_score.toFixed(2)}</span>
+                        <span style={{ fontSize: '0.6rem', fontWeight: 800, color, textTransform: 'uppercase' }}>{scoreLabel(c.fraud_score)}</span>
                       </div>
                     </td>
-                    <td>
-                      <div className="fraud-flags">
+                    <td style={{ padding: '1rem' }}>
+                      <div className="fraud-flags" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
                         {c.flags.map(f => {
-                          const fl = FLAG_LABELS[f] || { label: f, color: '#64748b' };
+                          const fl = FLAG_LABELS[f] || { label: f, color: 'var(--text-mid)' };
                           return (
-                            <span key={f} className="fraud-flag" style={{ background: fl.color + '22', color: fl.color }}>
+                            <span key={f} style={{ fontSize: '0.6rem', fontWeight: 800, padding: '0.2rem 0.5rem', borderRadius: '6px', background: fl.color + '15', color: fl.color, border: `1px solid ${fl.color}25` }}>
                               {fl.label}
                             </span>
                           );
                         })}
                       </div>
                     </td>
-                    <td>Rs.{c.amount}</td>
-                    <td>
-                      <span className={`fraud-status fraud-status--${c.status === 'auto_reject' ? 'reject' : 'queue'}`}>
-                        {c.status === 'auto_reject' ? 'Auto-rejected' : 'Manual review'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="fraud-row-actions">
-                        <button className="fraud-row-btn fraud-row-btn--approve" onClick={() => { setSelected(new Set([c.claim_id])); bulkAction('approve'); }}>{'\u2713'}</button>
-                        <button className="fraud-row-btn fraud-row-btn--reject"  onClick={() => { setSelected(new Set([c.claim_id])); bulkAction('reject');  }}>{'\u2715'}</button>
+                    <td style={{ padding: '1rem', fontWeight: 800 }}>₹{c.amount}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <div className="fraud-row-actions" style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button 
+                          style={{ width: 30, height: 30, borderRadius: '8px', border: '1.5px solid var(--green-primary)', background: 'transparent', color: 'var(--green-primary)', cursor: 'pointer', fontWeight: 900 }}
+                          onClick={() => { setSelected(new Set([c.claim_id])); bulkAction('approve'); }}
+                        >
+                          ✓
+                        </button>
+                        <button 
+                          style={{ width: 30, height: 30, borderRadius: '8px', border: '1.5px solid var(--error)', background: 'transparent', color: 'var(--error)', cursor: 'pointer', fontWeight: 900 }}
+                          onClick={() => { setSelected(new Set([c.claim_id])); bulkAction('reject'); }}
+                        >
+                          ✕
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -280,12 +305,13 @@ export default function FraudQueuePanel() {
       )}
 
       {/* Action log */}
-      {actionLog.length > 0 && queue.length > 0 && (
-        <div className="fraud-action-log">
+      {actionLog.length > 0 && (
+        <div className="fraud-action-log" style={{ marginTop: '1.5rem', background: 'var(--gray-bg)', border: '1.5px solid var(--border)', borderRadius: '18px', padding: '1rem' }}>
+          <p style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-light)', marginBottom: '0.5rem' }}>Session History</p>
           {actionLog.map((l, i) => (
-            <p key={i} className="fraud-action-log__item">
-              {l.time} -- {l.action === 'reject' ? 'Rejected' : 'Approved'} {l.count} claim{l.count > 1 ? 's' : ''}
-            </p>
+            <div key={i} style={{ fontSize: '0.8rem', color: 'var(--text-mid)', padding: '0.2rem 0', borderBottom: '1px solid rgba(0,0,0,0.03)' }}>
+              <span style={{ fontWeight: 700 }}>{l.time}</span> &nbsp;—&nbsp; {l.action === 'reject' ? <span style={{ color: 'var(--error)' }}>Rejected</span> : <span style={{ color: 'var(--green-primary)' }}>Approved</span>} <strong>{l.count}</strong> claim{l.count > 1 ? 's' : ''}
+            </div>
           ))}
         </div>
       )}

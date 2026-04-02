@@ -174,89 +174,91 @@ export default function TriggerPanel() {
       <div className="admin-section-label">DISRUPTION SIMULATION — TRIGGER ENGINE</div>
 
       {/* ── Live Engine Status Row ────────────────────────────────────── */}
-      <div className="engine-status-bar">
-        <div className="engine-status-bar__row">
-          <div className="engine-status-item">
-            <span className="engine-label">Scheduler</span>
+      <div className="engine-status-bar" style={{ background: 'var(--green-light)', border: '1.5px solid rgba(61,184,92,0.15)', borderRadius: '18px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem' }}>
+        <div className="engine-status-bar__row" style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <div className="engine-status-item" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span className="engine-label" style={{ fontFamily: 'Nunito', fontWeight: 900, fontSize: '0.75rem', color: 'var(--green-dark)', textTransform: 'uppercase' }}>Scheduler</span>
             <span className={`engine-dot ${getSchedulerDotClass()}`} />
-            <span className="engine-value">
+            <span className="engine-value" style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>
               {!engineStatus?.scheduler?.running ? 'Stopped'
                 : isSchedulerStale() ? 'Stale' : 'Running'}
             </span>
           </div>
-          <div className="engine-status-item">
-            <span className="engine-label">Poll interval</span>
-            <span className="engine-value">
+          <div className="engine-status-item" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span className="engine-label" style={{ fontFamily: 'Nunito', fontWeight: 900, fontSize: '0.75rem', color: 'var(--green-dark)', textTransform: 'uppercase' }}>Poll interval</span>
+            <span className="engine-value" style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>
               {engineStatus?.scheduler?.poll_interval_seconds || 45}s
             </span>
           </div>
-          <div className="engine-status-item">
-            <span className="engine-label">Last poll</span>
-            <span className="engine-value">
+          <div className="engine-status-item" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span className="engine-label" style={{ fontFamily: 'Nunito', fontWeight: 900, fontSize: '0.75rem', color: 'var(--green-dark)', textTransform: 'uppercase' }}>Last poll</span>
+            <span className="engine-value" style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-dark)' }}>
               {engineStatus?.scheduler?.last_poll
                 ? new Date(engineStatus.scheduler.last_poll).toLocaleTimeString()
                 : '—'}
             </span>
           </div>
-          <div className="engine-status-item">
-            <span className="engine-label">Active events</span>
-            <span className={`engine-value ${displayActiveEvents > 0 ? 'engine-value--highlight' : ''}`}>
+          <div className="engine-status-item" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span className="engine-label" style={{ fontFamily: 'Nunito', fontWeight: 900, fontSize: '0.75rem', color: 'var(--green-dark)', textTransform: 'uppercase' }}>Active events</span>
+            <span className="engine-value" style={{ fontWeight: 900, fontSize: '1.1rem', color: displayActiveEvents > 0 ? 'var(--error)' : 'var(--green-dark)' }}>
               {displayActiveEvents}
             </span>
           </div>
         </div>
 
-        {/* Data source indicators with tooltips */}
-        <div className="engine-sources">
+        {/* Data source indicators */}
+        <div className="engine-sources" style={{ display: 'flex', gap: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(61,184,92,0.1)' }}>
           {Object.entries(engineStatus?.data_sources || {}).map(([key, info]) => (
-            <div
-              key={key}
-              className="engine-source"
-              title={SOURCE_TOOLTIPS[info.status] || ''}
-            >
-              <span className={`engine-dot ${info.status === 'live' ? 'engine-dot--live' : info.status === 'mock' ? 'engine-dot--mock' : 'engine-dot--off'}`} />
-              <span className="engine-source__name">{SOURCE_LABELS[key] || key}</span>
-              <span className="engine-source__status">{info.status}</span>
-            </div>
-          ))}
-          {!engineStatus && Object.entries(SOURCE_LABELS).map(([key, label]) => (
-            <div key={key} className="engine-source" title="API key not configured">
-              <span className="engine-dot engine-dot--off" />
-              <span className="engine-source__name">{label}</span>
-              <span className="engine-source__status">unknown</span>
+            <div key={key} className="engine-source" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-mid)' }}>
+              <span className={`engine-dot ${info.status === 'live' ? 'engine-dot--green' : info.status === 'mock' ? 'engine-dot--amber' : 'engine-dot--red'}`} style={{ width: 7, height: 7, borderRadius: '50%' }} />
+              <span>{SOURCE_LABELS[key] || key}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <p className="trigger-panel__desc">
+      <p className="trigger-panel__desc" style={{ color: 'var(--text-light)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
         Fire a mock disruption event to test the full claim pipeline end-to-end.
         The real engine polls automatically every 45 seconds.
       </p>
 
-      {/* Trigger cards with colored left borders */}
-      <div className="trigger-grid">
+      {/* Trigger cards */}
+      <div className="trigger-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
         {TRIGGERS.map(t => (
           <div
             key={t.type}
             className="trigger-card"
-            style={{ borderLeft: `3px solid ${TRIGGER_COLORS[t.type]}` }}
+            style={{ 
+              background: 'var(--white)', 
+              border: '1.5px solid var(--border)', 
+              borderLeft: `5px solid ${TRIGGER_COLORS[t.type]}`,
+              borderRadius: '18px', 
+              padding: '1.25rem',
+              transition: 'all 0.2s',
+            }}
           >
-            <div className="trigger-card__header">
-              <span className="trigger-card__icon">{t.icon}</span>
-              <strong className="trigger-card__label">{t.label}</strong>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1.4rem' }}>{t.icon}</span>
+              <strong style={{ fontFamily: 'Nunito', fontWeight: 900, fontSize: '1.1rem', color: 'var(--text-dark)' }}>{t.label}</strong>
             </div>
-            <p className="trigger-card__detail">{t.detail}</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-light)', marginBottom: '1.25rem' }}>{t.detail}</p>
             <button
               className="trigger-card__btn"
               onClick={() => handleSimulate(t)}
               disabled={simulating}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: 'var(--green-primary)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontFamily: 'Nunito',
+                fontWeight: 800,
+                cursor: 'pointer'
+              }}
             >
-              {simulating && activeTrigger === t.type ? (
-                <><span className="trigger-card__spinner" /> Running...</>
-              ) : (
-                <>Simulate ↗</>
-              )}
+              {simulating && activeTrigger === t.type ? 'Running...' : 'Simulate ↗'}
             </button>
           </div>
         ))}
@@ -264,20 +266,15 @@ export default function TriggerPanel() {
 
       {/* Simulation log */}
       {logLines.length > 0 && (
-        <div className="sim-log" ref={logRef}>
-          <div className="sim-log__title">Last simulation log</div>
+        <div className="sim-log" ref={logRef} style={{ marginTop: '1.5rem', background: 'var(--gray-bg)', border: '1.5px solid var(--border)', borderRadius: '18px', padding: '1.25rem', maxHeight: '300px', overflowY: 'auto' }}>
+          <div style={{ fontFamily: 'Nunito', fontWeight: 900, fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--text-dark)' }}>Live simulation log</div>
           {logLines.map((line, i) => (
-            <div
-              key={i}
-              className={`sim-log__line ${line.total ? 'sim-log__total' : ''}`}
-            >
+            <div key={i} style={{ fontFamily: 'monospace', fontSize: '0.75rem', padding: '0.25rem 0', color: 'var(--text-mid)', borderBottom: '1px solid rgba(0,0,0,0.03)' }}>
               {line.total ? (
-                <strong>{line.msg}</strong>
+                <strong style={{ color: 'var(--green-dark)' }}>{line.msg}</strong>
               ) : (
                 <>
-                  <span className="sim-log__ts">{line.ts}</span>
-                  <span className="sim-log__sep">—</span>
-                  <span className="sim-log__msg">{line.msg}</span>
+                  <span style={{ color: 'var(--text-light)' }}>[{line.ts}]</span> — {line.msg}
                 </>
               )}
             </div>
