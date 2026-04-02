@@ -1,52 +1,328 @@
 import { useState, useEffect } from 'react';
-import { Card, CardBody, CardFooter, Button } from '../components/ui';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
-const TIER_ICONS = {
-  flex: '🌱',
-  standard: '⭐',
-  pro: '👑',
-};
+/* ─── Design tokens matching Register.jsx ───────────────────────────────── */
+const S = `
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
 
-const STATUS_STYLES = {
-  active: {
-    bg: 'bg-green-50',
-    border: 'border-green-200',
-    badge: 'bg-green-100 text-green-800',
-    text: 'text-green-800',
-    subtext: 'text-green-600',
-  },
-  grace_period: {
-    bg: 'bg-yellow-50',
-    border: 'border-yellow-200',
-    badge: 'bg-yellow-100 text-yellow-800',
-    text: 'text-yellow-800',
-    subtext: 'text-yellow-600',
-  },
-  lapsed: {
-    bg: 'bg-red-50',
-    border: 'border-red-200',
-    badge: 'bg-red-100 text-red-800',
-    text: 'text-red-800',
-    subtext: 'text-red-600',
-  },
-  cancelled: {
-    bg: 'bg-gray-50',
-    border: 'border-gray-200',
-    badge: 'bg-gray-100 text-gray-800',
-    text: 'text-gray-800',
-    subtext: 'text-gray-600',
-  },
-};
+  :root {
+    --green-primary: #3DB85C;
+    --green-dark:    #2a9e47;
+    --green-light:   #e8f7ed;
+    --text-dark:     #1a2e1a;
+    --text-mid:      #4a5e4a;
+    --text-light:    #8a9e8a;
+    --white:         #ffffff;
+    --gray-bg:       #f7f9f7;
+    --border:        #e2ece2;
+    --warning:       #d97706;
+    --error:         #dc2626;
+  }
 
-const STATUS_LABELS = {
-  active: 'Active',
-  grace_period: 'Grace Period',
-  lapsed: 'Lapsed',
-  cancelled: 'Cancelled',
-};
+  .pol-wrap {
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text-dark);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-bottom: 32px;
+  }
 
+  /* ── Page header ── */
+  .pol-page-title {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 24px;
+    color: var(--text-dark);
+  }
+  .pol-page-sub { font-size: 13px; color: var(--text-light); margin-top: 2px; }
+
+  /* ── Card ── */
+  .pol-card {
+    background: var(--white);
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+  }
+  .pol-card.ring-active { border-color: var(--green-primary); box-shadow: 0 0 0 3px rgba(61,184,92,0.15); }
+  .pol-card.locked { opacity: 0.55; }
+
+  .pol-card-body    { padding: 18px 18px 14px; }
+  .pol-card-footer  { padding: 0 18px 16px; }
+
+  /* ── Plan card header ── */
+  .plan-hdr { display: flex; justify-content: space-between; align-items: flex-start; }
+  .plan-icon { font-size: 28px; }
+  .plan-name { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px; margin-top: 4px; text-transform: capitalize; }
+  .plan-lock-badge {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    background: #f3f4f6; color: #6b7280; padding: 3px 9px; border-radius: 10px; margin-top: 4px;
+  }
+  .plan-price-big { font-family: 'Nunito', sans-serif; font-size: 28px; font-weight: 900; color: var(--text-dark); }
+  .plan-price-sub { font-size: 12px; color: var(--text-light); text-align: right; }
+  .plan-zone-adj  { font-size: 11px; text-align: right; margin-top: 2px; }
+
+  .plan-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .plan-stat { background: var(--gray-bg); border-radius: 12px; padding: 10px 12px; }
+  .plan-stat-label { font-size: 11px; color: var(--text-light); }
+  .plan-stat-val   { font-family: 'Nunito', sans-serif; font-size: 16px; font-weight: 800; color: var(--text-dark); margin-top: 2px; }
+
+  .plan-ineligible-note {
+    margin-top: 12px;
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+    padding: 8px 12px; font-size: 12px; color: #92400e;
+  }
+
+  /* ── Plan CTA button ── */
+  .plan-btn {
+    width: 100%; padding: 14px; border-radius: 14px;
+    font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 15px;
+    border: none; cursor: pointer; transition: background 0.2s, opacity 0.2s;
+  }
+  .plan-btn.primary { background: var(--green-primary); color: white; }
+  .plan-btn.primary:hover { background: var(--green-dark); }
+  .plan-btn.secondary { background: var(--gray-bg); color: var(--text-light); cursor: not-allowed; }
+  .plan-btn.outline { background: transparent; border: 1.5px solid var(--border); color: var(--text-mid); cursor: not-allowed; }
+
+  /* ── Active policy banner ── */
+  .active-pol-banner {
+    border-radius: 18px;
+    padding: 16px 18px;
+    border: 1.5px solid;
+  }
+  .active-pol-banner.st-active        { background: #f0fdf4; border-color: #bbf7d0; }
+  .active-pol-banner.st-grace_period  { background: #fffbeb; border-color: #fde68a; }
+  .active-pol-banner.st-lapsed        { background: #fef2f2; border-color: #fecaca; }
+  .active-pol-banner.st-cancelled     { background: #f9fafb; border-color: #e5e7eb; }
+
+  .apb-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .apb-tier { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px; }
+  .apb-badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; }
+  .apb-badge.st-active        { background: #dcfce7; color: #166534; }
+  .apb-badge.st-grace_period  { background: #fef9c3; color: #854d0e; }
+  .apb-badge.st-lapsed        { background: #fee2e2; color: #991b1b; }
+  .apb-badge.st-cancelled     { background: #f3f4f6; color: #374151; }
+  .apb-sub { font-size: 12px; color: var(--text-mid); margin-top: 3px; }
+  .apb-next-premium { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+
+  .apb-toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .rc-toggle {
+    position: relative; display: inline-block; width: 44px; height: 24px;
+  }
+  .rc-toggle input { opacity: 0; width: 0; height: 0; }
+  .rc-toggle-slider {
+    position: absolute; cursor: pointer; inset: 0; border-radius: 24px;
+    background: #d1d5db; transition: background 0.25s;
+  }
+  .rc-toggle-slider:before {
+    content: ''; position: absolute; height: 18px; width: 18px;
+    left: 3px; bottom: 3px; background: white; border-radius: 50%;
+    transition: transform 0.25s;
+  }
+  .rc-toggle input:checked + .rc-toggle-slider { background: var(--green-primary); }
+  .rc-toggle input:checked + .rc-toggle-slider:before { transform: translateX(20px); }
+  .apb-toggle-label { font-size: 13px; color: var(--text-mid); }
+
+  .apb-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .apb-action-btn {
+    flex: 1; padding: 9px; border-radius: 12px; font-size: 12px; font-weight: 700;
+    font-family: 'DM Sans', sans-serif; cursor: pointer; transition: opacity 0.2s;
+    border: 1.5px solid var(--border); background: transparent; color: var(--text-dark);
+  }
+  .apb-action-btn.danger { color: var(--error); border-color: #fecaca; }
+  .apb-action-btn.primary { background: var(--green-primary); color: white; border-color: var(--green-primary); }
+
+  /* ── Eligibility gate ── */
+  .eligib-gate {
+    border-radius: 14px; padding: 14px 16px;
+    border: 1.5px solid #fde68a; background: #fffbeb;
+  }
+  .eligib-gate.pass { border-color: #bbf7d0; background: #f0fdf4; }
+  .eligib-gate-title { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 14px; }
+  .eligib-gate.fail  .eligib-gate-title { color: #92400e; }
+  .eligib-gate.pass  .eligib-gate-title { color: #166534; }
+  .eligib-gate-sub { font-size: 12px; margin-top: 4px; }
+  .eligib-gate.fail .eligib-gate-sub { color: #b45309; }
+  .eligib-gate.pass .eligib-gate-sub { color: #15803d; }
+
+  /* ── Exclusions modal ── */
+  .excl-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 100;
+  }
+  .excl-sheet {
+    background: var(--white); width: 100%; max-width: 480px;
+    border-radius: 24px 24px 0 0; max-height: 90vh;
+    display: flex; flex-direction: column;
+  }
+  .excl-header { padding: 20px 20px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .excl-title  { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px; color: var(--text-dark); }
+  .excl-sub    { font-size: 13px; color: var(--text-mid); margin-top: 3px; }
+  .excl-list   { overflow-y: auto; flex: 1; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .excl-item   { display: flex; gap: 12px; padding: 12px 14px; background: var(--gray-bg); border: 1px solid var(--border); border-radius: 14px; }
+  .excl-item-title { font-size: 13px; font-weight: 700; color: var(--text-dark); }
+  .excl-item-desc  { font-size: 11.5px; color: var(--text-mid); margin-top: 2px; }
+  .excl-footer { padding: 14px 20px 24px; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .excl-check-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+  .excl-check { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--green-primary); margin-top: 2px; }
+  .excl-check-label { font-size: 13px; color: var(--text-dark); }
+  .excl-cta {
+    width: 100%; padding: 15px; background: var(--green-primary); color: white;
+    border: none; border-radius: 14px; font-family: 'Nunito', sans-serif; font-weight: 900;
+    font-size: 15px; cursor: pointer; transition: background 0.2s;
+  }
+  .excl-cta:disabled { background: var(--border); color: var(--text-light); cursor: not-allowed; }
+  .excl-cta:not(:disabled):hover { background: var(--green-dark); }
+  .excl-view-link {
+    width: 100%; text-align: center; font-size: 13px; color: var(--text-mid);
+    background: none; border: none; cursor: pointer; padding: 8px;
+    font-family: 'DM Sans', sans-serif; text-decoration: underline;
+  }
+
+  /* ── Premium breakdown (renewal modal) ── */
+  .breakdown-modal-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; }
+  .breakdown-modal-key { color: var(--text-mid); }
+  .breakdown-modal-val { font-weight: 600; color: var(--text-dark); }
+  .breakdown-modal-val.neg { color: var(--green-dark); }
+  .breakdown-modal-total {
+    border-top: 1.5px solid var(--border); margin-top: 6px; padding-top: 10px;
+    display: flex; justify-content: space-between;
+    font-family: 'Nunito', sans-serif; font-weight: 900;
+    font-size: 15px; color: var(--text-dark);
+  }
+  .breakdown-modal-total .val { color: var(--green-dark); }
+
+  /* ── Renewal modal ── */
+  .renew-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px;
+  }
+  .renew-modal {
+    background: var(--white); border-radius: 24px; max-width: 400px; width: 100%;
+    padding: 24px; max-height: 90vh; overflow-y: auto;
+  }
+  .renew-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px; color: var(--text-dark); margin-bottom: 16px; }
+  .tier-chips { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
+  .tier-chip {
+    padding: 10px 8px; border-radius: 12px; border: 1.5px solid var(--border);
+    text-align: center; cursor: pointer; transition: all 0.2s; background: var(--white);
+  }
+  .tier-chip.selected { border-color: var(--green-primary); background: var(--green-light); }
+  .tier-chip.disabled { opacity: 0.4; cursor: not-allowed; }
+  .tier-chip-name  { font-size: 13px; font-weight: 700; text-transform: capitalize; margin-top: 2px; }
+  .tier-chip-price { font-size: 11px; color: var(--text-light); }
+  .renew-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .renew-cancel {
+    flex: 1; padding: 13px; border-radius: 14px; border: 1.5px solid var(--border);
+    background: transparent; color: var(--text-mid); font-family: 'Nunito', sans-serif;
+    font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .renew-confirm {
+    flex: 2; padding: 13px; border-radius: 14px; border: none;
+    background: var(--green-primary); color: white; font-family: 'Nunito', sans-serif;
+    font-weight: 800; font-size: 14px; cursor: pointer;
+  }
+  .renew-confirm:disabled { background: var(--border); cursor: not-allowed; }
+
+  /* ── Info box ── */
+  .info-box { background: var(--gray-bg); border-radius: 16px; padding: 16px 18px; }
+  .info-box-title { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 14px; margin-bottom: 10px; }
+  .info-box li { font-size: 12.5px; color: var(--text-mid); margin-bottom: 6px; list-style: disc; margin-left: 16px; }
+`;
+
+/* ─── Data ──────────────────────────────────────────────────────────────── */
+const TIER_PRICES = { flex: 22, standard: 33, pro: 45 };
+const TIER_ICONS = { flex: '🌱', standard: '⭐', pro: '👑' };
+
+const EXCLUSIONS = [
+  { icon: '⚔️', title: 'War and armed conflict', desc: 'Losses arising from war, invasion, or armed hostilities.' },
+  { icon: '🦠', title: 'Pandemic / epidemic declaration', desc: 'Disruptions due to a government-declared pandemic or epidemic.' },
+  { icon: '☢️', title: 'Nuclear and radioactive events', desc: 'Any loss caused by nuclear, radioactive, or radiation hazard.' },
+  { icon: '🏛️', title: 'Government policy or regulatory changes', desc: 'Policy changes, bans, or regulatory decisions by any authority.' },
+  { icon: '⚙️', title: 'Platform operational decisions', desc: 'Planned maintenance, algorithm changes, or app updates by Zepto.' },
+  { icon: '🙋', title: 'Self-inflicted / voluntary offline', desc: 'Choosing to go offline or voluntarily skipping shifts.' },
+  { icon: '🏥', title: 'Health, accident, life', desc: 'Personal health events, accidents, or life insurance claims.' },
+  { icon: '🔧', title: 'Vehicle damage and repair', desc: 'Downtime due to vehicle breakdown, servicing, or repair.' },
+  { icon: '⏱️', title: 'Disruptions under 45 minutes', desc: 'Any disruption lasting less than 45 minutes is not covered.' },
+  { icon: '🗓️', title: 'Claims after 48-hour window', desc: 'Claims must be submitted within 48 hours of the disruption.' },
+];
+
+/* ─── ExclusionsScreen ────────────────────────────────────────────────── */
+function ExclusionsScreen({ onAccept }) {
+  const [checked, setChecked] = useState(false);
+  return (
+    <div className="excl-overlay">
+      <div className="excl-sheet">
+        <div className="excl-header">
+          <p className="excl-title">⚠️ What's Not Covered</p>
+          <p className="excl-sub">Read all 10 exclusions before your first premium is collected.</p>
+        </div>
+        <div className="excl-list">
+          {EXCLUSIONS.map((ex, i) => (
+            <div className="excl-item" key={i}>
+              <span style={{ fontSize: 22, flexShrink: 0, marginTop: 2 }}>{ex.icon}</span>
+              <div>
+                <p className="excl-item-title">{ex.title}</p>
+                <p className="excl-item-desc">{ex.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="excl-footer">
+          <label className="excl-check-row">
+            <input className="excl-check" type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} />
+            <span className="excl-check-label">I have read and understood all 10 exclusions listed above.</span>
+          </label>
+          <button className="excl-cta" disabled={!checked} onClick={onAccept}>
+            I Understand — Continue to Plans
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── PremiumBreakdown ────────────────────────────────────────────────── */
+function PremiumBreakdown({ quote, loyaltyWeeks }) {
+  if (!quote) return null;
+  const base = TIER_PRICES[quote.tier] || 33;
+  const zoneAdj = quote.risk_adjustment || 0;
+  const seasonal = 1.15;
+  const riqi = 1.15;
+  const activity = quote.tier === 'pro' ? 1.35 : quote.tier === 'flex' ? 0.80 : 1.00;
+  const loyalty = loyaltyWeeks >= 12 ? 0.90 : loyaltyWeeks >= 4 ? 0.94 : 1.00;
+  const total = Math.round(base * activity * riqi * seasonal * loyalty + zoneAdj);
+
+  return (
+    <div style={{ background: '#eff6ff', borderRadius: 14, padding: 14, border: '1px solid #bfdbfe', marginTop: 12 }}>
+      <p style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 800, fontSize: 12, color: '#1e40af', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+        Premium Breakdown (Next Week)
+      </p>
+      {[
+        ['Base Premium', `₹${base}`, ''],
+        ['Zone Risk Factor', zoneAdj !== 0 ? `${zoneAdj > 0 ? '+' : ''}₹${zoneAdj}` : '₹0', ''],
+        ['Seasonal Index', `×${seasonal.toFixed(2)}`, ''],
+        ['RIQI Adjustment', `×${riqi.toFixed(2)}`, ''],
+        ['Activity Tier', `×${activity.toFixed(2)}`, quote.tier],
+        ['Loyalty Discount', `×${loyalty.toFixed(2)}`, loyaltyWeeks >= 4 ? `${loyaltyWeeks}w streak` : 'None yet'],
+      ].map(([k, v, note]) => (
+        <div className="breakdown-modal-row" key={k}>
+          <span className="breakdown-modal-key">{k}{note ? <span style={{ fontSize: 10, color: 'var(--text-light)', marginLeft: 4 }}>({note})</span> : ''}</span>
+          <span className={`breakdown-modal-val ${v.includes('-') || v.startsWith('×0.9') ? 'neg' : ''}`}>{v}</span>
+        </div>
+      ))}
+      <div className="breakdown-modal-total">
+        <span>Total</span>
+        <span className="val">₹{total}/week</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main Policy ─────────────────────────────────────────────────────── */
 export function Policy() {
+  const { user } = useAuth();
   const [quotes, setQuotes] = useState([]);
   const [activePolicy, setActivePolicy] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -57,407 +333,304 @@ export function Policy() {
   const [renewalLoading, setRenewalLoading] = useState(false);
   const [downloadingCert, setDownloadingCert] = useState(false);
   const [togglingAutoRenew, setTogglingAutoRenew] = useState(false);
+  const [showExclusions, setShowExclusions] = useState(false);
+  const [exclusionsAccepted, setExclusionsAccepted] = useState(false);
+  const [pendingTier, setPendingTier] = useState(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Simulated — in production from partner activity API
+  const [partnerActivityDays] = useState(8);
+  const [loyaltyWeeks] = useState(3);
 
-  async function loadData() {
+  function tierEligible(tier) {
+    if (tier === 'flex') return { ok: true };
+    if (partnerActivityDays >= 7) return { ok: true };
+    return { ok: false, reason: `Cover starts after you complete 7 active delivery days (you have ${partnerActivityDays}).` };
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
     try {
-      const [quotesData, policyData] = await Promise.all([
+      const [qd, pd] = await Promise.all([
         api.getPolicyQuotes(),
         api.getActivePolicy().catch(() => null),
       ]);
-      setQuotes(quotesData);
-      setActivePolicy(policyData);
-    } catch (error) {
-      console.error('Failed to load policy data:', error);
-    } finally {
-      setLoading(false);
-    }
+      const fixed = (qd || []).map(q => ({
+        ...q,
+        base_premium: TIER_PRICES[q.tier] || q.base_premium,
+        final_premium: TIER_PRICES[q.tier] || q.final_premium,
+      }));
+      setQuotes(fixed); setActivePolicy(pd);
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  }
+
+  function initiatePurchase(tier) {
+    if (!exclusionsAccepted) { setPendingTier(tier); setShowExclusions(true); }
+    else handlePurchase(tier);
+  }
+
+  function onExclusionsAccept() {
+    setExclusionsAccepted(true); setShowExclusions(false);
+    if (pendingTier) { handlePurchase(pendingTier); setPendingTier(null); }
   }
 
   async function handlePurchase(tier) {
     setPurchasing(tier);
-    try {
-      await api.createPolicy(tier);
-      await loadData();
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setPurchasing(null);
-    }
+    try { await api.createPolicy(tier); await load(); }
+    catch (e) { alert(e.message); }
+    finally { setPurchasing(null); }
   }
 
   async function handleCancel() {
     if (!confirm('Are you sure you want to cancel your policy?')) return;
-
-    try {
-      await api.cancelPolicy(activePolicy.id);
-      await loadData();
-    } catch (error) {
-      alert(error.message);
-    }
+    try { await api.cancelPolicy(activePolicy.id); await load(); }
+    catch (e) { alert(e.message); }
   }
 
   async function openRenewalModal() {
     setShowRenewalModal(true);
-    setSelectedRenewalTier(activePolicy?.tier || null);
+    setSelectedRenewalTier(activePolicy?.tier);
     setRenewalLoading(true);
     try {
-      const quote = await api.getRenewalQuote(activePolicy.id, selectedRenewalTier);
-      setRenewalQuote(quote);
-    } catch (error) {
-      console.error('Failed to get renewal quote:', error);
-      alert(error.message);
-      setShowRenewalModal(false);
-    } finally {
-      setRenewalLoading(false);
-    }
+      const q = await api.getRenewalQuote(activePolicy.id, activePolicy.tier);
+      setRenewalQuote(q);
+    } catch (e) { alert(e.message); setShowRenewalModal(false); }
+    finally { setRenewalLoading(false); }
   }
 
   async function handleTierChange(tier) {
-    setSelectedRenewalTier(tier);
-    setRenewalLoading(true);
+    setSelectedRenewalTier(tier); setRenewalLoading(true);
     try {
-      const quote = await api.getRenewalQuote(activePolicy.id, tier);
-      setRenewalQuote(quote);
-    } catch (error) {
-      console.error('Failed to get renewal quote:', error);
-    } finally {
-      setRenewalLoading(false);
-    }
+      const q = await api.getRenewalQuote(activePolicy.id, tier);
+      setRenewalQuote(q);
+    } catch (e) { console.error(e); }
+    finally { setRenewalLoading(false); }
   }
 
   async function handleRenew() {
     setRenewalLoading(true);
     try {
-      await api.renewPolicy(
-        activePolicy.id,
-        selectedRenewalTier !== activePolicy.tier ? selectedRenewalTier : null,
-        activePolicy.auto_renew
-      );
-      setShowRenewalModal(false);
-      setRenewalQuote(null);
-      await loadData();
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setRenewalLoading(false);
-    }
+      await api.renewPolicy(activePolicy.id, selectedRenewalTier !== activePolicy.tier ? selectedRenewalTier : null, activePolicy.auto_renew);
+      setShowRenewalModal(false); setRenewalQuote(null); await load();
+    } catch (e) { alert(e.message); }
+    finally { setRenewalLoading(false); }
   }
 
-  async function handleDownloadCertificate() {
+  async function handleDownloadCert() {
     setDownloadingCert(true);
-    try {
-      await api.downloadCertificate(activePolicy.id);
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setDownloadingCert(false);
-    }
+    try { await api.downloadCertificate(activePolicy.id); }
+    catch (e) { alert(e.message); }
+    finally { setDownloadingCert(false); }
   }
 
   async function handleToggleAutoRenew() {
     setTogglingAutoRenew(true);
-    try {
-      await api.toggleAutoRenew(activePolicy.id, !activePolicy.auto_renew);
-      await loadData();
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setTogglingAutoRenew(false);
-    }
+    try { await api.toggleAutoRenew(activePolicy.id, !activePolicy.auto_renew); await load(); }
+    catch (e) { alert(e.message); }
+    finally { setTogglingAutoRenew(false); }
   }
 
-  function formatCountdown() {
+  function countdown() {
     if (!activePolicy) return null;
-
-    if (activePolicy.status === 'active' && activePolicy.days_until_expiry !== null) {
-      if (activePolicy.days_until_expiry === 0) {
-        return 'Expires today';
-      } else if (activePolicy.days_until_expiry === 1) {
-        return 'Expires tomorrow';
-      } else {
-        return `Expires in ${activePolicy.days_until_expiry} days`;
-      }
+    if (activePolicy.status === 'active' && activePolicy.days_until_expiry != null) {
+      const d = activePolicy.days_until_expiry;
+      if (d === 0) return 'Expires today';
+      if (d === 1) return 'Expires tomorrow';
+      return `Expires in ${d} days`;
     }
-
-    if (activePolicy.status === 'grace_period' && activePolicy.hours_until_grace_ends !== null) {
-      const hours = Math.floor(activePolicy.hours_until_grace_ends);
-      if (hours < 1) {
-        return 'Grace period ending soon';
-      } else if (hours === 1) {
-        return 'Grace period: 1 hour left';
-      } else {
-        return `Grace period: ${hours}h left`;
-      }
+    if (activePolicy.status === 'grace_period' && activePolicy.hours_until_grace_ends != null) {
+      const h = Math.floor(activePolicy.hours_until_grace_ends);
+      return h < 1 ? 'Grace period ending soon' : `Grace period: ${h}h left`;
     }
-
     return null;
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}>
+      <div style={{ width: 32, height: 32, border: '3px solid var(--green-light)', borderTopColor: 'var(--green-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+    </div>
+  );
 
-  const policyStatus = activePolicy?.status || 'active';
-  const statusStyle = STATUS_STYLES[policyStatus] || STATUS_STYLES.active;
-  const countdown = formatCountdown();
+  const polSt = activePolicy?.status || 'active';
+  const ST_LABELS = { active: 'Active', grace_period: 'Grace Period', lapsed: 'Lapsed', cancelled: 'Cancelled' };
+  const cd = countdown();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Insurance Plans</h1>
-        <p className="text-gray-600">Choose coverage that fits your needs</p>
-      </div>
+    <>
+      <style>{S}</style>
+      <div className="pol-wrap">
 
-      {/* Active Policy Banner */}
-      {activePolicy && (
-        <Card className={`${statusStyle.bg} ${statusStyle.border}`}>
-          <CardBody>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className={`${statusStyle.text} font-semibold`}>
-                    {activePolicy.tier.toUpperCase()} Plan
-                  </p>
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusStyle.badge}`}>
-                    {STATUS_LABELS[policyStatus]}
-                  </span>
-                </div>
-                <p className={`${statusStyle.subtext} text-sm`}>
-                  {countdown || `Expires ${new Date(activePolicy.expires_at).toLocaleDateString()}`}
-                </p>
+        {/* Exclusions modal */}
+        {showExclusions && <ExclusionsScreen onAccept={onExclusionsAccept} />}
 
-                {/* Auto-renewal toggle */}
-                <div className="flex items-center gap-2 mt-3">
-                  <button
-                    onClick={handleToggleAutoRenew}
-                    disabled={togglingAutoRenew}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                      activePolicy.auto_renew ? 'bg-blue-600' : 'bg-gray-200'
-                    } ${togglingAutoRenew ? 'opacity-50' : ''}`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        activePolicy.auto_renew ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                  <span className="text-sm text-gray-600">Auto-renewal</span>
-                </div>
+        {/* Page header */}
+        <div>
+          <h1 className="pol-page-title">Insurance Plans</h1>
+          <p className="pol-page-sub">Choose coverage that fits your activity level</p>
+        </div>
+
+        {/* Eligibility gate */}
+        {partnerActivityDays < 7 && !activePolicy && (
+          <div className={`eligib-gate ${partnerActivityDays >= 7 ? 'pass' : 'fail'}`}>
+            <p className="eligib-gate-title">
+              {partnerActivityDays >= 7 ? '✅ All plans available' : '⏳ Cover starts after 7 active delivery days'}
+            </p>
+            <p className="eligib-gate-sub">
+              You have <strong>{partnerActivityDays}</strong> active days.
+              Standard and Pro unlock at 7+ days. You can start with <strong>Flex</strong> now.
+            </p>
+          </div>
+        )}
+
+        {/* Active policy banner */}
+        {activePolicy && (
+          <div className={`active-pol-banner st-${polSt}`}>
+            <div className="apb-row">
+              <div>
+                <p className="apb-tier">{activePolicy.tier.toUpperCase()} Plan</p>
+                <p className="apb-sub">{cd || `Expires ${new Date(activePolicy.expires_at).toLocaleDateString('en-IN')}`}</p>
+                <p className="apb-next-premium">Next premium: ₹{TIER_PRICES[activePolicy.tier] || '—'}/week</p>
               </div>
-
-              <div className="flex flex-col gap-2">
-                {/* Renew button */}
-                {activePolicy.can_renew && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={openRenewalModal}
-                  >
-                    Renew
-                  </Button>
-                )}
-
-                {/* Download certificate */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadCertificate}
-                  disabled={downloadingCert}
-                  loading={downloadingCert}
-                >
-                  Certificate
-                </Button>
-
-                {/* Cancel button */}
-                {policyStatus === 'active' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCancel}
-                    className="text-red-600 border-red-300 hover:bg-red-50"
-                  >
-                    Cancel
-                  </Button>
-                )}
-              </div>
+              <span className={`apb-badge st-${polSt}`}>{ST_LABELS[polSt]}</span>
             </div>
-          </CardBody>
-        </Card>
-      )}
+            <div className="apb-toggle-row">
+              <label className="rc-toggle">
+                <input type="checkbox" checked={!!activePolicy.auto_renew} onChange={handleToggleAutoRenew} disabled={togglingAutoRenew} />
+                <span className="rc-toggle-slider" />
+              </label>
+              <span className="apb-toggle-label">Auto-renewal</span>
+            </div>
+            <div className="apb-actions">
+              {activePolicy.can_renew && (
+                <button className="apb-action-btn primary" onClick={openRenewalModal}>Renew</button>
+              )}
+              <button className="apb-action-btn" onClick={handleDownloadCert} disabled={downloadingCert}>
+                {downloadingCert ? 'Downloading…' : 'Certificate'}
+              </button>
+              {polSt === 'active' && (
+                <button className="apb-action-btn danger" onClick={handleCancel}>Cancel</button>
+              )}
+            </div>
+          </div>
+        )}
 
-      {/* Plan Cards */}
-      <div className="space-y-4">
-        {quotes.map((quote) => {
+        {/* Plan cards */}
+        {quotes.map(quote => {
+          const elig = tierEligible(quote.tier);
           const isActive = activePolicy?.tier === quote.tier;
+          const locked = !elig.ok && !isActive;
+          const price = TIER_PRICES[quote.tier] || quote.final_premium;
+
           return (
-            <Card
-              key={quote.tier}
-              className={isActive ? 'ring-2 ring-blue-500' : ''}
-            >
-              <CardBody>
-                <div className="flex items-start justify-between">
+            <div key={quote.tier} className={`pol-card ${isActive ? 'ring-active' : ''} ${locked ? 'locked' : ''}`}>
+              <div className="pol-card-body">
+                <div className="plan-hdr">
                   <div>
-                    <span className="text-2xl">{TIER_ICONS[quote.tier]}</span>
-                    <h3 className="text-xl font-bold text-gray-900 mt-1">
-                      {quote.tier_label || quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}
-                    </h3>
+                    <span className="plan-icon">{TIER_ICONS[quote.tier]}</span>
+                    <p className="plan-name">{quote.tier}</p>
+                    {locked && <span className="plan-lock-badge">🔒 Locked</span>}
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-gray-900">
-                      ₹{quote.final_premium}
-                    </p>
-                    <p className="text-sm text-gray-500">/week</p>
+                  <div>
+                    <p className="plan-price-big">₹{price}</p>
+                    <p className="plan-price-sub">/week</p>
                     {quote.risk_adjustment !== 0 && (
-                      <p className={`text-xs ${quote.risk_adjustment < 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                      <p className="plan-zone-adj" style={{ color: quote.risk_adjustment < 0 ? 'var(--green-dark)' : 'var(--warning)' }}>
                         {quote.risk_adjustment < 0 ? 'Zone discount' : 'Zone surcharge'}: ₹{Math.abs(quote.risk_adjustment)}
                       </p>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-gray-400 uppercase font-semibold">Max Day Payout</p>
-                    <p className="font-bold text-gray-900 text-sm">₹{quote.max_daily_payout}</p>
+                {locked && elig.reason && (
+                  <div className="plan-ineligible-note">ℹ️ {elig.reason}</div>
+                )}
+
+                <div className="plan-stats">
+                  <div className="plan-stat">
+                    <p className="plan-stat-label">Daily Payout</p>
+                    <p className="plan-stat-val">₹{quote.max_daily_payout}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-gray-400 uppercase font-semibold">Max Days/Week</p>
-                    <p className="font-bold text-gray-900 text-sm">{quote.max_days_per_week}</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-gray-400 uppercase font-semibold">Max Weekly</p>
-                    <p className="font-bold text-blue-600 text-sm">₹{quote.max_daily_payout * quote.max_days_per_week}</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-gray-400 uppercase font-semibold">Benefit Ratio</p>
-                    <p className="font-bold text-green-600 text-sm">~1:{Math.round((quote.max_daily_payout * quote.max_days_per_week) / quote.final_premium)}</p>
+                  <div className="plan-stat">
+                    <p className="plan-stat-label">Max Days/Week</p>
+                    <p className="plan-stat-val">{quote.max_days_per_week}</p>
                   </div>
                 </div>
-              </CardBody>
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  variant={isActive ? 'secondary' : 'primary'}
-                  disabled={!!activePolicy || purchasing === quote.tier}
-                  loading={purchasing === quote.tier}
-                  onClick={() => handlePurchase(quote.tier)}
+              </div>
+              <div className="pol-card-footer">
+                <button
+                  className={`plan-btn ${isActive || locked || !!activePolicy ? 'secondary' : 'primary'}`}
+                  disabled={!!activePolicy || locked || purchasing === quote.tier}
+                  onClick={() => initiatePurchase(quote.tier)}
                 >
-                  {isActive ? 'Current Plan' : activePolicy ? 'Already Covered' : 'Get This Plan'}
-                </Button>
-              </CardFooter>
-            </Card>
+                  {purchasing === quote.tier ? 'Processing…'
+                    : isActive ? 'Current Plan'
+                      : activePolicy ? 'Already Covered'
+                        : locked ? 'Not Eligible Yet'
+                          : 'Get This Plan'}
+                </button>
+              </div>
+            </div>
           );
         })}
-      </div>
 
-      {/* Info */}
-      <Card>
-        <CardBody className="text-sm text-gray-600">
-          <h4 className="font-semibold text-gray-900 mb-2">How it works:</h4>
-          <ul className="space-y-1 list-disc list-inside">
+        {/* View exclusions link */}
+        <button className="excl-view-link" onClick={() => setShowExclusions(true)}>
+          ⚠️ View all 10 policy exclusions
+        </button>
+
+        {/* How it works */}
+        <div className="info-box">
+          <p className="info-box-title">How it works:</p>
+          <ul>
             <li>Pay weekly premium via UPI</li>
             <li>Automatic payout when trigger events occur</li>
-            <li>No claim forms - we detect events automatically</li>
+            <li>No claim forms — events detected automatically</li>
             <li>Money credited to your UPI within minutes</li>
             <li>48-hour grace period after expiry for renewal</li>
           </ul>
-        </CardBody>
-      </Card>
+        </div>
 
-      {/* Renewal Modal */}
-      {showRenewalModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Renew Your Policy</h3>
-
-            {/* Tier selection */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Plan
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {quotes.map((quote) => (
-                  <button
-                    key={quote.tier}
-                    onClick={() => handleTierChange(quote.tier)}
-                    className={`p-3 rounded-lg border-2 text-center transition-colors ${
-                      selectedRenewalTier === quote.tier
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <span className="text-xl">{TIER_ICONS[quote.tier]}</span>
-                    <p className="text-sm font-medium capitalize">{quote.tier}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Quote details */}
-            {renewalLoading ? (
-              <div className="flex items-center justify-center h-32">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
-              </div>
-            ) : renewalQuote ? (
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Base Premium</span>
-                    <span>₹{renewalQuote.base_premium}</span>
-                  </div>
-                  {renewalQuote.risk_adjustment !== 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Zone Adjustment</span>
-                      <span className={renewalQuote.risk_adjustment < 0 ? 'text-green-600' : 'text-orange-600'}>
-                        {renewalQuote.risk_adjustment < 0 ? '-' : '+'}₹{Math.abs(renewalQuote.risk_adjustment)}
-                      </span>
+        {/* Renewal modal */}
+        {showRenewalModal && (
+          <div className="renew-overlay">
+            <div className="renew-modal">
+              <p className="renew-title">Renew Your Policy</p>
+              <p style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 12 }}>Select Plan</p>
+              <div className="tier-chips">
+                {quotes.map(q => {
+                  const el = tierEligible(q.tier);
+                  return (
+                    <div
+                      key={q.tier}
+                      className={`tier-chip ${selectedRenewalTier === q.tier ? 'selected' : ''} ${!el.ok ? 'disabled' : ''}`}
+                      onClick={() => el.ok && handleTierChange(q.tier)}
+                    >
+                      <div style={{ fontSize: 20 }}>{TIER_ICONS[q.tier]}</div>
+                      <p className="tier-chip-name">{q.tier}</p>
+                      <p className="tier-chip-price">₹{TIER_PRICES[q.tier]}</p>
                     </div>
-                  )}
-                  <div className="flex justify-between text-green-600">
-                    <span>Loyalty Discount (5%)</span>
-                    <span>-₹{renewalQuote.loyalty_discount}</span>
-                  </div>
-                  <div className="border-t pt-2 flex justify-between font-semibold">
-                    <span>Total</span>
-                    <span className="text-lg">₹{renewalQuote.final_premium}/week</span>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
-            ) : null}
 
-            {/* Actions */}
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setShowRenewalModal(false);
-                  setRenewalQuote(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                className="flex-1"
-                onClick={handleRenew}
-                disabled={renewalLoading || !renewalQuote}
-                loading={renewalLoading}
-              >
-                Confirm Renewal
-              </Button>
+              {renewalLoading ? (
+                <div style={{ textAlign: 'center', padding: 24 }}>
+                  <div style={{ width: 28, height: 28, border: '3px solid var(--green-light)', borderTopColor: 'var(--green-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto' }} />
+                </div>
+              ) : renewalQuote ? (
+                <PremiumBreakdown quote={renewalQuote} loyaltyWeeks={loyaltyWeeks} />
+              ) : null}
+
+              <div className="renew-actions">
+                <button className="renew-cancel" onClick={() => { setShowRenewalModal(false); setRenewalQuote(null); }}>Cancel</button>
+                <button className="renew-confirm" onClick={handleRenew} disabled={renewalLoading || !renewalQuote}>
+                  {renewalLoading ? 'Processing…' : 'Confirm Renewal'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }

@@ -645,9 +645,8 @@ def send_forecast_alerts(zone_id: int, db: Session, zone: Zone = None):
         }
 
         for partner in partners:
-            is_available, _ = is_partner_available_for_trigger(partner, db)
             pin_code_ok, _ = check_partner_pin_code_match(partner, zone, db) if zone else (True, "zone_missing")
-            if not is_available or not pin_code_ok:
+            if not pin_code_ok:
                 continue
 
             subscriptions = get_partner_subscriptions(partner.id, db)

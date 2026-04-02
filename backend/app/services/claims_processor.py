@@ -21,7 +21,7 @@ from app.models.policy import Policy, TIER_CONFIG
 from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent, TriggerType
 from app.models.zone import Zone
-from app.services.fraud_detector import calculate_fraud_score, FRAUD_THRESHOLDS
+from app.services.fraud_service import calculate_fraud_score, FRAUD_THRESHOLDS
 from app.services.premium_service import calculate_zone_pool_share as apply_zone_pool_share_cap
 from app.services.notifications import (
     notify_claim_created,
@@ -55,6 +55,7 @@ MIN_DISRUPTION_HOURS = {
 DEFAULT_DISRUPTION_HOURS = 4
 
 DAY_NAMES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+UNSET = object()
 
 
 def _ensure_partner_runtime_metadata_table(db: Session) -> None:
@@ -135,11 +136,11 @@ def upsert_partner_runtime_metadata(
     partner_id: int,
     db: Session,
     *,
-    pin_code: Optional[str] = None,
-    is_manual_offline: Optional[bool] = None,
-    manual_offline_until: Optional[datetime] = None,
-    leave_until: Optional[datetime] = None,
-    leave_note: Optional[str] = None,
+    pin_code: Optional[str] = UNSET,
+    is_manual_offline: Optional[bool] = UNSET,
+    manual_offline_until: Optional[datetime] = UNSET,
+    leave_until: Optional[datetime] = UNSET,
+    leave_note: Optional[str] = UNSET,
 ) -> dict:
     """Create or update partner runtime metadata."""
     _ensure_partner_runtime_metadata_table(db)
@@ -147,21 +148,24 @@ def upsert_partner_runtime_metadata(
 
     payload = {
         "partner_id": partner_id,
-        "pin_code": pin_code if pin_code is not None else existing["pin_code"],
-        "is_manual_offline": int(existing["is_manual_offline"] if is_manual_offline is None else is_manual_offline),
+        "pin_code": existing["pin_code"] if pin_code is UNSET else pin_code,
+        "is_manual_offline": int(existing["is_manual_offline"] if is_manual_offline is UNSET else is_manual_offline),
         "manual_offline_until": (
-            manual_offline_until.isoformat()
-            if manual_offline_until is not None
-            else (existing["manual_offline_until"].isoformat() if existing["manual_offline_until"] else None)
+            existing["manual_offline_until"].isoformat() if existing["manual_offline_until"] else None
+        ) if manual_offline_until is UNSET else (
+            manual_offline_until.isoformat() if manual_offline_until is not None else None
         ),
         "leave_until": (
-            leave_until.isoformat()
-            if leave_until is not None
-            else (existing["leave_until"].isoformat() if existing["leave_until"] else None)
+            existing["leave_until"].isoformat() if existing["leave_until"] else None
+        ) if leave_until is UNSET else (
+            leave_until.isoformat() if leave_until is not None else None
         ),
-        "leave_note": leave_note if leave_note is not None else existing["leave_note"],
+        "leave_note": existing["leave_note"] if leave_note is UNSET else leave_note,
         "updated_at": datetime.utcnow().isoformat(),
     }
+
+    if is_manual_offline is False and manual_offline_until is UNSET:
+        payload["manual_offline_until"] = None
 
     db.execute(
         text("""

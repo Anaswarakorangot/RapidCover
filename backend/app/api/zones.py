@@ -414,11 +414,10 @@ def update_partner_availability(
     metadata = upsert_partner_runtime_metadata(
         partner_id,
         db,
-        pin_code=request.pin_code,
-        is_manual_offline=request.is_manual_offline,
-        manual_offline_until=request.manual_offline_until,
-        leave_until=request.leave_until,
-        leave_note=request.leave_note,
+        **{
+            field: getattr(request, field)
+            for field in request.model_fields_set
+        },
     )
     return PartnerAvailabilityResponse(**metadata)
 
