@@ -10,7 +10,7 @@ When a trigger event fires, this service:
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
@@ -21,6 +21,7 @@ from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent, TriggerType
 from app.models.zone import Zone
 from app.services.fraud_detector import calculate_fraud_score, FRAUD_THRESHOLDS
+from app.services.premium_service import calculate_zone_pool_share as apply_zone_pool_share_cap
 from app.services.notifications import (
     notify_claim_created,
     notify_claim_approved,
@@ -51,6 +52,8 @@ MIN_DISRUPTION_HOURS = {
 
 # Default disruption duration for demo (since we're not tracking real duration)
 DEFAULT_DISRUPTION_HOURS = 4
+
+DAY_NAMES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 
 def calculate_payout_amount(
@@ -146,7 +149,105 @@ def check_weekly_limit(
     return (remaining > 0, max(0, remaining))
 
 
-def get_eligible_policies(zone_id: int, db: Session) -> list[tuple[Policy, Partner]]:
+def _parse_shift_time(value: Optional[str]) -> Optional[time]:
+    """Parse HH:MM strings used in partner shift preferences."""
+    if not value:
+        return None
+    try:
+        hour, minute = value.split(":", 1)
+        return time(hour=int(hour), minute=int(minute))
+    except (ValueError, AttributeError):
+        return None
+
+
+def is_partner_available_for_trigger(
+    partner: Partner,
+    trigger_time: Optional[datetime] = None,
+) -> tuple[bool, str]:
+    """
+    Check whether the partner should be eligible when the trigger fires.
+
+    Uses existing partner activity + shift preference fields:
+    - inactive partners are excluded
+    - if shift_days are configured, the trigger day must match
+    - if shift_start / shift_end are configured, the trigger time must be in-window
+    """
+    trigger_time = trigger_time or datetime.utcnow()
+
+    if not partner.is_active:
+        return False, "partner_inactive"
+
+    shift_days = [str(day).strip().lower()[:3] for day in (partner.shift_days or []) if day]
+    trigger_day = DAY_NAMES[trigger_time.weekday()]
+    if shift_days and trigger_day not in shift_days:
+        return False, "outside_shift_days"
+
+    shift_start = _parse_shift_time(getattr(partner, "shift_start", None))
+    shift_end = _parse_shift_time(getattr(partner, "shift_end", None))
+    if shift_start and shift_end:
+        current_time = trigger_time.time()
+        if shift_start <= shift_end:
+            in_window = shift_start <= current_time <= shift_end
+        else:
+            # Overnight shifts like 22:00-06:00
+            in_window = current_time >= shift_start or current_time <= shift_end
+
+        if not in_window:
+            return False, "outside_shift_window"
+
+    return True, "eligible"
+
+
+def _get_zone_density_weight(zone: Optional[Zone], total_partners_in_event: int) -> float:
+    """
+    Resolve density weight from the model if present, else infer from event size.
+    """
+    model_density_weight = getattr(zone, "density_weight", None) if zone else None
+    if model_density_weight is not None:
+        return float(model_density_weight)
+
+    if total_partners_in_event < 50:
+        return 0.15
+    if total_partners_in_event <= 150:
+        return 0.35
+    return 0.50
+
+
+def calculate_city_weekly_reserve(zone_id: int, db: Session, days: int = 7) -> float:
+    """Estimate city weekly reserve from premiums collected in the recent period."""
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    if not zone:
+        return 0.0
+
+    now = datetime.utcnow()
+    period_start = now - timedelta(days=days)
+    city_zones = db.query(Zone).filter(Zone.city.ilike(f"%{zone.city}%")).all()
+    zone_ids = [z.id for z in city_zones]
+    if not zone_ids:
+        return 0.0
+
+    partner_ids = [row[0] for row in db.query(Partner.id).filter(Partner.zone_id.in_(zone_ids)).all()]
+    if not partner_ids:
+        return 0.0
+
+    total_premiums = (
+        db.query(func.sum(Policy.weekly_premium))
+        .filter(
+            Policy.partner_id.in_(partner_ids),
+            Policy.created_at >= period_start,
+            Policy.created_at <= now,
+        )
+        .scalar()
+    ) or 0.0
+
+    return float(total_premiums)
+
+
+def get_eligible_policies(
+    zone_id: int,
+    db: Session,
+    trigger_time: Optional[datetime] = None,
+) -> list[tuple[Policy, Partner]]:
     """
     Get all active policies for partners in a zone.
 
@@ -176,7 +277,24 @@ def get_eligible_policies(zone_id: int, db: Session) -> list[tuple[Policy, Partn
         .all()
     )
 
-    return results
+    trigger_time = trigger_time or now
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    eligible_results: list[tuple[Policy, Partner]] = []
+    for policy, partner in results:
+        is_available, _ = is_partner_available_for_trigger(partner, trigger_time)
+        if not is_available:
+            continue
+
+        if zone:
+            from app.services.trigger_engine import check_partner_pin_code_match
+
+            pin_code_match, _ = check_partner_pin_code_match(partner, zone)
+            if not pin_code_match:
+                continue
+
+        eligible_results.append((policy, partner))
+
+    return eligible_results
 
 
 def process_trigger_event(
@@ -193,7 +311,11 @@ def process_trigger_event(
     created_claims = []
 
     # Get eligible policies in the affected zone
-    eligible = get_eligible_policies(zone_id, db)
+    eligible = get_eligible_policies(zone_id, db, trigger_event.started_at or datetime.utcnow())
+    total_partners_in_event = len(eligible)
+    city_weekly_reserve = calculate_city_weekly_reserve(zone_id, db)
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    zone_density_weight = _get_zone_density_weight(zone, total_partners_in_event)
 
     for policy, partner in eligible:
         # Calculate payout amount
@@ -211,6 +333,18 @@ def process_trigger_event(
         has_weekly_days, _ = check_weekly_limit(partner, policy, db)
         if not has_weekly_days:
             continue  # Skip if weekly days exhausted
+
+        # Apply zone pool share cap for mass events
+        zone_pool_result = apply_zone_pool_share_cap(
+            calculated_payout=payout,
+            city_weekly_reserve=city_weekly_reserve,
+            zone_density_weight=zone_density_weight,
+            total_partners_in_event=total_partners_in_event,
+        )
+        payout = zone_pool_result["final_payout"]
+
+        if payout <= 0:
+            continue
 
         # Calculate fraud score
         fraud_result = calculate_fraud_score(partner, trigger_event, db)
@@ -240,6 +374,10 @@ def process_trigger_event(
                 "final_payout": payout,
                 "trigger_type": trigger_event.trigger_type.value,
                 "zone_id": zone_id,
+                "zone_density_weight": zone_density_weight,
+                "city_weekly_reserve": round(city_weekly_reserve, 2),
+                "total_partners_in_event": total_partners_in_event,
+                "zone_pool_share": zone_pool_result,
             },
             "processed_at": datetime.utcnow().isoformat(),
         }

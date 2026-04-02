@@ -53,10 +53,12 @@ TRIGGER_MIN_DURATION = {
 # ─── In-memory tracking of ongoing events ──────────────────────────────────
 # Format: { "zone_id:trigger_type": { "start": timestamp, "details": dict } }
 active_events: dict[str, dict] = {}
+forecast_alert_state: dict[int, str] = {}
 
 # ─── Trigger log (in-memory ring buffer for admin UI) ──────────────────────
 _trigger_log: list[dict] = []
 _MAX_LOG_ENTRIES = 200
+FORECAST_ALERT_COOLDOWN_HOURS = 24
 
 
 def _add_log(zone_id: int, zone_code: str, event_type: str, message: str, level: str = "info"):
@@ -115,6 +117,7 @@ def check_all_triggers(force: bool = False, zone_code: str = None):
             return
 
         for zone in zones:
+            _run_forecast_alerts(zone, db)
             _check_zone_triggers(zone, db, force=force)
 
     except Exception as e:
@@ -204,6 +207,30 @@ def _check_zone_triggers(zone: Zone, db: Session, force: bool = False):
         "closed_since": platform.closed_since.isoformat() if platform.closed_since else None,
         "data_source": platform.source,
     })
+
+
+def _run_forecast_alerts(zone: Zone, db: Session) -> int:
+    """Dispatch forecast alerts for a zone with a 24-hour cooldown."""
+    now = datetime.utcnow()
+    last_sent_iso = forecast_alert_state.get(zone.id)
+    if last_sent_iso:
+        last_sent = datetime.fromisoformat(last_sent_iso)
+        if now - last_sent < timedelta(hours=FORECAST_ALERT_COOLDOWN_HOURS):
+            return 0
+
+    alerts = check_48hr_forecast(zone.id, db)
+    if not alerts:
+        return 0
+
+    sent_count = send_forecast_alerts(zone.id, db)
+    forecast_alert_state[zone.id] = now.isoformat()
+
+    if sent_count > 0:
+        _add_log(zone.id, zone.code, "forecast", f"Sent {sent_count} forecast alert push notifications", "info")
+    else:
+        _add_log(zone.id, zone.code, "forecast", "Forecast conditions matched, but no active push subscriptions were available", "info")
+
+    return sent_count
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -420,3 +447,84 @@ def _summarize(details: dict) -> str:
     if "data_source" in details:
         parts.append(f"src={details['data_source']}")
     return ", ".join(parts) if parts else str(details)
+
+
+def check_partner_pin_code_match(partner: Partner, zone: Zone) -> tuple[bool, str]:
+    """
+    Validate partner PIN-code eligibility when model fields are present.
+
+    Current fallback behavior:
+    - if partner.pin_code or zone.pin_codes are not yet available on the models,
+      keep the partner eligible and return a reason code explaining the fallback
+    """
+    partner_pin_code = getattr(partner, "pin_code", None)
+    zone_pin_codes = getattr(zone, "pin_codes", None)
+
+    if not partner_pin_code or not zone_pin_codes:
+        return True, "pin_code_fields_unavailable"
+
+    if partner_pin_code in zone_pin_codes:
+        return True, "pin_code_match"
+
+    return False, "pin_code_mismatch"
+
+
+def check_48hr_forecast(zone_id: int, db: Session) -> list[dict]:
+    """Check forecast and return list of predicted alerts."""
+    alerts = []
+
+    mock_rain_forecast = 35.0
+    mock_temp_forecast = 41.0
+
+    if mock_rain_forecast > 30:
+        alerts.append({
+            "type": "rain",
+            "message": "Heavy rain predicted (>30mm) in the next 48 hours. Please be prepared.",
+            "severity": "high",
+        })
+
+    if mock_temp_forecast > 40:
+        alerts.append({
+            "type": "heat",
+            "message": "Extreme heat predicted (>40°C) in the next 48 hours. Stay hydrated.",
+            "severity": "high",
+        })
+
+    return alerts
+
+
+def send_forecast_alerts(zone_id: int, db: Session):
+    """Send push notifications to partners in zone."""
+    alerts = check_48hr_forecast(zone_id, db)
+    if not alerts:
+        return 0
+
+    partners = db.query(Partner).filter(
+        Partner.zone_id == zone_id,
+        Partner.is_active == True,
+    ).all()
+    if not partners:
+        return 0
+
+    from app.services.notifications import send_push_notification, get_partner_subscriptions
+
+    success_count = 0
+    for alert in alerts:
+        payload = {
+            "title": f"Weather Alert: {alert['type'].capitalize()}",
+            "body": alert["message"],
+            "url": "/",
+            "tag": f"forecast-alert-{alert['type']}",
+            "type": "weather_alert",
+            "icon": "/icon-192.png",
+        }
+
+        for partner in partners:
+            subscriptions = get_partner_subscriptions(partner.id, db)
+            for sub in subscriptions:
+                if send_push_notification(sub, payload):
+                    success_count += 1
+
+    db.commit()
+    logger.info(f"Sent {len(alerts)} forecast alerts to zone {zone_id}. Total pushes: {success_count}")
+    return success_count
