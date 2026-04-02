@@ -1,13 +1,22 @@
+/**
+ * Login.jsx  –  Partner login with OTP
+ *
+ * Person 1 Phase 2 (Task 6 – demo UX cleanup):
+ *   - Dev OTP display is small, labelled "DEV ONLY", non-intrusive
+ *   - Mock KYC note is secondary text only
+ *   - Main user journey feels real even though OTP is mocked
+ *
+ * UI: Original green theme restored (matching Register.jsx design system).
+ * Auth flow: Uses api.requestOtp / api.verifyOtp directly + login(token).
+ */
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { OTPInput } from '../components/ui';
-import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
 
   :root {
     --green-primary: #3DB85C;
@@ -213,6 +222,28 @@ const styles = `
   }
   .login-otp-info strong { color: var(--text-dark); }
 
+  .login-otp-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    font-size: 22px;
+    font-family: monospace;
+    font-weight: 800;
+    color: var(--text-dark);
+    background: var(--gray-bg);
+    outline: none;
+    text-align: center;
+    letter-spacing: 6px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    margin-bottom: 16px;
+  }
+  .login-otp-input:focus {
+    border-color: var(--green-primary);
+    box-shadow: 0 0 0 3px rgba(61,184,92,0.12);
+    background: var(--white);
+  }
+
   .login-back {
     width: 100%;
     padding: 12px;
@@ -239,29 +270,35 @@ const styles = `
     text-decoration: none;
     font-family: 'Nunito', sans-serif;
   }
+
+  .login-mock-note {
+    text-align: center;
+    font-size: 11px;
+    color: #ccc;
+    margin-top: 14px;
+  }
 `;
 
-export function Login() {
-  const navigate = useNavigate();
+export default function Login() {
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const [step, setStep] = useState('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
-  const [devOtp, setDevOtp] = useState('');
+  const [devOtp, setDevOtp] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   async function handleRequestOTP(e) {
     e.preventDefault();
     setError('');
+    if (!phone.trim()) { setError('Please enter your phone number.'); return; }
     setLoading(true);
-    const cleanPhone = phone.replace(/\s/g, '');
     try {
-      const result = await api.requestOTP(cleanPhone);
-      if (result.otp) {
+      const result = await api.requestOtp(phone.trim());
+      if (result?.otp) {
         setDevOtp(result.otp);
-        setOtp(result.otp);
       }
       setStep('otp');
     } catch (err) {
@@ -274,10 +311,10 @@ export function Login() {
   async function handleVerifyOTP(e) {
     e.preventDefault();
     setError('');
+    if (!otp.trim()) { setError('Please enter the OTP.'); return; }
     setLoading(true);
-    const cleanPhone = phone.replace(/\s/g, '');
     try {
-      await login(cleanPhone, otp);
+      await login(phone.trim(), otp.trim());
       navigate('/');
     } catch (err) {
       setError(err.message);
@@ -318,9 +355,11 @@ export function Login() {
                 <input
                   className={`login-input${error ? ' error' : ''}`}
                   type="tel"
+                  inputMode="numeric"
                   placeholder="+91 9876543210"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  autoFocus
                 />
               </div>
 
@@ -341,6 +380,11 @@ export function Login() {
                 {loading && <span className="spinner" />}
                 Get OTP
               </button>
+
+              <div className="login-footer">
+                New here?{' '}
+                <a href="/register">Register now</a>
+              </div>
             </form>
 
           ) : (
@@ -350,14 +394,24 @@ export function Login() {
                 Sent to <strong>{phone}</strong>
               </div>
 
+              {/* Dev OTP – small, labelled, secondary – does NOT dominate the UI */}
               {devOtp && (
                 <div className="dev-otp-box">
-                  <div className="dev-otp-label">Dev Mode — Your OTP:</div>
+                  <div className="dev-otp-label">DEV ONLY — Your OTP:</div>
                   <div className="dev-otp-value">{devOtp}</div>
                 </div>
               )}
 
-              <OTPInput value={otp} onChange={setOtp} />
+              <input
+                className="login-otp-input"
+                type="text"
+                inputMode="numeric"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="••••••"
+                autoFocus
+                maxLength={6}
+              />
 
               {error && <div className="login-error" style={{ marginTop: 10 }}>{error}</div>}
 
@@ -365,7 +419,7 @@ export function Login() {
                 type="submit"
                 className="login-btn"
                 style={{ marginTop: 20 }}
-                disabled={otp.length < 6 || loading}
+                disabled={otp.length < 4 || loading}
               >
                 {loading && <span className="spinner" />}
                 Verify &amp; Login
@@ -374,18 +428,17 @@ export function Login() {
               <button
                 type="button"
                 className="login-back"
-                onClick={() => setStep('phone')}
+                onClick={() => { setStep('phone'); setOtp(''); setDevOtp(null); }}
               >
                 ← Change phone number
               </button>
+
+              {/* Mock KYC note – small, non-breaking, secondary */}
+              <p className="login-mock-note">
+                KYC verification is mocked for this demo.
+              </p>
             </form>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="login-footer">
-          New here?{' '}
-          <a href="/register">Register now</a>
         </div>
 
       </div>

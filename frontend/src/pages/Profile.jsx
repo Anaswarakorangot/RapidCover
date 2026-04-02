@@ -1,3 +1,17 @@
+/**
+ * Profile.jsx  –  Partner profile, zone history, renewal preview
+ *
+ * Person 1 Phase 2:
+ *   - Removed MOCK_ZONE_HISTORY constant
+ *   - Removed hardcoded renewal premium breakdown
+ *   - Zone history from GET /partners/me/zone-history
+ *   - Renewal preview from GET /partners/me/renewal-preview
+ *   - Empty state shown when no zone history exists
+ *   - "Zone #id" chip replaced with actual zone name/code/city when available
+ *
+ * UI: Original green theme restored (matching Login.jsx / Register.jsx).
+ */
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -219,6 +233,8 @@ const S = `
     transition: border-color 0.2s;
   }
   .prf-file-label.has-file { border-color: var(--green-primary); background: var(--green-light); color: var(--green-dark); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
 `;
 
 /* ─── LANGUAGES ─────────────────────────────────────────────────────────── */
@@ -304,9 +320,9 @@ function KycSetup({ currentKyc, onSave }) {
   const st = currentKyc?.kyc_status || 'skipped';
   const ST_MAP = {
     verified: { label: '✓ KYC Verified', cls: 'kyc-verified' },
-    pending: { label: '⏳ KYC Pending Review', cls: 'kyc-pending' },
-    failed: { label: '✗ KYC Failed', cls: 'kyc-failed' },
-    skipped: { label: 'KYC not submitted', cls: 'kyc-skipped' },
+    pending:  { label: '⏳ KYC Pending Review', cls: 'kyc-pending' },
+    failed:   { label: '✗ KYC Failed', cls: 'kyc-failed' },
+    skipped:  { label: 'KYC not submitted', cls: 'kyc-skipped' },
   };
   const badge = ST_MAP[st] || ST_MAP.skipped;
 
@@ -382,53 +398,69 @@ function KycSetup({ currentKyc, onSave }) {
   );
 }
 
-/* ─── ZoneHistorySection ──────────────────────────────────────────────── */
-const MOCK_ZONE_HISTORY = [
-  { date: '2025-03-18', oldZone: 'Kondapur Central', newZone: 'Gachibowli West', premiumBefore: 33, premiumAfter: 36, reason: 'Demand rebalancing' },
-  { date: '2025-02-04', oldZone: 'HITEC City North', newZone: 'Kondapur Central', premiumBefore: 30, premiumAfter: 33, reason: 'Zone restructuring' },
-  { date: '2025-01-10', oldZone: 'Madhapur', newZone: 'HITEC City North', premiumBefore: 28, premiumAfter: 30, reason: 'Coverage area expansion' },
-];
-
-function ZoneHistorySection() {
+/* ─── ZoneHistorySection – real data from backend ────────────────────────── */
+function ZoneHistorySection({ zoneHistoryData, loading }) {
   const [open, setOpen] = useState(false);
+
+  const history = zoneHistoryData?.history || [];
+  const hasHistory = zoneHistoryData?.has_history && history.length > 0;
+
   return (
     <div className="prf-card">
       <div className="prf-card-body">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <p className="prf-section-title" style={{ marginBottom: 0 }}>📍 Zone Reassignment History</p>
-          <button
-            style={{ fontSize: 11, fontWeight: 700, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 20, padding: '4px 12px', cursor: 'pointer' }}
-            onClick={() => setOpen(v => !v)}
-          >
-            {open ? 'Hide' : `Show (${MOCK_ZONE_HISTORY.length})`}
-          </button>
+          {hasHistory && (
+            <button
+              style={{ fontSize: 11, fontWeight: 700, color: 'var(--green-dark)', background: 'var(--green-light)', border: 'none', borderRadius: 20, padding: '4px 12px', cursor: 'pointer' }}
+              onClick={() => setOpen(v => !v)}
+            >
+              {open ? 'Hide' : `Show (${history.length})`}
+            </button>
+          )}
         </div>
-        {!open ? (
+
+        {loading ? (
+          <p style={{ fontSize: 13, color: 'var(--text-light)' }}>Loading history…</p>
+        ) : !hasHistory ? (
+          <p style={{ fontSize: 13, color: 'var(--text-light)' }}>No zone changes yet.</p>
+        ) : !open ? (
           <p style={{ fontSize: 13, color: 'var(--text-light)' }}>
-            {MOCK_ZONE_HISTORY.length} past zone change{MOCK_ZONE_HISTORY.length !== 1 ? 's' : ''} on record.
+            {history.length} past zone change{history.length !== 1 ? 's' : ''} on record.
           </p>
-        ) : MOCK_ZONE_HISTORY.map((h, i) => {
-          const up = h.premiumAfter > h.premiumBefore;
-          const delta = Math.abs(h.premiumAfter - h.premiumBefore);
+        ) : history.map((h, i) => {
+          const oldZone = h.old_zone_name || h.oldZone || '—';
+          const newZone = h.new_zone_name || h.newZone || '—';
+          const premBefore = h.premium_before ?? h.premiumBefore;
+          const premAfter  = h.premium_after  ?? h.premiumAfter;
+          const reason     = h.reason || h.reassignment_reason || '';
+          const dateStr    = h.effective_at || h.date;
+          const up = premAfter > premBefore;
+          const delta = Math.abs((premAfter || 0) - (premBefore || 0));
+
           return (
             <div className="zh-item" key={i}>
               <div className="zh-meta">
-                <span className="zh-date">{new Date(h.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                <span className="zh-reason">{h.reason}</span>
+                <span className="zh-date">
+                  {dateStr ? new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                </span>
+                {reason && <span className="zh-reason">{reason}</span>}
               </div>
               <div className="zh-zones">
-                <span className="zh-old">{h.oldZone}</span>
+                <span className="zh-old">{oldZone}</span>
                 <span className="zh-arrow">→</span>
-                <span className="zh-new">{h.newZone}</span>
+                <span className="zh-new">{newZone}</span>
               </div>
-              <div className="zh-premium">
-                <span className="zh-prem-label">Premium:</span>
-                <span className="zh-prem-old">₹{h.premiumBefore}</span>
-                <span className="zh-arrow">→</span>
-                <span className={`zh-prem-new ${up ? 'up' : 'down'}`}>
-                  ₹{h.premiumAfter}/wk ({up ? `+₹${delta}` : `-₹${delta}`})
-                </span>
-              </div>
+              {premBefore != null && premAfter != null && (
+                <div className="zh-premium">
+                  <span className="zh-prem-label">Premium:</span>
+                  <span className="zh-prem-old">₹{premBefore}</span>
+                  <span className="zh-arrow">→</span>
+                  <span className={`zh-prem-new ${up ? 'up' : 'down'}`}>
+                    ₹{premAfter}/wk ({up ? `+₹${delta}` : `-₹${delta}`})
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}
@@ -437,18 +469,93 @@ function ZoneHistorySection() {
   );
 }
 
-/* ─── RenewalBreakdownCard ─────────────────────────────────────────────── */
-function RenewalBreakdownCard({ user }) {
+/* ─── RenewalBreakdownCard – real data from backend ─────────────────────── */
+function RenewalBreakdownCard({ renewalPreview, renewalLoading, user, onRenew }) {
+  // Fallback to local estimate only if backend hasn't responded yet
   const TIER_PRICES = { flex: 22, standard: 33, pro: 45 };
-  const tier = user?.current_tier || 'standard';
-  const base = TIER_PRICES[tier] || 33;
-  const zoneAdj = 3;
+
+  // If backend data available, use it
+  if (!renewalLoading && renewalPreview?.has_policy && renewalPreview?.breakdown) {
+    const bd    = renewalPreview.breakdown;
+    const tier  = renewalPreview.current_tier || 'standard';
+    const total = renewalPreview.renewal_premium;
+
+    const rows = [
+      ['Base Premium',       `₹${bd.base}`,                             `${tier} plan`,          false],
+      ['Zone Risk Factor',   `+₹${bd.zone_risk ?? 0}`,                  'Zone surcharge',        false],
+      ['Seasonal Index',     `×${Number(bd.seasonal_index ?? 1).toFixed(2)}`,  'City-specific monthly', false],
+      ['RIQI Adjustment',   `×${Number(bd.riqi_adjustment ?? 1).toFixed(2)}`, bd.riqi_band || '',    false],
+      ['Activity Tier Factor', `×${Number(bd.activity_factor ?? 1).toFixed(2)}`, tier,              false],
+      ['Loyalty Discount',   `×${Number(bd.loyalty_discount ?? 1).toFixed(2)}`,
+        renewalPreview.loyalty_streak_weeks ? `${renewalPreview.loyalty_streak_weeks}-week streak` : '',
+        bd.loyalty_discount < 1],
+      ['Platform Fee',       '₹0',                                       'Waived',                false],
+    ];
+
+    return (
+      <div className="prf-card">
+        <div className="prf-card-body">
+          <p className="prf-section-title">🔄 Next Week Premium Breakdown</p>
+          <p className="prf-section-sub">All formula factors — recalculated every Monday</p>
+          {rows.map(([k, v, note, neg]) => (
+            <div className="ren-row" key={k}>
+              <span className="ren-key">{k}{note ? <span className="ren-note">({note})</span> : null}</span>
+              <span className={`ren-val${neg ? ' neg' : ''}`}>{v}</span>
+            </div>
+          ))}
+          <div className="ren-total">
+            <span>Total Next Week</span>
+            <span className="val">₹{total}</span>
+          </div>
+          {renewalPreview.expires_at && (
+            <p style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 10 }}>
+              Current policy expires {new Date(renewalPreview.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+          )}
+          {renewalPreview.renewal_available && onRenew && (
+            <button className="prf-btn-primary" style={{ marginTop: 14 }} onClick={onRenew}>
+              Renew Now
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Local fallback (while loading or no policy)
+  if (renewalLoading) {
+    return (
+      <div className="prf-card">
+        <div className="prf-card-body">
+          <p className="prf-section-title">🔄 Next Week Premium Breakdown</p>
+          <p style={{ fontSize: 13, color: 'var(--text-light)' }}>Loading renewal data…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!renewalPreview?.has_policy) {
+    return (
+      <div className="prf-card">
+        <div className="prf-card-body">
+          <p className="prf-section-title">🔄 Next Week Premium Breakdown</p>
+          <p style={{ fontSize: 13, color: 'var(--text-light)' }}>
+            {renewalPreview?.message || 'No active policy found.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Static fallback estimate
+  const tier     = user?.current_tier || 'standard';
+  const base     = TIER_PRICES[tier] || 33;
+  const zoneAdj  = 3;
   const seasonal = 1.15;
-  const riqi = 1.15;
+  const riqi     = 1.15;
   const activity = tier === 'pro' ? 1.35 : tier === 'flex' ? 0.80 : 1.00;
-  const loyalty = 0.94;
-  const fee = 0;
-  const total = Math.round(base * activity * riqi * seasonal * loyalty + zoneAdj + fee);
+  const loyalty  = 0.94;
+  const total    = Math.round(base * activity * riqi * seasonal * loyalty + zoneAdj);
 
   return (
     <div className="prf-card">
@@ -456,13 +563,13 @@ function RenewalBreakdownCard({ user }) {
         <p className="prf-section-title">🔄 Next Week Premium Breakdown</p>
         <p className="prf-section-sub">All 7 formula factors — recalculated every Monday</p>
         {[
-          ['Base Premium', `₹${base}`, `${tier} plan`, false],
-          ['Zone Risk Factor', `+₹${zoneAdj}`, 'Urban Core', false],
-          ['Seasonal Index', `×${seasonal.toFixed(2)}`, 'City-specific monthly', false],
-          ['RIQI Adjustment', `×${riqi.toFixed(2)}`, 'Urban Fringe band', false],
-          ['Activity Tier Factor', `×${activity.toFixed(2)}`, tier, false],
-          ['Loyalty Discount', `×${loyalty.toFixed(2)}`, '4-week streak', true],
-          ['Platform Fee', '₹0', 'Waived', false],
+          ['Base Premium',        `₹${base}`,              `${tier} plan`,         false],
+          ['Zone Risk Factor',    `+₹${zoneAdj}`,          'Urban Core',           false],
+          ['Seasonal Index',      `×${seasonal.toFixed(2)}`, 'City-specific monthly', false],
+          ['RIQI Adjustment',     `×${riqi.toFixed(2)}`,   'Urban Fringe band',    false],
+          ['Activity Tier Factor', `×${activity.toFixed(2)}`, tier,                false],
+          ['Loyalty Discount',    `×${loyalty.toFixed(2)}`, '4-week streak',       true],
+          ['Platform Fee',        '₹0',                    'Waived',               false],
         ].map(([k, v, note, neg]) => (
           <div className="ren-row" key={k}>
             <span className="ren-key">{k}<span className="ren-note">({note})</span></span>
@@ -482,17 +589,42 @@ function RenewalBreakdownCard({ user }) {
 export function Profile() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(user?.name || '');
+
+  const [editing,  setEditing]  = useState(false);
+  const [name,     setName]     = useState(user?.name || '');
   const [language, setLanguage] = useState(user?.language_pref || 'en');
-  const [saving, setSaving] = useState(false);
-  const [upiId, setUpiId] = useState(user?.upi_id || '');
-  const [kyc, setKyc] = useState(user?.kyc || null);
+  const [saving,   setSaving]   = useState(false);
+  const [upiId,    setUpiId]    = useState(user?.upi_id || '');
+  const [kyc,      setKyc]      = useState(user?.kyc || null);
+
+  const [zoneHistoryData, setZoneHistoryData] = useState(null);
+  const [historyLoading,  setHistoryLoading]  = useState(true);
+  const [renewalPreview,  setRenewalPreview]  = useState(null);
+  const [renewalLoading,  setRenewalLoading]  = useState(true);
+
+  // ── Load zone history ─────────────────────────────────────────────────────
+  useEffect(() => {
+    api.getZoneHistory()
+      .then(data => setZoneHistoryData(data))
+      .catch(() => setZoneHistoryData({ history: [], total: 0, has_history: false }))
+      .finally(() => setHistoryLoading(false));
+  }, []);
+
+  // ── Load renewal preview ──────────────────────────────────────────────────
+  useEffect(() => {
+    api.getRenewalPreview()
+      .then(data => setRenewalPreview(data))
+      .catch(() => setRenewalPreview(null))
+      .finally(() => setRenewalLoading(false));
+  }, []);
 
   async function handleSave() {
     setSaving(true);
-    try { await api.updateProfile({ name, language_pref: language }); await refreshUser(); setEditing(false); }
-    catch (e) { alert(e.message); } finally { setSaving(false); }
+    try {
+      await api.updateProfile({ name, language_pref: language });
+      await refreshUser();
+      setEditing(false);
+    } catch (e) { alert(e.message); } finally { setSaving(false); }
   }
 
   return (
@@ -541,21 +673,30 @@ export function Profile() {
           </div>
         </div>
 
-        {/* ── Zone ── */}
+        {/* ── Zone chip – show real name/code if available ── */}
         {user?.zone_id && (
           <div className="prf-card">
             <div className="prf-card-body">
               <p className="prf-section-title">📍 Your Zone</p>
-              <div className="zone-chip">Zone #{user.zone_id}</div>
+              <div className="zone-chip">
+                {user.zone_name
+                  ? `${user.zone_name}${user.zone_code ? ` · ${user.zone_code}` : ''}`
+                  : `Zone #${user.zone_id}`}
+              </div>
             </div>
           </div>
         )}
 
-        {/* ── Zone History ── */}
-        <ZoneHistorySection />
+        {/* ── Zone History – real backend data ── */}
+        <ZoneHistorySection zoneHistoryData={zoneHistoryData} loading={historyLoading} />
 
-        {/* ── Renewal Breakdown ── */}
-        <RenewalBreakdownCard user={user} />
+        {/* ── Renewal Breakdown – real backend data ── */}
+        <RenewalBreakdownCard
+          renewalPreview={renewalPreview}
+          renewalLoading={renewalLoading}
+          user={user}
+          onRenew={() => navigate('/policy')}
+        />
 
         {/* ── UPI Linking ── */}
         <div className="prf-card">
@@ -586,7 +727,7 @@ export function Profile() {
         {/* ── Account links ── */}
         <div className="prf-card">
           <div className="prf-card-body" style={{ padding: '10px 18px' }}>
-            {[['📄 Terms of Service', '/terms'], ['🔒 Privacy Policy', '/privacy'], ['💬 Help & Support', '/help']].map(([label]) => (
+            {[['📄 Terms of Service'], ['🔒 Privacy Policy'], ['💬 Help & Support']].map(([label]) => (
               <button className="prf-action-row" key={label}>
                 <span>{label}</span>
                 <span style={{ color: 'var(--text-light)' }}>→</span>
@@ -603,3 +744,5 @@ export function Profile() {
     </>
   );
 }
+
+export default Profile;

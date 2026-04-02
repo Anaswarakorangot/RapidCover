@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 /* ─── Design tokens matching Register.jsx ───────────────────────────────── */
@@ -90,6 +90,7 @@ const S = `
     border-radius: 18px;
     padding: 16px 18px;
     border: 1.5px solid;
+    margin-bottom: 16px;
   }
   .active-pol-banner.st-active        { background: #f0fdf4; border-color: #bbf7d0; }
   .active-pol-banner.st-grace_period  { background: #fffbeb; border-color: #fde68a; }
@@ -97,7 +98,7 @@ const S = `
   .active-pol-banner.st-cancelled     { background: #f9fafb; border-color: #e5e7eb; }
 
   .apb-row { display: flex; justify-content: space-between; align-items: flex-start; }
-  .apb-tier { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px; }
+  .apb-tier { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px; text-transform: uppercase; }
   .apb-badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; }
   .apb-badge.st-active        { background: #dcfce7; color: #166534; }
   .apb-badge.st-grace_period  { background: #fef9c3; color: #854d0e; }
@@ -128,7 +129,7 @@ const S = `
   .apb-action-btn {
     flex: 1; padding: 9px; border-radius: 12px; font-size: 12px; font-weight: 700;
     font-family: 'DM Sans', sans-serif; cursor: pointer; transition: opacity 0.2s;
-    border: 1.5px solid var(--border); background: transparent; color: var(--text-dark);
+    border: 1.5px solid var(--border); background: var(--white); color: var(--text-dark);
   }
   .apb-action-btn.danger { color: var(--error); border-color: #fecaca; }
   .apb-action-btn.primary { background: var(--green-primary); color: white; border-color: var(--green-primary); }
@@ -137,6 +138,7 @@ const S = `
   .eligib-gate {
     border-radius: 14px; padding: 14px 16px;
     border: 1.5px solid #fde68a; background: #fffbeb;
+    margin-bottom: 16px;
   }
   .eligib-gate.pass { border-color: #bbf7d0; background: #f0fdf4; }
   .eligib-gate-title { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 14px; }
@@ -164,7 +166,7 @@ const S = `
   .excl-item-title { font-size: 13px; font-weight: 700; color: var(--text-dark); }
   .excl-item-desc  { font-size: 11.5px; color: var(--text-mid); margin-top: 2px; }
   .excl-footer { padding: 14px 20px 24px; border-top: 1px solid var(--border); flex-shrink: 0; }
-  .excl-check-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+  .excl-check-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; cursor: pointer; }
   .excl-check { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--green-primary); margin-top: 2px; }
   .excl-check-label { font-size: 13px; color: var(--text-dark); }
   .excl-cta {
@@ -177,7 +179,7 @@ const S = `
   .excl-view-link {
     width: 100%; text-align: center; font-size: 13px; color: var(--text-mid);
     background: none; border: none; cursor: pointer; padding: 8px;
-    font-family: 'DM Sans', sans-serif; text-decoration: underline;
+    font-family: 'DM Sans', sans-serif; text-decoration: underline; margin-top: 16px;
   }
 
   /* ── Premium breakdown (renewal modal) ── */
@@ -191,7 +193,7 @@ const S = `
     font-family: 'Nunito', sans-serif; font-weight: 900;
     font-size: 15px; color: var(--text-dark);
   }
-  .breakdown-modal-total .val { color: var(--green-dark); }
+  .breakdown-modal-total .val { color: var(--green-dark); text-align: right; }
 
   /* ── Renewal modal ── */
   .renew-overlay {
@@ -226,15 +228,12 @@ const S = `
   .renew-confirm:disabled { background: var(--border); cursor: not-allowed; }
 
   /* ── Info box ── */
-  .info-box { background: var(--gray-bg); border-radius: 16px; padding: 16px 18px; }
+  .info-box { background: var(--gray-bg); border-radius: 16px; padding: 16px 18px; margin-top: 16px; }
   .info-box-title { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 14px; margin-bottom: 10px; }
   .info-box li { font-size: 12.5px; color: var(--text-mid); margin-bottom: 6px; list-style: disc; margin-left: 16px; }
 `;
 
 /* ─── Data ──────────────────────────────────────────────────────────────── */
-const TIER_PRICES = { flex: 22, standard: 33, pro: 45 };
-const TIER_ICONS = { flex: '🌱', standard: '⭐', pro: '👑' };
-
 const EXCLUSIONS = [
   { icon: '⚔️', title: 'War and armed conflict', desc: 'Losses arising from war, invasion, or armed hostilities.' },
   { icon: '🦠', title: 'Pandemic / epidemic declaration', desc: 'Disruptions due to a government-declared pandemic or epidemic.' },
@@ -247,6 +246,18 @@ const EXCLUSIONS = [
   { icon: '⏱️', title: 'Disruptions under 45 minutes', desc: 'Any disruption lasting less than 45 minutes is not covered.' },
   { icon: '🗓️', title: 'Claims after 48-hour window', desc: 'Claims must be submitted within 48 hours of the disruption.' },
 ];
+
+const TIER_META = {
+  flex: { icon: '⚡', label: 'Flex', subtitle: 'Part-time · 4–5 hrs/day' },
+  standard: { icon: '🛵', label: 'Standard', subtitle: 'Full-time · 8–10 hrs/day' },
+  pro: { icon: '🏆', label: 'Pro', subtitle: 'Peak warrior · 12+ hrs/day' }
+};
+
+const TIER_LIMITS = {
+  flex: { max_payout_day: 250, max_days_week: 2, weekly_premium: 22 },
+  standard: { max_payout_day: 400, max_days_week: 3, weekly_premium: 33 },
+  pro: { max_payout_day: 500, max_days_week: 4, weekly_premium: 45 },
+};
 
 /* ─── ExclusionsScreen ────────────────────────────────────────────────── */
 function ExclusionsScreen({ onAccept }) {
@@ -284,49 +295,58 @@ function ExclusionsScreen({ onAccept }) {
 }
 
 /* ─── PremiumBreakdown ────────────────────────────────────────────────── */
-function PremiumBreakdown({ quote, loyaltyWeeks }) {
-  if (!quote) return null;
-  const base = TIER_PRICES[quote.tier] || 33;
-  const zoneAdj = quote.risk_adjustment || 0;
-  const seasonal = 1.15;
-  const riqi = 1.15;
-  const activity = quote.tier === 'pro' ? 1.35 : quote.tier === 'flex' ? 0.80 : 1.00;
-  const loyalty = loyaltyWeeks >= 12 ? 0.90 : loyaltyWeeks >= 4 ? 0.94 : 1.00;
-  const total = Math.round(base * activity * riqi * seasonal * loyalty + zoneAdj);
+function PremiumBreakdown({ breakdown }) {
+  if (!breakdown) return null;
 
   return (
     <div style={{ background: '#eff6ff', borderRadius: 14, padding: 14, border: '1px solid #bfdbfe', marginTop: 12 }}>
       <p style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 800, fontSize: 12, color: '#1e40af', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
         Premium Breakdown (Next Week)
       </p>
-      {[
-        ['Base Premium', `₹${base}`, ''],
-        ['Zone Risk Factor', zoneAdj !== 0 ? `${zoneAdj > 0 ? '+' : ''}₹${zoneAdj}` : '₹0', ''],
-        ['Seasonal Index', `×${seasonal.toFixed(2)}`, ''],
-        ['RIQI Adjustment', `×${riqi.toFixed(2)}`, ''],
-        ['Activity Tier', `×${activity.toFixed(2)}`, quote.tier],
-        ['Loyalty Discount', `×${loyalty.toFixed(2)}`, loyaltyWeeks >= 4 ? `${loyaltyWeeks}w streak` : 'None yet'],
-      ].map(([k, v, note]) => (
-        <div className="breakdown-modal-row" key={k}>
-          <span className="breakdown-modal-key">{k}{note ? <span style={{ fontSize: 10, color: 'var(--text-light)', marginLeft: 4 }}>({note})</span> : ''}</span>
-          <span className={`breakdown-modal-val ${v.includes('-') || v.startsWith('×0.9') ? 'neg' : ''}`}>{v}</span>
+      
+      <div className="breakdown-modal-row">
+        <span className="breakdown-modal-key">Base Premium</span>
+        <span className="breakdown-modal-val">₹{breakdown.base_premium}</span>
+      </div>
+      
+      {breakdown.activity_multiplier !== 1.0 && (
+        <div className="breakdown-modal-row">
+          <span className="breakdown-modal-key">Activity Tier</span>
+          <span className="breakdown-modal-val text-blue-600">×{breakdown.activity_multiplier}</span>
         </div>
-      ))}
+      )}
+      {breakdown.zone_risk_adjustment !== 0 && (
+        <div className="breakdown-modal-row">
+          <span className="breakdown-modal-key">Zone Factor</span>
+          <span className="breakdown-modal-val text-red-600">+{breakdown.zone_risk_adjustment}</span>
+        </div>
+      )}
+      {breakdown.loyalty_discount !== 0 && (
+        <div className="breakdown-modal-row">
+          <span className="breakdown-modal-key">Loyalty Discount</span>
+          <span className="breakdown-modal-val text-green-600">-{breakdown.loyalty_discount}</span>
+        </div>
+      )}
+
       <div className="breakdown-modal-total">
         <span>Total</span>
-        <span className="val">₹{total}/week</span>
+        <span className="val">₹{breakdown.total}/week</span>
       </div>
     </div>
   );
 }
 
 /* ─── Main Policy ─────────────────────────────────────────────────────── */
-export function Policy() {
-  const { user } = useAuth();
-  const [quotes, setQuotes] = useState([]);
+export default function Policy() {
+  const navigate = useNavigate();
+
   const [activePolicy, setActivePolicy] = useState(null);
+  const [eligibility, setEligibility] = useState(null);
+  const [breakdown, setBreakdown] = useState(null);
+  const [quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
   const [showRenewalModal, setShowRenewalModal] = useState(false);
   const [renewalQuote, setRenewalQuote] = useState(null);
   const [selectedRenewalTier, setSelectedRenewalTier] = useState(null);
@@ -336,32 +356,28 @@ export function Policy() {
   const [showExclusions, setShowExclusions] = useState(false);
   const [exclusionsAccepted, setExclusionsAccepted] = useState(false);
   const [pendingTier, setPendingTier] = useState(null);
-
-  // Simulated — in production from partner activity API
-  const [partnerActivityDays] = useState(8);
-  const [loyaltyWeeks] = useState(3);
-
-  function tierEligible(tier) {
-    if (tier === 'flex') return { ok: true };
-    if (partnerActivityDays >= 7) return { ok: true };
-    return { ok: false, reason: `Cover starts after you complete 7 active delivery days (you have ${partnerActivityDays}).` };
-  }
+  const [error, setError] = useState(null);
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     try {
-      const [qd, pd] = await Promise.all([
-        api.getPolicyQuotes(),
+      const [pd, elig, breakd, qd] = await Promise.all([
         api.getActivePolicy().catch(() => null),
+        api.getPartnerEligibility().catch(() => null),
+        api.getPremiumBreakdown().catch(() => null),
+        api.getPolicyQuotes().catch(() => [])
       ]);
-      const fixed = (qd || []).map(q => ({
-        ...q,
-        base_premium: TIER_PRICES[q.tier] || q.base_premium,
-        final_premium: TIER_PRICES[q.tier] || q.final_premium,
-      }));
-      setQuotes(fixed); setActivePolicy(pd);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+      setActivePolicy(pd);
+      setEligibility(elig);
+      setBreakdown(breakd);
+      setQuotes(Array.isArray(qd) ? qd : []);
+    } catch (e) {
+      console.error(e);
+      setError(e.message);
+    } finally { 
+      setLoading(false); 
+    }
   }
 
   function initiatePurchase(tier) {
@@ -382,9 +398,11 @@ export function Policy() {
   }
 
   async function handleCancel() {
-    if (!confirm('Are you sure you want to cancel your policy?')) return;
+    if (!window.confirm('Are you sure you want to cancel your policy?')) return;
+    setCancelling(true);
     try { await api.cancelPolicy(activePolicy.id); await load(); }
     catch (e) { alert(e.message); }
+    finally { setCancelling(false); }
   }
 
   async function openRenewalModal() {
@@ -399,7 +417,8 @@ export function Policy() {
   }
 
   async function handleTierChange(tier) {
-    setSelectedRenewalTier(tier); setRenewalLoading(true);
+    setSelectedRenewalTier(tier); 
+    setRenewalLoading(true);
     try {
       const q = await api.getRenewalQuote(activePolicy.id, tier);
       setRenewalQuote(q);
@@ -416,18 +435,30 @@ export function Policy() {
     finally { setRenewalLoading(false); }
   }
 
-  async function handleDownloadCert() {
-    setDownloadingCert(true);
-    try { await api.downloadCertificate(activePolicy.id); }
-    catch (e) { alert(e.message); }
-    finally { setDownloadingCert(false); }
-  }
-
   async function handleToggleAutoRenew() {
     setTogglingAutoRenew(true);
-    try { await api.toggleAutoRenew(activePolicy.id, !activePolicy.auto_renew); await load(); }
+    try { 
+      // Toggle auto_renew via patch
+      await api.updateAutoRenew(activePolicy.id, !activePolicy.auto_renew);
+      await load(); 
+    }
     catch (e) { alert(e.message); }
     finally { setTogglingAutoRenew(false); }
+  }
+
+  async function handleDownloadCert() {
+    setDownloadingCert(true);
+    try {
+      const blob = await api.downloadCertificate(activePolicy.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `policy_certificate_${activePolicy.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch(e) { alert(e.message); }
+    finally { setDownloadingCert(false); }
   }
 
   function countdown() {
@@ -446,7 +477,7 @@ export function Policy() {
   }
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--gray-bg)' }}>
       <div style={{ width: 32, height: 32, border: '3px solid var(--green-light)', borderTopColor: 'var(--green-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
     </div>
   );
@@ -454,30 +485,38 @@ export function Policy() {
   const polSt = activePolicy?.status || 'active';
   const ST_LABELS = { active: 'Active', grace_period: 'Grace Period', lapsed: 'Lapsed', cancelled: 'Cancelled' };
   const cd = countdown();
+  const currentTier = activePolicy?.tier || null;
+  const gateBlocked = eligibility?.gate_blocked ?? false;
 
   return (
     <>
       <style>{S}</style>
-      <div className="pol-wrap">
+      <div className="pol-wrap" style={{ padding: '24px 16px', background: 'var(--gray-bg)', minHeight: '100vh' }}>
 
         {/* Exclusions modal */}
         {showExclusions && <ExclusionsScreen onAccept={onExclusionsAccept} />}
 
-        {/* Page header */}
-        <div>
+        {/* Header */}
+        <div style={{ marginBottom: 16 }}>
           <h1 className="pol-page-title">Insurance Plans</h1>
           <p className="pol-page-sub">Choose coverage that fits your activity level</p>
         </div>
 
+        {error && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px', borderRadius: '12px', color: '#991b1b', fontSize: 13, marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
+
         {/* Eligibility gate */}
-        {partnerActivityDays < 7 && !activePolicy && (
-          <div className={`eligib-gate ${partnerActivityDays >= 7 ? 'pass' : 'fail'}`}>
+        {gateBlocked && (
+          <div className="eligib-gate fail">
             <p className="eligib-gate-title">
-              {partnerActivityDays >= 7 ? '✅ All plans available' : '⏳ Cover starts after 7 active delivery days'}
+              ⏳ Cover starts after 7 active delivery days
             </p>
             <p className="eligib-gate-sub">
-              You have <strong>{partnerActivityDays}</strong> active days.
-              Standard and Pro unlock at 7+ days. You can start with <strong>Flex</strong> now.
+              You have <strong>{eligibility?.active_days_last_30 ?? 0}</strong> active days.
+              Complete 7 days to unlock coverage.
             </p>
           </div>
         )}
@@ -489,17 +528,19 @@ export function Policy() {
               <div>
                 <p className="apb-tier">{activePolicy.tier.toUpperCase()} Plan</p>
                 <p className="apb-sub">{cd || `Expires ${new Date(activePolicy.expires_at).toLocaleDateString('en-IN')}`}</p>
-                <p className="apb-next-premium">Next premium: ₹{TIER_PRICES[activePolicy.tier] || '—'}/week</p>
+                <p className="apb-next-premium">Next premium: ₹{breakdown?.total ?? TIER_LIMITS[activePolicy.tier].weekly_premium}/week</p>
               </div>
               <span className={`apb-badge st-${polSt}`}>{ST_LABELS[polSt]}</span>
             </div>
-            <div className="apb-toggle-row">
-              <label className="rc-toggle">
-                <input type="checkbox" checked={!!activePolicy.auto_renew} onChange={handleToggleAutoRenew} disabled={togglingAutoRenew} />
-                <span className="rc-toggle-slider" />
-              </label>
-              <span className="apb-toggle-label">Auto-renewal</span>
-            </div>
+            {activePolicy.can_renew && (
+              <div className="apb-toggle-row">
+                <label className="rc-toggle">
+                  <input type="checkbox" checked={!!activePolicy.auto_renew} onChange={handleToggleAutoRenew} disabled={togglingAutoRenew} />
+                  <span className="rc-toggle-slider" />
+                </label>
+                <span className="apb-toggle-label">Auto-renewal</span>
+              </div>
+            )}
             <div className="apb-actions">
               {activePolicy.can_renew && (
                 <button className="apb-action-btn primary" onClick={openRenewalModal}>Renew</button>
@@ -507,78 +548,76 @@ export function Policy() {
               <button className="apb-action-btn" onClick={handleDownloadCert} disabled={downloadingCert}>
                 {downloadingCert ? 'Downloading…' : 'Certificate'}
               </button>
-              {polSt === 'active' && (
-                <button className="apb-action-btn danger" onClick={handleCancel}>Cancel</button>
+              {(polSt === 'active' || polSt === 'grace_period') && (
+                <button className="apb-action-btn danger" onClick={handleCancel} disabled={cancelling}>
+                  {cancelling ? 'Wait...' : 'Cancel'}
+                </button>
               )}
             </div>
           </div>
         )}
 
         {/* Plan cards */}
-        {quotes.map(quote => {
-          const elig = tierEligible(quote.tier);
-          const isActive = activePolicy?.tier === quote.tier;
-          const locked = !elig.ok && !isActive;
-          const price = TIER_PRICES[quote.tier] || quote.final_premium;
+        {['flex', 'standard', 'pro'].map(tier => {
+          const isCurrent = currentTier === tier;
+          const isAllowed = eligibility?.allowed_tiers?.includes(tier) ?? true;
+          const isBlocked = eligibility?.blocked_tiers?.includes(tier) ?? gateBlocked;
+          const meta = TIER_META[tier];
+          const limits = TIER_LIMITS[tier];
+          const displayPremium = isCurrent && breakdown?.total ? breakdown.total : limits.weekly_premium;
+          const reason = eligibility?.reasons?.[tier];
 
           return (
-            <div key={quote.tier} className={`pol-card ${isActive ? 'ring-active' : ''} ${locked ? 'locked' : ''}`}>
+            <div key={tier} className={`pol-card ${isCurrent ? 'ring-active' : ''} ${isBlocked ? 'locked' : ''}`} style={{ marginBottom: 12 }}>
               <div className="pol-card-body">
                 <div className="plan-hdr">
                   <div>
-                    <span className="plan-icon">{TIER_ICONS[quote.tier]}</span>
-                    <p className="plan-name">{quote.tier}</p>
-                    {locked && <span className="plan-lock-badge">🔒 Locked</span>}
+                    <span className="plan-icon">{meta.icon}</span>
+                    <p className="plan-name">{meta.label}</p>
+                    {isBlocked && <span className="plan-lock-badge">🔒 Locked</span>}
+                    {isCurrent && <span className="plan-lock-badge" style={{background: 'var(--green-primary)', color:'white'}}>✅ Current</span>}
                   </div>
                   <div>
-                    <p className="plan-price-big">₹{price}</p>
+                    <p className="plan-price-big">₹{displayPremium}</p>
                     <p className="plan-price-sub">/week</p>
-                    {quote.risk_adjustment !== 0 && (
-                      <p className="plan-zone-adj" style={{ color: quote.risk_adjustment < 0 ? 'var(--green-dark)' : 'var(--warning)' }}>
-                        {quote.risk_adjustment < 0 ? 'Zone discount' : 'Zone surcharge'}: ₹{Math.abs(quote.risk_adjustment)}
-                      </p>
-                    )}
                   </div>
                 </div>
 
-                {locked && elig.reason && (
-                  <div className="plan-ineligible-note">ℹ️ {elig.reason}</div>
+                {isBlocked && reason && !gateBlocked && (
+                  <div className="plan-ineligible-note">ℹ️ {reason}</div>
                 )}
 
                 <div className="plan-stats">
                   <div className="plan-stat">
                     <p className="plan-stat-label">Daily Payout</p>
-                    <p className="plan-stat-val">₹{quote.max_daily_payout}</p>
+                    <p className="plan-stat-val">₹{limits.max_payout_day}</p>
                   </div>
                   <div className="plan-stat">
                     <p className="plan-stat-label">Max Days/Week</p>
-                    <p className="plan-stat-val">{quote.max_days_per_week}</p>
+                    <p className="plan-stat-val">{limits.max_days_week}</p>
                   </div>
                 </div>
               </div>
               <div className="pol-card-footer">
                 <button
-                  className={`plan-btn ${isActive || locked || !!activePolicy ? 'secondary' : 'primary'}`}
-                  disabled={!!activePolicy || locked || purchasing === quote.tier}
-                  onClick={() => initiatePurchase(quote.tier)}
+                  className={`plan-btn ${isCurrent || isBlocked || activePolicy ? 'secondary' : 'primary'}`}
+                  disabled={!!activePolicy || isBlocked || purchasing === tier}
+                  onClick={() => initiatePurchase(tier)}
                 >
-                  {purchasing === quote.tier ? 'Processing…'
-                    : isActive ? 'Current Plan'
-                      : activePolicy ? 'Already Covered'
-                        : locked ? 'Not Eligible Yet'
-                          : 'Get This Plan'}
+                  {purchasing === tier ? 'Processing…' : 
+                   isCurrent ? 'Current Plan' : 
+                   activePolicy ? 'Already Covered' : 
+                   isBlocked ? 'Not Eligible' : 'Get This Plan'}
                 </button>
               </div>
             </div>
           );
         })}
 
-        {/* View exclusions link */}
         <button className="excl-view-link" onClick={() => setShowExclusions(true)}>
           ⚠️ View all 10 policy exclusions
         </button>
 
-        {/* How it works */}
         <div className="info-box">
           <p className="info-box-title">How it works:</p>
           <ul>
@@ -596,18 +635,19 @@ export function Policy() {
             <div className="renew-modal">
               <p className="renew-title">Renew Your Policy</p>
               <p style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 12 }}>Select Plan</p>
+              
               <div className="tier-chips">
-                {quotes.map(q => {
-                  const el = tierEligible(q.tier);
+                {['flex', 'standard', 'pro'].map(tier => {
+                  const el = eligibility?.allowed_tiers?.includes(tier) ?? true;
                   return (
                     <div
-                      key={q.tier}
-                      className={`tier-chip ${selectedRenewalTier === q.tier ? 'selected' : ''} ${!el.ok ? 'disabled' : ''}`}
-                      onClick={() => el.ok && handleTierChange(q.tier)}
+                      key={tier}
+                      className={`tier-chip ${selectedRenewalTier === tier ? 'selected' : ''} ${!el ? 'disabled' : ''}`}
+                      onClick={() => el && handleTierChange(tier)}
                     >
-                      <div style={{ fontSize: 20 }}>{TIER_ICONS[q.tier]}</div>
-                      <p className="tier-chip-name">{q.tier}</p>
-                      <p className="tier-chip-price">₹{TIER_PRICES[q.tier]}</p>
+                      <div style={{ fontSize: 20 }}>{TIER_META[tier].icon}</div>
+                      <p className="tier-chip-name">{tier}</p>
+                      <p className="tier-chip-price">₹{TIER_LIMITS[tier].weekly_premium}</p>
                     </div>
                   );
                 })}
@@ -618,7 +658,13 @@ export function Policy() {
                   <div style={{ width: 28, height: 28, border: '3px solid var(--green-light)', borderTopColor: 'var(--green-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto' }} />
                 </div>
               ) : renewalQuote ? (
-                <PremiumBreakdown quote={renewalQuote} loyaltyWeeks={loyaltyWeeks} />
+                <PremiumBreakdown breakdown={{
+                  base_premium: renewalQuote.base_premium,
+                  activity_multiplier: renewalQuote.activity_multiplier || 1,
+                  zone_risk_adjustment: renewalQuote.zone_risk_adjustment || 0,
+                  loyalty_discount: renewalQuote.loyalty_discount_applied || 0,
+                  total: renewalQuote.final_premium
+                }} />
               ) : null}
 
               <div className="renew-actions">
@@ -630,6 +676,7 @@ export function Policy() {
             </div>
           </div>
         )}
+
       </div>
     </>
   );

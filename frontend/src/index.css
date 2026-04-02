@@ -1,17 +1,27 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
 
-/* Custom CSS variables for RapidCover theme */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
 :root {
-  --rc-primary: #2563eb;
-  --rc-primary-dark: #1d4ed8;
-  --rc-success: #16a34a;
-  --rc-warning: #f59e0b;
-  --rc-danger: #dc2626;
+  --green-primary: #3DB85C;
+  --green-dark:    #2a9e47;
+  --green-light:   #e8f7ed;
+  --text-dark:     #1a2e1a;
+  --text-mid:      #4a5e4a;
+  --text-light:    #8a9e8a;
+  --white:         #ffffff;
+  --gray-bg:       #f7f9f7;
+  --border:        #e2ece2;
+  --error:         #dc2626;
+  --warning:       #d97706;
 }
 
-/* Base styles */
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--gray-bg);
+  color: var(--text-dark);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* PWA safe area padding for notched devices */
@@ -23,3 +33,6 @@ body {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
