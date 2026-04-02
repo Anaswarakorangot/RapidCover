@@ -121,11 +121,11 @@ Gig workers earn weekly, spend weekly, plan weekly. RapidCover is priced to matc
 
 ### Base Tiers
 
-| Tier | Weekly Premium | Max Payout / Day | Max Days / Week | Best For |
-|------|---------------|-----------------|-----------------|----------|
-| ⚡ Flex | ₹39/week | ₹350 | 2 days | Part-time, 4–5 hrs/day |
-| 🛵 Standard | ₹59/week | ₹600 | 3 days | Full-time, 8–10 hrs/day |
-| 🏆 Pro | ₹89/week | ₹900 | 4 days | Peak warriors, 12+ hrs/day |
+| Tier | Weekly Premium | Max Payout / Day | Max Days / Week | Max Weekly | Ratio |
+|------|---------------|-----------------|-----------------|------------|-------|
+| ⚡ **Flex** | ₹22/week | ₹250 | 2 days | ₹500 | ~1:23 |
+| 🛵 **Standard** | ₹33/week | ₹400 | 3 days | ₹1,200 | ~1:36 |
+| 🏆 **Pro** | ₹45/week | ₹500 | 4 days | ₹2,000 | ~1:44 |
 
 ### ML Dynamic Pricing Layer
 

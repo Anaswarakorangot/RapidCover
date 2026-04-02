@@ -306,8 +306,8 @@ export function Policy() {
                 <div className="flex items-start justify-between">
                   <div>
                     <span className="text-2xl">{TIER_ICONS[quote.tier]}</span>
-                    <h3 className="text-xl font-bold text-gray-900 mt-1 capitalize">
-                      {quote.tier}
+                    <h3 className="text-xl font-bold text-gray-900 mt-1">
+                      {quote.tier_label || quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}
                     </h3>
                   </div>
                   <div className="text-right">
@@ -323,14 +323,22 @@ export function Policy() {
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
                   <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-gray-500">Daily Payout</p>
-                    <p className="font-semibold text-gray-900">₹{quote.max_daily_payout}</p>
+                    <p className="text-gray-400 uppercase font-semibold">Max Day Payout</p>
+                    <p className="font-bold text-gray-900 text-sm">₹{quote.max_daily_payout}</p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-gray-500">Max Days/Week</p>
-                    <p className="font-semibold text-gray-900">{quote.max_days_per_week}</p>
+                    <p className="text-gray-400 uppercase font-semibold">Max Days/Week</p>
+                    <p className="font-bold text-gray-900 text-sm">{quote.max_days_per_week}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-gray-400 uppercase font-semibold">Max Weekly</p>
+                    <p className="font-bold text-blue-600 text-sm">₹{quote.max_daily_payout * quote.max_days_per_week}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-gray-400 uppercase font-semibold">Benefit Ratio</p>
+                    <p className="font-bold text-green-600 text-sm">~1:{Math.round((quote.max_daily_payout * quote.max_days_per_week) / quote.final_premium)}</p>
                   </div>
                 </div>
               </CardBody>

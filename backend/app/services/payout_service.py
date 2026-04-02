@@ -128,7 +128,7 @@ def process_payout(claim: Claim, db: Session, upi_ref: Optional[str] = None) -> 
     db.commit()
     db.refresh(claim)
 
-    logger.info(f"Payout processed: claim={claim.id}, partner={partner.id}, amount=₹{claim.amount}, ref={upi_ref}")
+    logger.info(f"Payout processed: claim={claim.id}, partner={partner.id}, amount=Rs.{claim.amount}, ref={upi_ref}")
     notify_claim_paid(claim, db)
 
     return True, upi_ref, transaction_log
