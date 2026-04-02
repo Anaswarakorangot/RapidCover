@@ -21,7 +21,7 @@ from app.models.policy import Policy, TIER_CONFIG
 from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent, TriggerType
 from app.models.zone import Zone
-from app.services.fraud_detector import calculate_fraud_score, FRAUD_THRESHOLDS
+from app.services.fraud_service import calculate_fraud_score, FRAUD_THRESHOLDS
 from app.services.premium_service import calculate_zone_pool_share as apply_zone_pool_share_cap
 from app.services.notifications import (
     notify_claim_created,
