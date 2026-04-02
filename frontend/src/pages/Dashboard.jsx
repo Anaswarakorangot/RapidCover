@@ -1,9 +1,25 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+/**
+ * Dashboard.jsx  –  RapidCover Partner Home
+ *
+ * Person 1 Phase 2:
+ *   - Removed ALL hardcoded constants: zoneReassignment, weatherAlert, streakWeeks
+ *   - All state comes from GET /partners/me/experience-state
+ *   - Polls every 5 s during active drills; stops after 2 min of inactivity
+ *   - Shows strong payout banner when latest_payout.status === "paid"
+ *   - Zone alert / reassignment cards only render when backend sends them (non-null)
+ *
+ * UI: Original green theme preserved (matching Register.jsx / Login.jsx design system).
+ */
 
-/* ─── Design Tokens (matches Register.jsx UI) ─────────────────────────────── */
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
+
+const POLL_INTERVAL_MS = 5_000;
+const POLL_TIMEOUT_MS  = 120_000;
+
+/* ─── Design Tokens (identical to Login.jsx & Register.jsx) ──────────────── */
 const S = `
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
 
@@ -56,10 +72,10 @@ const S = `
     position: relative;
     overflow: hidden;
   }
-  .policy-hero.flex-tier    { background: linear-gradient(135deg, #059669, #10b981); }
-  .policy-hero.standard-tier{ background: linear-gradient(135deg, #2563eb, #3b82f6); }
-  .policy-hero.pro-tier     { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
-  .policy-hero.no-policy    { background: linear-gradient(135deg, #6b7280, #9ca3af); }
+  .policy-hero.flex-tier     { background: linear-gradient(135deg, #059669, #10b981); }
+  .policy-hero.standard-tier { background: linear-gradient(135deg, #2563eb, #3b82f6); }
+  .policy-hero.pro-tier      { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
+  .policy-hero.no-policy     { background: linear-gradient(135deg, #6b7280, #9ca3af); }
 
   .policy-hero-label  { font-size: 11px; opacity: 0.75; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
   .policy-hero-tier   { font-family: 'Nunito', sans-serif; font-size: 26px; font-weight: 900; margin-top: 2px; text-transform: capitalize; }
@@ -91,14 +107,20 @@ const S = `
   .alert-orange { background: #fff7ed; border: 1.5px solid #fed7aa; }
   .alert-blue   { background: #eff6ff; border: 1.5px solid #bfdbfe; }
   .alert-red    { background: #fef2f2; border: 1.5px solid #fecaca; }
+  .alert-green  { background: #f0fdf4; border: 1.5px solid #bbf7d0; }
+  .alert-purple { background: #faf5ff; border: 1.5px solid #e9d5ff; }
   .alert-title  { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 13px; }
   .alert-orange .alert-title { color: #9a3412; }
   .alert-blue   .alert-title { color: #1e40af; }
   .alert-red    .alert-title { color: #991b1b; }
+  .alert-green  .alert-title { color: #166534; }
+  .alert-purple .alert-title { color: #6b21a8; }
   .alert-body   { font-size: 12px; margin-top: 2px; line-height: 1.5; }
   .alert-orange .alert-body { color: #c2410c; }
   .alert-blue   .alert-body { color: #1d4ed8; }
   .alert-red    .alert-body { color: #dc2626; }
+  .alert-green  .alert-body { color: #166534; }
+  .alert-purple .alert-body { color: #6b21a8; }
 
   .alert-actions { display: flex; gap: 8px; margin-top: 10px; }
   .alert-btn-outline {
@@ -117,6 +139,32 @@ const S = `
   }
   .alert-orange .alert-badge { background: #ffedd5; color: #9a3412; }
   .alert-blue   .alert-badge { background: #dbeafe; color: #1e40af; }
+  .alert-green  .alert-badge { background: #dcfce7; color: #166534; }
+  .alert-purple .alert-badge { background: #ede9fe; color: #6b21a8; }
+
+  /* ── Payout banner ── */
+  .payout-banner {
+    background: linear-gradient(135deg, var(--green-primary), var(--green-dark));
+    border-radius: 20px;
+    padding: 16px 18px;
+    color: white;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    position: relative;
+    box-shadow: 0 6px 20px rgba(61,184,92,0.35);
+  }
+  .payout-banner-title   { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 17px; }
+  .payout-banner-sub     { font-size: 13px; opacity: 0.9; margin-top: 2px; }
+  .payout-banner-time    { font-size: 11px; opacity: 0.7; margin-top: 4px; }
+  .payout-banner-dismiss {
+    position: absolute; top: 12px; right: 14px;
+    background: rgba(255,255,255,0.2); border: none; color: white;
+    font-size: 16px; width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; line-height: 1;
+  }
+  .payout-banner-dismiss:hover { background: rgba(255,255,255,0.35); }
 
   /* ── Streak bar ── */
   .streak-bar-wrap { margin-bottom: 8px; }
@@ -128,6 +176,7 @@ const S = `
   .streak-fill.green  { background: #22c55e; }
   .streak-fill.blue   { background: #3b82f6; }
   .streak-fill.purple { background: #8b5cf6; }
+  .streak-fill.amber  { background: #f59e0b; }
 
   /* ── Premium breakdown ── */
   .breakdown-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; font-size: 13px; }
@@ -155,12 +204,12 @@ const S = `
     transition: box-shadow 0.2s, transform 0.2s;
   }
   .qa-tile:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
-  .qa-tile-icon { font-size: 24px; }
+  .qa-tile-icon  { font-size: 24px; }
   .qa-tile-label { font-size: 12px; font-weight: 600; color: var(--text-dark); margin-top: 6px; font-family: 'Nunito', sans-serif; }
 
   /* ── Earnings tiles ── */
   .earn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .earn-tile { background: var(--white); border: 1.5px solid var(--border); border-radius: 18px; padding: 16px; text-align: center; }
+  .earn-tile  { background: var(--white); border: 1.5px solid var(--border); border-radius: 18px; padding: 16px; text-align: center; }
   .earn-label  { font-size: 11px; color: var(--text-light); margin-bottom: 4px; }
   .earn-amount { font-family: 'Nunito', sans-serif; font-size: 22px; font-weight: 900; }
   .earn-claims { font-size: 11px; color: var(--text-light); margin-top: 2px; }
@@ -203,12 +252,10 @@ const S = `
   }
 
   /* ── No policy CTA ── */
-  .no-policy-cta {
-    text-align: center; padding: 28px 16px;
-  }
-  .no-policy-icon { font-size: 48px; }
+  .no-policy-cta { text-align: center; padding: 28px 16px; }
+  .no-policy-icon  { font-size: 48px; }
   .no-policy-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px; color: var(--text-dark); margin: 10px 0 6px; }
-  .no-policy-sub { font-size: 13px; color: var(--text-mid); margin-bottom: 18px; }
+  .no-policy-sub   { font-size: 13px; color: var(--text-mid); margin-bottom: 18px; }
   .rc-btn-primary {
     display: inline-block; background: var(--green-primary); color: white;
     border: none; border-radius: 14px; padding: 13px 28px; font-family: 'Nunito', sans-serif;
@@ -216,26 +263,103 @@ const S = `
     transition: background 0.2s;
   }
   .rc-btn-primary:hover { background: var(--green-dark); }
+
+  /* ── Live badge ── */
+  .live-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    background: var(--green-light); color: var(--green-dark);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .live-dot {
+    width: 6px; height: 6px; background: var(--green-primary);
+    border-radius: 50%; animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  @keyframes spin   { to { transform: rotate(360deg); } }
 `;
+
+/* ─── Helpers ─────────────────────────────────────────────────────────────── */
+
+const TRIGGER_INFO = {
+  rain:     { icon: '🌧️', label: 'Heavy Rain',      color: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
+  heat:     { icon: '🌡️', label: 'Extreme Heat',    color: '#fef2f2', border: '#fecaca', text: '#991b1b' },
+  aqi:      { icon: '💨', label: 'Dangerous AQI',   color: '#fffbeb', border: '#fde68a', text: '#92400e' },
+  shutdown: { icon: '🚫', label: 'Civic Shutdown',   color: '#faf5ff', border: '#e9d5ff', text: '#6b21a8' },
+  closure:  { icon: '🏪', label: 'Store Closure',    color: '#f9fafb', border: '#e5e7eb', text: '#374151' },
+};
+const STATUS_CLS = { paid: 'st-paid', pending: 'st-pending', approved: 'st-approved', rejected: 'st-rejected' };
+const BASES      = { flex: 22, standard: 33, pro: 45 };
+const COV_EVENTS = [
+  { icon: '🌧️', label: 'Heavy Rain & Floods' },
+  { icon: '🌡️', label: 'Extreme Heat (>43°C)' },
+  { icon: '💨', label: 'Dangerous AQI (>400)' },
+  { icon: '🚫', label: 'Curfew & Bandh' },
+  { icon: '🏪', label: 'Dark Store Closures' },
+];
 
 /* ─── Sub-components ──────────────────────────────────────────────────────── */
 
-function ZoneReassignmentCard({ notification, onAccept, onDismiss }) {
-  if (!notification) return null;
-  const { oldZone, newZone, premiumDelta, hoursLeft } = notification;
+/** Shown prominently at top when a paid claim exists */
+function PayoutBanner({ payout, onDismiss }) {
+  if (!payout || payout.status !== 'paid') return null;
+  return (
+    <div className="payout-banner">
+      <span style={{ fontSize: 28 }}>💸</span>
+      <div style={{ flex: 1 }}>
+        <p className="payout-banner-title">Money Sent!</p>
+        <p className="payout-banner-sub">
+          ₹{payout.amount} paid via UPI{payout.upi_ref ? ` · Ref: ${payout.upi_ref}` : ''}
+        </p>
+        {payout.paid_at && (
+          <p className="payout-banner-time">
+            {new Date(payout.paid_at).toLocaleString('en-IN', {
+              day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+            })}
+          </p>
+        )}
+      </div>
+      <button className="payout-banner-dismiss" onClick={onDismiss} aria-label="Dismiss">×</button>
+    </div>
+  );
+}
+
+/** Only renders when backend sends a non-null zone_alert */
+function ZoneAlertCard({ alert }) {
+  if (!alert) return null;
+  const alertClass = alert.severity === 'high' || alert.severity === 'critical' ? 'alert-red' : 'alert-blue';
+  const icon = TRIGGER_INFO[alert.type]?.icon || '⚠️';
+  return (
+    <div className={`alert-card ${alertClass}`}>
+      <span style={{ fontSize: 22 }}>{icon}</span>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <span className="alert-title">48-Hour {alert.type?.charAt(0).toUpperCase() + alert.type?.slice(1)} Alert</span>
+          <span className="alert-badge">{alert.severity?.toUpperCase()}</span>
+        </div>
+        <p className="alert-body">{alert.message}</p>
+        <p style={{ fontSize: 11, color: '#3b82f6', marginTop: 4 }}>Keep your documents handy for quick claims.</p>
+      </div>
+    </div>
+  );
+}
+
+/** Only renders when backend sends a non-null zone_reassignment */
+function ZoneReassignmentCard({ card, onAccept, onDismiss }) {
+  if (!card) return null;
+  const { old_zone, new_zone, premium_delta, hours_left } = card;
   return (
     <div className="alert-card alert-orange">
       <span style={{ fontSize: 22 }}>📍</span>
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <span className="alert-title">Zone Reassignment</span>
-          <span className="alert-badge">{hoursLeft}h to accept</span>
+          {hours_left > 0 && <span className="alert-badge">{hours_left}h to accept</span>}
         </div>
         <p className="alert-body">
-          Zepto reassigned your zone from <strong>{oldZone}</strong> to <strong>{newZone}</strong>.
-          {premiumDelta !== 0 && (
-            <span style={{ color: premiumDelta > 0 ? '#c2410c' : '#166534' }}>
-              {' '}Premium {premiumDelta > 0 ? `+₹${premiumDelta}` : `-₹${Math.abs(premiumDelta)}`}/week.
+          Your zone has changed from <strong>{old_zone}</strong> to <strong>{new_zone}</strong>.
+          {premium_delta !== 0 && (
+            <span style={{ color: premium_delta > 0 ? '#c2410c' : '#166534' }}>
+              {' '}Premium {premium_delta > 0 ? `+₹${premium_delta}` : `-₹${Math.abs(premium_delta)}`}/week.
             </span>
           )}
         </p>
@@ -248,41 +372,29 @@ function ZoneReassignmentCard({ notification, onAccept, onDismiss }) {
   );
 }
 
-function WeatherAlertCard({ alert }) {
-  if (!alert) return null;
-  return (
-    <div className="alert-card alert-blue">
-      <span style={{ fontSize: 22 }}>🌧️</span>
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <span className="alert-title">48-Hour Weather Alert</span>
-          <span className="alert-badge">Heads up</span>
-        </div>
-        <p className="alert-body">{alert.message}</p>
-        <p style={{ fontSize: 11, color: '#3b82f6', marginTop: 4 }}>Keep your documents handy for quick claims.</p>
-      </div>
-    </div>
-  );
-}
-
-function StreakProgressBar({ streakWeeks }) {
-  const w4 = Math.min((streakWeeks / 4) * 100, 100);
-  const w12 = Math.min((streakWeeks / 12) * 100, 100);
-  const done4 = streakWeeks >= 4;
-  const done12 = streakWeeks >= 12;
+/** Loyalty/streak progress bars – same visual as original */
+function StreakProgressBar({ loyalty }) {
+  if (!loyalty) return null;
+  const { streak_weeks, next_milestone } = loyalty;
+  const w4  = Math.min((streak_weeks / 4)  * 100, 100);
+  const w12 = Math.min((streak_weeks / 12) * 100, 100);
+  const done4  = streak_weeks >= 4;
+  const done12 = streak_weeks >= 12;
 
   return (
     <div className="rc-card">
       <div className="rc-card-body">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <span className="rc-section-title" style={{ marginBottom: 0 }}>🔥 Loyalty Streak</span>
-          <span style={{ fontSize: 12, color: 'var(--text-light)', fontWeight: 600 }}>{streakWeeks} week{streakWeeks !== 1 ? 's' : ''} active</span>
+          <span style={{ fontSize: 12, color: 'var(--text-light)', fontWeight: 600 }}>
+            {streak_weeks} week{streak_weeks !== 1 ? 's' : ''} active
+          </span>
         </div>
         <div className="streak-bar-wrap">
           <div className="streak-bar-header">
             <span className="streak-bar-label">{done4 ? '✅' : '🎯'} 4-week milestone (6% off)</span>
             <span className="streak-bar-val" style={{ color: done4 ? '#22c55e' : 'var(--text-mid)' }}>
-              {done4 ? 'Unlocked!' : `${streakWeeks}/4 wks`}
+              {done4 ? 'Unlocked!' : `${streak_weeks}/4 wks`}
             </span>
           </div>
           <div className="streak-track">
@@ -293,7 +405,7 @@ function StreakProgressBar({ streakWeeks }) {
           <div className="streak-bar-header">
             <span className="streak-bar-label">{done12 ? '✅' : '🏆'} 12-week milestone (10% off)</span>
             <span className="streak-bar-val" style={{ color: done12 ? '#22c55e' : 'var(--text-mid)' }}>
-              {done12 ? 'Unlocked!' : `${streakWeeks}/12 wks`}
+              {done12 ? 'Unlocked!' : `${streak_weeks}/12 wks`}
             </span>
           </div>
           <div className="streak-track">
@@ -310,32 +422,46 @@ function StreakProgressBar({ streakWeeks }) {
   );
 }
 
-function WeeklyPremiumBreakdown({ policy }) {
-  const today = new Date();
+/** Premium breakdown – collapsible, same design as original */
+function WeeklyPremiumBreakdown({ breakdown, policy }) {
+  const today    = new Date();
   const isMonday = today.getDay() === 1;
   const [open, setOpen] = useState(isMonday);
 
-  if (!policy) return null;
+  // Use backend data when available, fall back to local estimate for display only
+  if (!breakdown && !policy) return null;
 
-  const BASES = { flex: 22, standard: 33, pro: 45 };
-  const base = BASES[policy.tier] || 33;
-  const zoneRisk = 3;
-  const seasonal = 1.15;
-  const riqi = 1.15;
-  const activity = policy.tier === 'pro' ? 1.35 : policy.tier === 'flex' ? 0.80 : 1.00;
-  const loyalty = 0.94;
-  const fee = 0;
-  const total = Math.round(base * activity * riqi * seasonal * loyalty + zoneRisk + fee);
-
-  const rows = [
-    { label: 'Base Premium', note: `${policy.tier} plan`, val: `₹${base}`, cls: '' },
-    { label: 'Zone Risk Factor', note: 'Urban Core surcharge', val: `+₹${zoneRisk}`, cls: 'positive' },
-    { label: 'Seasonal Index', note: 'City-specific monthly', val: `×${seasonal.toFixed(2)}`, cls: '' },
-    { label: 'RIQI Adjustment', note: 'Urban Fringe band', val: `×${riqi.toFixed(2)}`, cls: 'positive' },
-    { label: 'Activity Tier Factor', note: policy.tier, val: `×${activity.toFixed(2)}`, cls: '' },
-    { label: 'Loyalty Discount', note: '4-week streak', val: `×${loyalty.toFixed(2)}`, cls: 'negative' },
-    { label: 'Platform Fee', note: 'Waived', val: '₹0', cls: '' },
-  ];
+  let rows, total;
+  if (breakdown) {
+    rows = [
+      { label: 'Base Premium',       note: policy?.tier ? `${policy.tier} plan` : '',      val: `₹${breakdown.base}`,                cls: '' },
+      { label: 'Zone Risk Factor',   note: 'Zone surcharge',                                val: `+₹${breakdown.zone_risk}`,          cls: 'positive' },
+      { label: 'Seasonal Index',     note: 'City-specific monthly',                         val: `×${Number(breakdown.seasonal_index).toFixed(2)}`,  cls: '' },
+      { label: 'RIQI Adjustment',    note: breakdown.riqi_band || '',                        val: `×${Number(breakdown.riqi_adjustment).toFixed(2)}`, cls: 'positive' },
+      { label: 'Activity Tier Factor', note: policy?.tier || '',                             val: `×${Number(breakdown.activity_factor).toFixed(2)}`, cls: '' },
+      { label: 'Loyalty Discount',   note: breakdown.loyalty_weeks ? `${breakdown.loyalty_weeks}-week streak` : '4-week streak', val: `×${Number(breakdown.loyalty_discount).toFixed(2)}`, cls: 'negative' },
+      { label: 'Platform Fee',       note: 'Waived',                                        val: '₹0',                                cls: '' },
+    ];
+    total = breakdown.total;
+  } else {
+    // Local fallback (only shown when breakdown endpoint unavailable)
+    const base     = BASES[policy.tier] || 33;
+    const zoneRisk = 3;
+    const seasonal = 1.15;
+    const riqi     = 1.15;
+    const activity = policy.tier === 'pro' ? 1.35 : policy.tier === 'flex' ? 0.80 : 1.00;
+    const loyalty  = 0.94;
+    total = Math.round(base * activity * riqi * seasonal * loyalty + zoneRisk);
+    rows = [
+      { label: 'Base Premium',        note: `${policy.tier} plan`,       val: `₹${base}`,              cls: '' },
+      { label: 'Zone Risk Factor',    note: 'Urban Core surcharge',       val: `+₹${zoneRisk}`,         cls: 'positive' },
+      { label: 'Seasonal Index',      note: 'City-specific monthly',      val: `×${seasonal.toFixed(2)}`, cls: '' },
+      { label: 'RIQI Adjustment',     note: 'Urban Fringe band',          val: `×${riqi.toFixed(2)}`,    cls: 'positive' },
+      { label: 'Activity Tier Factor', note: policy.tier,                 val: `×${activity.toFixed(2)}`, cls: '' },
+      { label: 'Loyalty Discount',    note: '4-week streak',              val: `×${loyalty.toFixed(2)}`, cls: 'negative' },
+      { label: 'Platform Fee',        note: 'Waived',                     val: '₹0',                    cls: '' },
+    ];
+  }
 
   return (
     <div className="rc-card">
@@ -356,7 +482,10 @@ function WeeklyPremiumBreakdown({ policy }) {
           <div style={{ marginTop: 12 }}>
             {rows.map(r => (
               <div className="breakdown-row" key={r.label}>
-                <span className="breakdown-key">{r.label}<span className="breakdown-note">({r.note})</span></span>
+                <span className="breakdown-key">
+                  {r.label}
+                  {r.note && <span className="breakdown-note">({r.note})</span>}
+                </span>
                 <span className={`breakdown-val ${r.cls}`}>{r.val}</span>
               </div>
             ))}
@@ -372,64 +501,118 @@ function WeeklyPremiumBreakdown({ policy }) {
 }
 
 /* ─── Main Dashboard ─────────────────────────────────────────────────────── */
+
 export function Dashboard() {
   const { user } = useAuth();
-  const [policy, setPolicy] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [zone, setZone] = useState(null);
-  const [triggers, setTriggers] = useState([]);
-  const [recentClaims, setRecentClaims] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showZoneCard, setShowZoneCard] = useState(true);
+  const navigate = useNavigate();
 
-  const zoneReassignment = { oldZone: 'Kondapur Central', newZone: 'Gachibowli West', premiumDelta: 3, hoursLeft: 18 };
-  const weatherAlert = { message: 'Heavy rain forecast Tuesday 4PM in your zone. Stay prepared.' };
-  const streakWeeks = 3;
+  const [expState,      setExpState]      = useState(null);
+  const [policy,        setPolicy]        = useState(null);
+  const [summary,       setSummary]       = useState(null);
+  const [zone,          setZone]          = useState(null);
+  const [triggers,      setTriggers]      = useState([]);
+  const [recentClaims,  setRecentClaims]  = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState(null);
+  const [payoutDismissed,   setPayoutDismissed]   = useState(false);
+  const [reassignDismissed, setReassignDismissed] = useState(false);
+  const [pollingActive, setPollingActive] = useState(true);
+
+  const pollRef         = useRef(null);
+  const activityRef     = useRef(null);
+  const seenPayoutIdRef = useRef(null);
+
+  /* ── idle timer ── */
+  const resetActivityTimer = useCallback(() => {
+    if (activityRef.current) clearTimeout(activityRef.current);
+    setPollingActive(true);
+    activityRef.current = setTimeout(() => setPollingActive(false), POLL_TIMEOUT_MS);
+  }, []);
+
+  /* ── fetch all in parallel ── */
+  const fetchAll = useCallback(async (isInitial = false) => {
+    try {
+      const [expRes, polRes, sumRes, claimsRes] = await Promise.allSettled([
+        api.getPartnerExperienceState().catch(() => null),
+        api.getActivePolicy().catch(() => null),
+        api.getClaimsSummary().catch(() => null),
+        api.getClaims({ limit: 5 }).catch(() => ({ claims: [] })),
+      ]);
+
+      if (expRes.status === 'fulfilled' && expRes.value) {
+        const exp = expRes.value;
+        setExpState(exp);
+        const lp = exp.latest_payout;
+        if (lp?.status === 'paid' && lp.claim_id !== seenPayoutIdRef.current) {
+          seenPayoutIdRef.current = lp.claim_id;
+          setPayoutDismissed(false);
+        }
+        if (exp.zone_alert) resetActivityTimer();
+      }
+
+      if (polRes.status === 'fulfilled')    setPolicy(polRes.value);
+      if (sumRes.status === 'fulfilled')    setSummary(sumRes.value);
+      if (claimsRes.status === 'fulfilled') {
+        const raw = claimsRes.value;
+        // API may return {claims:[]} or a plain array
+        setRecentClaims(Array.isArray(raw) ? raw : (raw?.claims || []));
+      }
+
+      // Also load zone & active triggers if we have a zone_id
+      if (isInitial && user?.zone_id) {
+        const z  = await api.getZone(user.zone_id).catch(() => null);
+        const tr = await api.getActiveTriggers(user.zone_id).catch(() => ({ triggers: [] }));
+        setZone(z);
+        setTriggers(tr.triggers || []);
+      }
+
+      if (isInitial) setError(null);
+    } catch (err) {
+      if (isInitial) setError(err.message);
+    } finally {
+      if (isInitial) setLoading(false);
+    }
+  }, [user?.zone_id, resetActivityTimer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [pol, summ, claims] = await Promise.all([
-          api.getActivePolicy().catch(() => null),
-          api.getClaimsSummary(),
-          api.getClaims(1, 3).catch(() => ({ claims: [] })),
-        ]);
-        setPolicy(pol); setSummary(summ); setRecentClaims(claims.claims || []);
-        if (user?.zone_id) {
-          const z = await api.getZone(user.zone_id).catch(() => null);
-          const tr = await api.getActiveTriggers(user.zone_id).catch(() => ({ triggers: [] }));
-          setZone(z); setTriggers(tr.triggers || []);
-        }
-      } catch (e) { console.error(e); } finally { setLoading(false); }
+    fetchAll(true);
+    resetActivityTimer();
+    return () => {
+      if (pollRef.current)    clearInterval(pollRef.current);
+      if (activityRef.current) clearTimeout(activityRef.current);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (pollingActive) {
+      pollRef.current = setInterval(() => fetchAll(false), POLL_INTERVAL_MS);
     }
-    load();
-  }, [user?.zone_id]);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [pollingActive, fetchAll]);
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}>
-      <div style={{ width: 32, height: 32, border: '3px solid var(--green-light)', borderTopColor: 'var(--green-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  );
+  /* ── derived ── */
+  const zoneAlert       = expState?.zone_alert       ?? null;
+  const zoneReassignment = expState?.zone_reassignment ?? null;
+  const loyalty         = expState?.loyalty          ?? null;
+  const premiumBreakdown = expState?.premium_breakdown ?? null;
+  const latestPayout    = expState?.latest_payout    ?? null;
 
-  const BASES = { flex: 22, standard: 33, pro: 45 };
-  const daysLeft = policy ? Math.ceil((new Date(policy.expires_at) - new Date()) / 864e5) : 0;
+  const daysLeft  = policy ? Math.ceil((new Date(policy.expires_at) - new Date()) / 864e5) : 0;
   const tierClass = { flex: 'flex-tier', standard: 'standard-tier', pro: 'pro-tier' }[policy?.tier] || 'no-policy';
 
-  const TRIGGER_INFO = {
-    rain: { icon: '🌧️', label: 'Heavy Rain', color: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
-    heat: { icon: '🌡️', label: 'Extreme Heat', color: '#fef2f2', border: '#fecaca', text: '#991b1b' },
-    aqi: { icon: '💨', label: 'Dangerous AQI', color: '#fffbeb', border: '#fde68a', text: '#92400e' },
-    shutdown: { icon: '🚫', label: 'Civic Shutdown', color: '#faf5ff', border: '#e9d5ff', text: '#6b21a8' },
-    closure: { icon: '🏪', label: 'Store Closure', color: '#f9fafb', border: '#e5e7eb', text: '#374151' },
-  };
-  const STATUS_CLS = { paid: 'st-paid', pending: 'st-pending', approved: 'st-approved', rejected: 'st-rejected' };
-  const COV_EVENTS = [
-    { icon: '🌧️', label: 'Heavy Rain & Floods' },
-    { icon: '🌡️', label: 'Extreme Heat (>43°C)' },
-    { icon: '💨', label: 'Dangerous AQI (>400)' },
-    { icon: '🚫', label: 'Curfew & Bandh' },
-    { icon: '🏪', label: 'Dark Store Closures' },
-  ];
+  /* ── loading state ── */
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}>
+      <div style={{
+        width: 32, height: 32,
+        border: '3px solid var(--green-light)',
+        borderTopColor: 'var(--green-primary)',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+      }} />
+    </div>
+  );
 
   return (
     <>
@@ -440,60 +623,77 @@ export function Dashboard() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h1 style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 900, fontSize: 22, color: 'var(--text-dark)' }}>
-              Hello, {user?.name?.split(' ')[0]} 👋
+              Hello, {user?.name?.split(' ')[0] || 'Partner'} 👋
             </h1>
             <p style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 2 }}>
               {zone ? `${zone.name} (${zone.code})` : 'Set your zone in profile'}
             </p>
           </div>
-          {policy && (
-            <span style={{
-              display: 'flex', alignItems: 'center', gap: 6, background: 'var(--green-light)',
-              border: '1px solid #bbf7d0', color: 'var(--green-dark)', fontSize: 11,
-              fontWeight: 700, padding: '5px 12px', borderRadius: 20,
-            }}>
-              <span style={{ width: 6, height: 6, background: 'var(--green-primary)', borderRadius: '50%', animation: 'pulse 1.5s infinite' }} />
-              Covered
-            </span>
-          )}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            {policy && (
+              <span style={{
+                display: 'flex', alignItems: 'center', gap: 6, background: 'var(--green-light)',
+                border: '1px solid #bbf7d0', color: 'var(--green-dark)', fontSize: 11,
+                fontWeight: 700, padding: '5px 12px', borderRadius: 20,
+              }}>
+                <span style={{ width: 6, height: 6, background: 'var(--green-primary)', borderRadius: '50%', animation: 'pulse 1.5s infinite' }} />
+                Covered
+              </span>
+            )}
+            {pollingActive && (
+              <span style={{ fontSize: 10, color: 'var(--text-light)' }}>🔄 Live</span>
+            )}
+          </div>
         </div>
 
-        {/* ── Zone Reassignment ── */}
-        {showZoneCard && (
+        {/* ── 1. Payout Banner – always top, only when paid ── */}
+        {!payoutDismissed && (
+          <PayoutBanner payout={latestPayout} onDismiss={() => setPayoutDismissed(true)} />
+        )}
+
+        {/* ── 2. Zone Alert – only when backend sends one ── */}
+        <ZoneAlertCard alert={zoneAlert} />
+
+        {/* ── 3. Zone Reassignment – only when backend sends one ── */}
+        {!reassignDismissed && (
           <ZoneReassignmentCard
-            notification={zoneReassignment}
-            onAccept={() => setShowZoneCard(false)}
-            onDismiss={() => setShowZoneCard(false)}
+            card={zoneReassignment}
+            onAccept={() => setReassignDismissed(true)}
+            onDismiss={() => setReassignDismissed(true)}
           />
         )}
 
-        {/* ── 48h Weather Alert ── */}
-        <WeatherAlertCard alert={weatherAlert} />
-
-        {/* ── Active Triggers ── */}
+        {/* ── 4. Active Triggers ── */}
         {triggers.length > 0 && (
           <div className="alert-card alert-red">
             <span style={{ fontSize: 22 }}>⚠️</span>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <span className="alert-title">Active Disruptions in Your Zone</span>
-                <span style={{ marginLeft: 8, background: '#ef4444', color: 'white', fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 10 }}>{triggers.length}</span>
+                <span style={{ marginLeft: 8, background: '#ef4444', color: 'white', fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 10 }}>
+                  {triggers.length}
+                </span>
               </div>
               {triggers.map(t => {
                 const info = TRIGGER_INFO[t.trigger_type] || { icon: '⚠️', label: t.trigger_type, color: '#f9fafb', border: '#e5e7eb', text: '#374151' };
                 return (
-                  <div key={t.id} className="trigger-chip" style={{ background: info.color, borderColor: info.border, color: info.text, marginTop: 8 }}>
+                  <div key={t.id} className="trigger-chip"
+                    style={{ background: info.color, borderColor: info.border, color: info.text, marginTop: 8 }}>
                     <span>{info.icon} <strong>{info.label}</strong></span>
                     <span style={{ fontSize: 11, fontWeight: 700 }}>Severity {t.severity}/5</span>
                   </div>
                 );
               })}
-              {policy && <p style={{ fontSize: 12, color: '#dc2626', marginTop: 6, fontWeight: 600 }}>✅ You're covered! Claims will be auto-processed.</p>}
+              {policy && (
+                <p style={{ fontSize: 12, color: '#dc2626', marginTop: 6, fontWeight: 600 }}>
+                  ✅ You're covered! Claims will be auto-processed.
+                </p>
+              )}
             </div>
           </div>
         )}
 
-        {/* ── Coverage Hero Card ── */}
+        {/* ── 5. Coverage Hero Card ── */}
         {policy ? (
           <div className={`policy-hero ${tierClass}`}>
             <p className="policy-hero-label">Active Policy</p>
@@ -536,13 +736,13 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* ── Streak Counter ── */}
-        <StreakProgressBar streakWeeks={streakWeeks} />
+        {/* ── 6. Loyalty Streak ── */}
+        <StreakProgressBar loyalty={loyalty} />
 
-        {/* ── Weekly Premium Breakdown ── */}
-        <WeeklyPremiumBreakdown policy={policy} />
+        {/* ── 7. Weekly Premium Breakdown ── */}
+        <WeeklyPremiumBreakdown breakdown={premiumBreakdown} policy={policy} />
 
-        {/* ── Earnings Summary ── */}
+        {/* ── 8. Earnings Summary ── */}
         <div>
           <p className="rc-section-title">Earnings</p>
           <div className="earn-grid">
@@ -559,7 +759,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* ── Recent Claims ── */}
+        {/* ── 9. Recent Claims ── */}
         {recentClaims.length > 0 && (
           <div className="rc-card">
             <div className="rc-card-body">
@@ -575,7 +775,9 @@ export function Dashboard() {
                       <span style={{ fontSize: 24 }}>{info.icon}</span>
                       <div>
                         <p className="claim-label">{info.label}</p>
-                        <p className="claim-date">{new Date(claim.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+                        <p className="claim-date">
+                          {new Date(claim.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </p>
                       </div>
                     </div>
                     <div>
@@ -589,7 +791,7 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* ── Quick Actions ── */}
+        {/* ── 10. Quick Actions ── */}
         <div>
           <p className="rc-section-title">Quick Actions</p>
           <div className="qa-grid">
@@ -604,7 +806,7 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* ── Coverage events ── */}
+        {/* ── 11. Coverage events ── */}
         <div className="rc-card">
           <div className="rc-card-body">
             <p className="rc-section-title">You're covered for:</p>
@@ -617,7 +819,16 @@ export function Dashboard() {
           </div>
         </div>
 
+        {/* Error state */}
+        {error && (
+          <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 16, padding: '14px 16px', color: '#dc2626', fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+
       </div>
     </>
   );
 }
+
+export default Dashboard;

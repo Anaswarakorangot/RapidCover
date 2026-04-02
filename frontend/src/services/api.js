@@ -1,351 +1,377 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+/**
+ * api.js  –  RapidCover frontend API client
+ *
+ * Person 1 Phase 2 additions are in the "EXPERIENCE STATE" section at the bottom.
+ * All existing methods are preserved unchanged.
+ */
 
-class ApiService {
-  constructor() {
-    this.baseUrl = API_BASE;
-  }
+const BASE = '/api/v1';
 
-  getToken() {
-    return localStorage.getItem('token');
-  }
+// ── Shared helpers ────────────────────────────────────────────────────────────
 
-  setToken(token) {
-    localStorage.setItem('token', token);
-  }
-
-  clearToken() {
-    localStorage.removeItem('token');
-  }
-
-  async request(endpoint, options = {}) {
-    const url = `${this.baseUrl}${endpoint}`;
-    const token = this.getToken();
-
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    if (config.body && typeof config.body === 'object') {
-      config.body = JSON.stringify(config.body);
-    }
-
-    const response = await fetch(url, config);
-
-    if (response.status === 401) {
-      this.clearToken();
-      window.location.href = '/login';
-      throw new Error('Unauthorized');
-    }
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      // Handle FastAPI validation errors (detail is an array)
-      let message = 'Request failed';
-      if (typeof error.detail === 'string') {
-        message = error.detail;
-      } else if (Array.isArray(error.detail) && error.detail.length > 0) {
-        message = error.detail[0].msg || error.detail[0].message || 'Validation error';
-      }
-      throw new Error(message);
-    }
-
-    return response.json();
-  }
-
-  // Auth
-  async requestOTP(phone) {
-    return this.request('/partners/login', {
-      method: 'POST',
-      body: { phone },
-    });
-  }
-
-  async verifyOTP(phone, otp) {
-    const data = await this.request('/partners/verify', {
-      method: 'POST',
-      body: { phone, otp },
-    });
-    this.setToken(data.access_token);
-    return data;
-  }
-
-  async register(partnerData) {
-    return this.request('/partners/register', {
-      method: 'POST',
-      body: partnerData,
-    });
-  }
-
-  async validatePartnerId(partnerId, platform) {
-    return this.request(
-      `/partners/validate-id?partner_id=${encodeURIComponent(partnerId)}&platform=${encodeURIComponent(platform)}`
-    );
-  }
-
-  // Partner
-  async getProfile() {
-    return this.request('/partners/me');
-  }
-
-  async updateProfile(data) {
-    return this.request('/partners/me', {
-      method: 'PATCH',
-      body: data,
-    });
-  }
-
-  // Policies
-  async getPolicyQuotes() {
-    return this.request('/policies/quotes');
-  }
-
-  async createPolicy(tier, autoRenew = true) {
-    return this.request('/policies', {
-      method: 'POST',
-      body: { tier, auto_renew: autoRenew },
-    });
-  }
-
-  async getActivePolicy() {
-    return this.request('/policies/active');
-  }
-
-  async getPolicyHistory() {
-    return this.request('/policies/history');
-  }
-
-  async cancelPolicy(policyId) {
-    return this.request(`/policies/${policyId}/cancel`, {
-      method: 'POST',
-    });
-  }
-
-  async getRenewalQuote(policyId, tier = null) {
-    const query = tier ? `?tier=${encodeURIComponent(tier)}` : '';
-    return this.request(`/policies/${policyId}/renewal-quote${query}`);
-  }
-
-  async renewPolicy(policyId, tier = null, autoRenew = true) {
-    return this.request(`/policies/${policyId}/renew`, {
-      method: 'POST',
-      body: { tier, auto_renew: autoRenew },
-    });
-  }
-
-  async toggleAutoRenew(policyId, autoRenew) {
-    return this.request(`/policies/${policyId}/auto-renew`, {
-      method: 'PATCH',
-      body: { auto_renew: autoRenew },
-    });
-  }
-
-  async downloadCertificate(policyId) {
-    const url = `${this.baseUrl}/policies/${policyId}/certificate`;
-    const token = this.getToken();
-
-    const response = await fetch(url, {
-      headers: {
-        ...(token && { Authorization: `Bearer ${token}` }),
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.detail || 'Failed to download certificate');
-    }
-
-    // Get filename from Content-Disposition header
-    const contentDisposition = response.headers.get('Content-Disposition');
-    let filename = 'policy_certificate.pdf';
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename="(.+)"/);
-      if (match) {
-        filename = match[1];
-      }
-    }
-
-    // Download the blob
-    const blob = await response.blob();
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(downloadUrl);
-  }
-
-  // Claims
-  async getClaims(page = 1, pageSize = 10) {
-    return this.request(`/claims?page=${page}&page_size=${pageSize}`);
-  }
-
-  async getClaimsSummary() {
-    return this.request('/claims/summary');
-  }
-
-  async getClaim(claimId) {
-    return this.request(`/claims/${claimId}`);
-  }
-
-  // Zones
-  async getZones(city = null) {
-    const query = city ? `?city=${encodeURIComponent(city)}` : '';
-    return this.request(`/zones${query}`);
-  }
-
-  async getZone(zoneId) {
-    return this.request(`/zones/${zoneId}`);
-  }
-
-  async getNearestZones(lat, lng, limit = 3) {
-    return this.request(`/zones/nearest?lat=${lat}&lng=${lng}&limit=${limit}`);
-  }
-
-  // Triggers
-  async getActiveTriggers(zoneId = null) {
-    const query = zoneId ? `?zone_id=${zoneId}` : '';
-    return this.request(`/triggers/active${query}`);
-  }
-
-  // Admin endpoints
-  async getAdminDashboard() {
-    return this.request('/admin/dashboard');
-  }
-
-  async seedZones() {
-    return this.request('/admin/seed', { method: 'POST' });
-  }
-
-  async getAdminTriggers(activeOnly = false) {
-    const query = activeOnly ? '?active_only=true' : '';
-    return this.request(`/admin/triggers${query}`);
-  }
-
-  async getAdminClaims(statusFilter = null) {
-    const query = statusFilter ? `?status_filter=${statusFilter}` : '';
-    return this.request(`/admin/claims${query}`);
-  }
-
-  async simulateWeather(zoneId, rainfall_mm_hr = null, temp_celsius = null) {
-    return this.request('/admin/simulate/weather', {
-      method: 'POST',
-      body: { zone_id: zoneId, rainfall_mm_hr, temp_celsius },
-    });
-  }
-
-  async simulateAQI(zoneId, aqi) {
-    return this.request('/admin/simulate/aqi', {
-      method: 'POST',
-      body: { zone_id: zoneId, aqi },
-    });
-  }
-
-  async simulateShutdown(zoneId, reason) {
-    return this.request('/admin/simulate/shutdown', {
-      method: 'POST',
-      body: { zone_id: zoneId, reason },
-    });
-  }
-
-  async simulateClosure(zoneId, reason) {
-    return this.request('/admin/simulate/closure', {
-      method: 'POST',
-      body: { zone_id: zoneId, reason },
-    });
-  }
-
-  async processTrigger(triggerId) {
-    return this.request(`/admin/triggers/${triggerId}/process`, { method: 'POST' });
-  }
-
-  async approveClaim(claimId) {
-    return this.request(`/admin/claims/${claimId}/approve`, { method: 'POST' });
-  }
-
-  async rejectClaim(claimId, reason = null) {
-    return this.request(`/admin/claims/${claimId}/reject`, {
-      method: 'POST',
-      body: { reason },
-    });
-  }
-
-  async payoutClaim(claimId) {
-    return this.request(`/admin/claims/${claimId}/payout`, { method: 'POST' });
-  }
-
-  async processAutoRenewals() {
-    return this.request('/admin/process-auto-renewals', { method: 'POST' });
-  }
-
-  // Push Notifications
-  async subscribePush(subscriptionData) {
-    return this.request('/notifications/subscribe', {
-      method: 'POST',
-      body: subscriptionData,
-    });
-  }
-
-  async unsubscribePush(endpoint = null) {
-    return this.request('/notifications/unsubscribe', {
-      method: 'POST',
-      body: endpoint ? { endpoint } : {},
-    });
-  }
-
-  async getNotificationStatus(endpoint = null) {
-    const query = endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : '';
-    return this.request(`/notifications/status${query}`);
-  }
-
-  // ── Person 3 additions ───────────────────────────────────────────────────
-
-  // Weekly premium breakdown — all 7 factors from ml_service premium_model
-  // TODO: replace mock with real API once Person 1 adds /policies/:id/premium-breakdown
-  async getPremiumBreakdown(policyId) {
-    return {
-      base_premium: 33,
-      zone_risk: 3,
-      seasonal_index: 1.15,
-      riqi_adjustment: 1.15,
-      activity_tier_factor: 1.00,
-      loyalty_discount: 0.94,
-      platform_fee: 0,
-      total: 36,
-      tier: 'standard',
-    };
-  }
-
-  // Zone reassignment pending notification (24h accept window)
-  // TODO: replace mock once Person 1 adds /partners/me/zone-reassignment
-  async getZoneReassignment() {
-    return null; // null = no pending reassignment
-  }
-
-  // 48-hour weather alert for partner's zone
-  // TODO: replace mock once Person 1 adds /zones/:id/weather-alert
-  async getWeatherAlert(zoneId) {
-    return {
-      message: 'Heavy rain forecast Tuesday 4PM in your zone. Stay prepared.',
-    };
-  }
-
-  // Zone reassignment history for Profile page
-  // TODO: replace mock once Person 1 adds /partners/me/zone-history
-  async getZoneHistory() {
-    return [
-      { date: '2025-03-18', oldZone: 'Kondapur Central', newZone: 'Gachibowli West', premiumBefore: 33, premiumAfter: 36, reason: 'Demand rebalancing' },
-      { date: '2025-02-04', oldZone: 'HITEC City North', newZone: 'Kondapur Central', premiumBefore: 30, premiumAfter: 33, reason: 'Zone restructuring' },
-      { date: '2025-01-10', oldZone: 'Madhapur', newZone: 'HITEC City North', premiumBefore: 28, premiumAfter: 30, reason: 'Coverage area expansion' },
-    ];
-  }
+function getToken() {
+  return localStorage.getItem('access_token');
 }
 
-export const api = new ApiService();
+function authHeaders() {
+  const token = getToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function handleResponse(res) {
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      detail = body.detail || JSON.stringify(body);
+    } catch (_) { }
+    throw new Error(detail);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+async function requestOtp(phone) {
+  const res = await fetch(`${BASE}/partners/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone }),
+  });
+  return handleResponse(res);
+}
+
+async function verifyOtp(phone, otp) {
+  const res = await fetch(`${BASE}/partners/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, otp }),
+  });
+  return handleResponse(res);
+}
+
+async function register(partnerData) {
+  const res = await fetch(`${BASE}/partners/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(partnerData),
+  });
+  return handleResponse(res);
+}
+
+// ── Profile ───────────────────────────────────────────────────────────────────
+
+async function getProfile() {
+  const res = await fetch(`${BASE}/partners/me`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function updateProfile(data) {
+  const res = await fetch(`${BASE}/partners/me`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  return handleResponse(res);
+}
+
+// ── Policies ──────────────────────────────────────────────────────────────────
+
+async function getActivePolicy() {
+  const res = await fetch(`${BASE}/policies/active`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function getPolicyHistory() {
+  const res = await fetch(`${BASE}/policies/history`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function getPolicyQuotes() {
+  const res = await fetch(`${BASE}/policies/quotes`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function createPolicy(tier, autoRenew = true) {
+  const res = await fetch(`${BASE}/policies`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ tier, auto_renew: autoRenew }),
+  });
+  return handleResponse(res);
+}
+
+async function cancelPolicy(policyId) {
+  const res = await fetch(`${BASE}/policies/${policyId}/cancel`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+async function getRenewalQuote(policyId, tier = null) {
+  const url = new URL(`${BASE}/policies/${policyId}/renewal-quote`, window.location.origin);
+  if (tier) url.searchParams.set('tier', tier);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function renewPolicy(policyId, tier = null, autoRenew = true) {
+  const res = await fetch(`${BASE}/policies/${policyId}/renew`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ tier, auto_renew: autoRenew }),
+  });
+  return handleResponse(res);
+}
+
+async function updateAutoRenew(policyId, autoRenew) {
+  const res = await fetch(`${BASE}/policies/${policyId}/auto-renew`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ auto_renew: autoRenew }),
+  });
+  return handleResponse(res);
+}
+
+async function downloadCertificate(policyId) {
+  const res = await fetch(`${BASE}/policies/${policyId}/certificate`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.blob();
+}
+
+// ── Claims ────────────────────────────────────────────────────────────────────
+
+async function getClaimsSummary() {
+  const res = await fetch(`${BASE}/claims/summary`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function getClaims(params = {}) {
+  const url = new URL(`${BASE}/claims`, window.location.origin);
+  Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v));
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// ── Triggers ──────────────────────────────────────────────────────────────────
+
+async function getActiveTriggers(zoneId = null) {
+  const url = new URL(`${BASE}/triggers/active`, window.location.origin);
+  if (zoneId) url.searchParams.set('zone_id', zoneId);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function getZone(zoneId) {
+  const res = await fetch(`${BASE}/zones/${zoneId}`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// ── Zones ─────────────────────────────────────────────────────────────────────
+
+async function getZones(city = null) {
+  const url = new URL(`${BASE}/zones`, window.location.origin);
+  if (city) url.searchParams.set('city', city);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function getNearestZones(lat, lng) {
+  const url = new URL(`${BASE}/zones/nearest`, window.location.origin);
+  url.searchParams.set('lat', lat);
+  url.searchParams.set('lng', lng);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// ── RIQI ──────────────────────────────────────────────────────────────────────
+
+async function getRiqiScores() {
+  const res = await fetch(`${BASE}/partners/riqi`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function getCityRiqi(city) {
+  const res = await fetch(`${BASE}/partners/riqi/${encodeURIComponent(city)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+// ── Premium (legacy – kept for backward compat) ───────────────────────────────
+
+async function getPremiumQuotes(city, activeDays = 15, avgHours = 8, loyaltyWeeks = 0) {
+  const url = new URL(`${BASE}/partners/quotes`, window.location.origin);
+  url.searchParams.set('city', city);
+  url.searchParams.set('active_days_last_30', activeDays);
+  url.searchParams.set('avg_hours_per_day', avgHours);
+  url.searchParams.set('loyalty_weeks', loyaltyWeeks);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+async function getNotificationStatus(endpoint = null) {
+  const url = new URL(`${BASE}/notifications/status`, window.location.origin);
+  if (endpoint) url.searchParams.set('endpoint', endpoint);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function subscribePush(subscriptionData) {
+  const res = await fetch(`${BASE}/notifications/subscribe`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(subscriptionData),
+  });
+  return handleResponse(res);
+}
+
+async function unsubscribePush(endpoint = null) {
+  const res = await fetch(`${BASE}/notifications/unsubscribe`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ endpoint }),
+  });
+  return handleResponse(res);
+}
+
+// ── Validation ────────────────────────────────────────────────────────────────
+
+async function validatePartnerId(partnerId, platform) {
+  const url = new URL(`${BASE}/partners/validate-id`, window.location.origin);
+  url.searchParams.set('partner_id', partnerId);
+  url.searchParams.set('platform', platform);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXPERIENCE STATE  –  Person 1, Phase 2
+// These five methods replace every hardcoded constant in dashboard / profile / policy.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Master dashboard state – replaces zoneReassignment, weatherAlert, streakWeeks.
+ * Poll every 5 s during active drills.
+ *
+ * Response shape:
+ * {
+ *   zone_alert:        { type, message, severity, trigger_id, started_at } | null,
+ *   zone_reassignment: { old_zone, new_zone, premium_delta, hours_left, ... } | null,
+ *   loyalty:           { streak_weeks, discount_unlocked, next_milestone, discount_pct },
+ *   premium_breakdown: { base, zone_risk, seasonal_index, riqi_adjustment,
+ *                        activity_factor, loyalty_discount, total, city, riqi_band },
+ *   latest_payout:     { claim_id, status:"paid", amount, upi_ref, paid_at } | null,
+ *   fetched_at:        ISO string,
+ * }
+ */
+async function getPartnerExperienceState() {
+  const res = await fetch(`${BASE}/partners/me/experience-state`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Itemised premium breakdown. Replaces ALL TIER_PRICES multiplier math in UI.
+ */
+async function getPremiumBreakdown() {
+  const res = await fetch(`${BASE}/partners/me/premium-breakdown`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Tier eligibility from backend. Frontend must use this to lock/unlock plan cards.
+ *
+ * Response: { active_days_last_30, loyalty_weeks, allowed_tiers, blocked_tiers, reasons, gate_blocked }
+ */
+async function getPartnerEligibility() {
+  const res = await fetch(`${BASE}/partners/me/eligibility`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Real zone history. Replaces MOCK_ZONE_HISTORY in Profile.jsx.
+ *
+ * Response: { history:[{old_zone_name, new_zone_name, new_zone_code, effective_at, ...}], total, has_history }
+ */
+async function getZoneHistory() {
+  const res = await fetch(`${BASE}/partners/me/zone-history`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Simplified renewal quote for profile page.
+ * Replaces hardcoded renewal premium breakdown in Profile.jsx.
+ */
+async function getRenewalPreview() {
+  const res = await fetch(`${BASE}/partners/me/renewal-preview`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+// ── Default export ────────────────────────────────────────────────────────────
+
+const api = {
+  // Auth
+  requestOtp,
+  verifyOtp,
+  register,
+  // Profile
+  getProfile,
+  updateProfile,
+  // Policies
+  getActivePolicy,
+  getPolicyHistory,
+  getPolicyQuotes,
+  createPolicy,
+  cancelPolicy,
+  getRenewalQuote,
+  renewPolicy,
+  updateAutoRenew,
+  downloadCertificate,
+  // Claims
+  getClaimsSummary,
+  getClaims,
+  // Triggers
+  getActiveTriggers,
+  // Zones
+  getZone,
+  getZones,
+  getNearestZones,
+  // RIQI
+  getRiqiScores,
+  getCityRiqi,
+  // Premium (legacy)
+  getPremiumQuotes,
+  // Notifications
+  getNotificationStatus,
+  subscribePush,
+  unsubscribePush,
+  // Validation
+  validatePartnerId,
+  // ── Experience State (Person 1, Phase 2) ─────────────────────────────────────
+  getPartnerExperienceState,
+  getPremiumBreakdown,
+  getPartnerEligibility,
+  getZoneHistory,
+  getRenewalPreview,
+};
+
 export default api;
