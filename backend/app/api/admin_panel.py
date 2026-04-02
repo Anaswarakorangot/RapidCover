@@ -514,6 +514,26 @@ async def simulate_trigger(req: SimulateTriggerRequest):
     # Actually fire the trigger engine in force mode
     try:
         from app.services.trigger_engine import check_all_triggers
+        from app.database import SessionLocal
+        from app.models.zone import Zone
+        from app.services.external_apis import (
+            MockWeatherAPI, MockAQIAPI, MockPlatformAPI, MockCivicAPI
+        )
+        db = SessionLocal()
+        zone = db.query(Zone).filter(Zone.code == zone_code).first()
+        if zone:
+            if trigger_type == "rain":
+                MockWeatherAPI.set_conditions(zone.id, rainfall_mm_hr=72.0)
+            elif trigger_type == "heat":
+                MockWeatherAPI.set_conditions(zone.id, temp_celsius=45.0)
+            elif trigger_type == "aqi":
+                MockAQIAPI.set_conditions(zone.id, aqi=420)
+            elif trigger_type == "shutdown":
+                MockCivicAPI.set_shutdown(zone.id, reason="Admin simulation")
+            elif trigger_type == "closure":
+                MockPlatformAPI.set_store_closed(zone.id, reason="Admin simulation")
+        db.close()
+        
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             None,
