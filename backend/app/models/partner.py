@@ -33,6 +33,14 @@ class Partner(Base):
     zone_id = Column(Integer, ForeignKey("zones.id"), nullable=True)
     language_pref = Column(Enum(Language), default=Language.ENGLISH)
     is_active = Column(Boolean, default=True)
+    # Shift preferences
+    shift_days = Column(JSON, nullable=True, default=lambda: [])      # e.g. ["mon","tue","wed","thu","fri"]
+    shift_start = Column(String(10), nullable=True)                    # e.g. "09:00"
+    shift_end = Column(String(10), nullable=True)                      # e.g. "18:00"
+
+    # Zone history (list of {zone_id, from_date, to_date})
+    zone_history = Column(JSON, nullable=True, default=lambda: [])
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

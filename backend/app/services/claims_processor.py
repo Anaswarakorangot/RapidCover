@@ -33,11 +33,11 @@ from app.config import get_settings
 
 # Payout configuration
 HOURLY_PAYOUT_RATES = {
-    TriggerType.RAIN: 50,      # ₹50/hour
-    TriggerType.HEAT: 40,      # ₹40/hour
-    TriggerType.AQI: 45,       # ₹45/hour
-    TriggerType.SHUTDOWN: 60,  # ₹60/hour (civic shutdowns are more impactful)
-    TriggerType.CLOSURE: 55,   # ₹55/hour
+    TriggerType.RAIN: 50,      # Rs.50/hour
+    TriggerType.HEAT: 40,      # Rs.40/hour
+    TriggerType.AQI: 45,       # Rs.45/hour
+    TriggerType.SHUTDOWN: 60,  # Rs.60/hour (civic shutdowns are more impactful)
+    TriggerType.CLOSURE: 55,   # Rs.55/hour
 }
 
 # Minimum disruption hours for payout

@@ -13,6 +13,10 @@ class PartnerCreate(BaseModel):
     language_pref: Language = Language.ENGLISH
     upi_id: Optional[str] = None
     kyc:    Optional[KYCSchema] = None
+    shift_days: Optional[list] = None        # e.g. ["mon","tue","wed"]
+    shift_start: Optional[str] = None        # e.g. "09:00"
+    shift_end: Optional[str] = None          # e.g. "18:00"
+    zone_history: Optional[list] = None      # e.g. [{"zone_id": 1, "from": "2026-01"}]
     @validator("upi_id")
     def validate_upi(cls, v):
         if v is None:
@@ -48,6 +52,10 @@ class PartnerResponse(BaseModel):
     created_at: datetime
     upi_id: Optional[str] = None
     kyc:    Optional[KYCSchema] = None
+    shift_days: Optional[list] = None
+    shift_start: Optional[str] = None
+    shift_end: Optional[str] = None
+    zone_history: Optional[list] = None
     model_config = {"from_attributes": True}
 
 
@@ -57,3 +65,7 @@ class PartnerUpdate(BaseModel):
     language_pref: Optional[Language] = None
     upi_id: Optional[str] = None
     kyc:    Optional[KYCSchema] = None
+    shift_days: Optional[list] = None
+    shift_start: Optional[str] = None
+    shift_end: Optional[str] = None
+    zone_history: Optional[list] = None

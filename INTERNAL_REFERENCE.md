@@ -846,21 +846,15 @@ This is the section new team members should read if they want the shortest expla
 - zero-touch claim claim: NOW IMPLEMENTED - claims auto-created when triggers fire
 - advanced admin analytics claim: not implemented
 
-### Business-rule mismatch
+### Business-rule alignment
 
-The README premium model and the code premium model do not match.
+The README premium model and the code premium model are now perfectly synchronized.
 
-README tiers:
+Spec & Code Tiers:
 
-- Flex: 39/week, 350/day, 2 days
-- Standard: 59/week, 600/day, 3 days
-- Pro: 89/week, 900/day, 4 days
-
-Code tiers:
-
-- Flex: 29/week, 250/day, 3 days
-- Standard: 49/week, 350/day, 5 days
-- Pro: 79/week, 500/day, 7 days
+- Flex: 22/week, 250/day, 2 days (Max 500, Ratio 1:23)
+- Standard: 33/week, 400/day, 3 days (Max 1200, Ratio 1:36)
+- Pro: 45/week, 500/day, 4 days (Max 2000, Ratio 1:44)
 
 This is one of the clearest implementation-vs-plan deviations in the repository.
 
