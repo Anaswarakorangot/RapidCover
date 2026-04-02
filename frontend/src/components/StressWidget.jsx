@@ -1,6 +1,4 @@
-// frontend/src/components/StressWidget.jsx
-// Hardcoded stress scenario table — all 6 actuarial scenarios from Section 4 of team guide
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 const SCENARIOS = [
     {
@@ -41,7 +39,7 @@ const SCENARIOS = [
         cities: 'CHN + BOM',
         partners: 6000,
         payout: '₹90L',
-        payoutRaw: 0000,
+        payoutRaw: 9000000,
         poolPct: '~320%',
         mode: 'Reinsurance activation on Day 1 (Loss Ratio immediately exceeds 100%). City payout capped at 120% of weekly pool.',
         badge: 'catastrophic',
@@ -86,15 +84,15 @@ const SCENARIOS = [
         partners: 50,
         payout: '₹0',
         payoutRaw: 0,
-        poolPct: '8% (if missed)',
+        poolPct: '8%',
         mode: 'Auto-reject + Fraud queue. Expected: 35–40 accounts auto-rejected (score >0.90), 10–15 to manual queue (0.75–0.90).',
         badge: 'fraud',
         detail: {
             signals: [
-                'device_fingerprint_match (w5) — shared/emulated devices',
-                'centroid_drift_score (w7) — no 30-day GPS history',
-                'claim_frequency_score (w4) — newly registered accounts spike',
-                'gps_coherence (w1) — fails for GPS-spoofed accounts',
+                'device_fingerprint_match (w5)',
+                'centroid_drift_score (w7)',
+                'claim_frequency_score (w4)',
+                'gps_coherence (w1)',
             ],
             note: 'Admin fraud queue shows cluster pattern — all 50 claims from same event, same zone, same device profile. Bulk-reject available.',
         },
@@ -102,11 +100,11 @@ const SCENARIOS = [
 ];
 
 const BADGE_STYLES = {
-    reinsurance: { bg: '#fff3cd', color: '#856404', label: 'Reinsurance' },
-    catastrophic: { bg: '#f8d7da', color: '#842029', label: 'Catastrophic' },
-    proportional: { bg: '#cff4fc', color: '#0a6170', label: 'Proportional' },
-    normal: { bg: '#d1e7dd', color: '#0f5132', label: 'Normal' },
-    fraud: { bg: '#e2d9f3', color: '#432874', label: 'Fraud Blocked' },
+    reinsurance: { bg: '#fee2e2', color: 'var(--error)', label: 'Reinsurance' },
+    catastrophic: { bg: '#fef2f2', color: 'var(--error)', label: 'Catastrophic' },
+    proportional: { bg: '#fef9c3', color: 'var(--warning)', label: 'Proportional' },
+    normal: { bg: 'var(--green-light)', color: 'var(--green-primary)', label: 'Normal' },
+    fraud: { bg: '#f3e8ff', color: '#9333ea', label: 'Fraud Blocked' },
 };
 
 export default function StressWidget() {
@@ -118,29 +116,28 @@ export default function StressWidget() {
 
     return (
         <section className="stress-widget">
-            <div className="stress-widget__header">
+            <div className="stress-widget__header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                    <h2 className="stress-widget__title">⚡ Stress Scenarios</h2>
-                    <p className="stress-widget__subtitle">
+                    <h2 className="stress-widget__title" style={{ fontFamily: 'Nunito', fontWeight: 900, fontSize: '1.5rem', color: 'var(--text-dark)' }}>⚡ Stress Scenarios</h2>
+                    <p className="stress-widget__subtitle" style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '0.4rem' }}>
                         Actuarial stress test — 6 scenarios modelling extreme but plausible events
                     </p>
                 </div>
-                <span className="stress-widget__count">{SCENARIOS.length} scenarios</span>
+                <span className="stress-widget__count" style={{ fontSize: '0.75rem', fontWeight: 800, background: 'var(--gray-bg)', padding: '0.4rem 0.8rem', borderRadius: '10px', color: 'var(--text-mid)' }}>{SCENARIOS.length} scenarios</span>
             </div>
 
-            {/* Summary table */}
-            <div className="stress-table-wrapper">
-                <table className="stress-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Scenario</th>
-                            <th>Cities</th>
-                            <th className="stress-table__num">Partners</th>
-                            <th className="stress-table__num">Est. Payout</th>
-                            <th className="stress-table__num">% Weekly Pool</th>
-                            <th>System Mode</th>
-                            <th></th>
+            <div className="stress-table-wrapper" style={{ background: 'var(--white)', borderRadius: '24px', border: '1.5px solid var(--border)', overflow: 'hidden' }}>
+                <table className="stress-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead style={{ background: 'var(--gray-bg)', borderBottom: '1.5px solid var(--border)' }}>
+                        <tr style={{ textAlign: 'left' }}>
+                            <th style={{ padding: '1rem', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>ID</th>
+                            <th style={{ padding: '1rem', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>Scenario</th>
+                            <th style={{ padding: '1rem', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>Cities</th>
+                            <th style={{ padding: '1rem', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)', textAlign: 'right' }}>Partners</th>
+                            <th style={{ padding: '1rem', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)', textAlign: 'right' }}>Est. Payout</th>
+                            <th style={{ padding: '1rem', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)', textAlign: 'center' }}>Weekly Pool</th>
+                            <th style={{ padding: '1rem', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: 'var(--text-light)' }}>System Mode</th>
+                            <th style={{ padding: '1rem' }}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -148,134 +145,115 @@ export default function StressWidget() {
                             const badge = BADGE_STYLES[s.badge];
                             const isOpen = expanded === s.id;
                             return (
-                                <>
-                                    <tr key={s.id} className={`stress-table__row ${isOpen ? 'stress-table__row--open' : ''}`}>
-                                        <td><code className="stress-id">{s.id}</code></td>
-                                        <td className="stress-table__name">{s.name}</td>
-                                        <td className="stress-table__cities">{s.cities}</td>
-                                        <td className="stress-table__num">{s.partners.toLocaleString()}</td>
-                                        <td className="stress-table__num stress-table__payout">{s.payout}</td>
-                                        <td className="stress-table__num">
-                                            <span
-                                                className="stress-pool-badge"
-                                                style={{ background: badge.bg, color: badge.color }}
+                                <React.Fragment key={s.id}>
+                                    <tr 
+                                        style={{ borderBottom: '1px solid var(--border)', background: isOpen ? 'var(--gray-bg)' : 'transparent', transition: 'all 0.15s' }}
+                                    >
+                                        <td style={{ padding: '1rem' }}><code style={{ fontWeight: 800 }}>{s.id}</code></td>
+                                        <td style={{ padding: '1rem', fontWeight: 700, fontSize: '0.9rem' }}>{s.name}</td>
+                                        <td style={{ padding: '1rem', fontSize: '0.8rem', color: 'var(--text-mid)' }}>{s.cities}</td>
+                                        <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 700 }}>{s.partners.toLocaleString()}</td>
+                                        <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 900, color: 'var(--text-dark)' }}>{s.payout}</td>
+                                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                            <span 
+                                                style={{ fontSize: '0.65rem', fontWeight: 900, padding: '0.3rem 0.6rem', borderRadius: '8px', background: badge.bg, color: badge.color, border: `1px solid ${badge.color}25` }}
                                             >
                                                 {s.poolPct}
                                             </span>
                                         </td>
-                                        <td>
-                                            <span
-                                                className="stress-mode-badge"
-                                                style={{ background: badge.bg, color: badge.color }}
+                                        <td style={{ padding: '1rem' }}>
+                                            <span 
+                                                style={{ fontSize: '0.65rem', fontWeight: 900, padding: '0.3rem 0.6rem', borderRadius: '8px', background: 'var(--gray-bg)', color: 'var(--text-mid)', textTransform: 'uppercase' }}
                                             >
                                                 {badge.label}
                                             </span>
                                         </td>
-                                        <td>
-                                            <button
-                                                className="stress-expand-btn"
+                                        <td style={{ padding: '1rem' }}>
+                                            <button 
                                                 onClick={() => toggle(s.id)}
-                                                aria-label={isOpen ? 'Collapse' : 'Expand'}
+                                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-light)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none' }}
                                             >
-                                                {isOpen ? '▲' : '▼'}
+                                                ▼
                                             </button>
                                         </td>
                                     </tr>
                                     {isOpen && (
-                                        <tr key={`${s.id}-detail`} className="stress-detail-row">
-                                            <td colSpan={8}>
-                                                <div className="stress-detail">
-                                                    <p className="stress-detail__mode"><strong>System Response:</strong> {s.mode}</p>
+                                        <tr style={{ background: 'var(--gray-bg)' }}>
+                                            <td colSpan={8} style={{ padding: '0 1rem 1.5rem' }}>
+                                                <div style={{ background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: '18px', padding: '1.25rem' }}>
+                                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-dark)', lineHeight: 1.6, marginBottom: '1rem' }}>
+                                                        <strong style={{ fontFamily: 'Nunito', color: 'var(--green-primary)' }}>System Response:</strong> {s.mode}
+                                                    </p>
 
-                                                    {/* City breakdown for multi-city scenarios */}
                                                     {s.detail.blr && (
-                                                        <div className="stress-detail__cities">
-                                                            <div className="stress-detail__city">
-                                                                <span className="stress-detail__city-name">Bangalore</span>
-                                                                <span>{s.detail.blr.partners.toLocaleString()} partners</span>
-                                                                <span>{s.detail.blr.payout}</span>
-                                                                <code>{s.detail.blr.calc}</code>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                                            <div style={{ background: 'var(--gray-bg)', padding: '0.75rem', borderRadius: '12px' }}>
+                                                                <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-light)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Bangalore</span>
+                                                                <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{s.detail.blr.payout}</span>
+                                                                <code style={{ fontSize: '0.6rem', display: 'block', marginTop: '0.2rem', opacity: 0.7 }}>{s.detail.blr.calc}</code>
                                                             </div>
-                                                            <div className="stress-detail__city">
-                                                                <span className="stress-detail__city-name">Mumbai</span>
-                                                                <span>{s.detail.bom.partners.toLocaleString()} partners</span>
-                                                                <span>{s.detail.bom.payout}</span>
-                                                                <code>{s.detail.bom.calc}</code>
+                                                            <div style={{ background: 'var(--gray-bg)', padding: '0.75rem', borderRadius: '12px' }}>
+                                                                <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-light)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Mumbai</span>
+                                                                <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{s.detail.bom.payout}</span>
+                                                                <code style={{ fontSize: '0.6rem', display: 'block', marginTop: '0.2rem', opacity: 0.7 }}>{s.detail.bom.calc}</code>
                                                             </div>
                                                         </div>
                                                     )}
+
                                                     {s.detail.del && (
-                                                        <div className="stress-detail__cities">
-                                                            <div className="stress-detail__city">
-                                                                <span className="stress-detail__city-name">Delhi</span>
-                                                                <span>{s.detail.del.partners.toLocaleString()} partners</span>
-                                                                <span>{s.detail.del.payout}</span>
-                                                                <code>{s.detail.del.calc}</code>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                                                            <div style={{ background: 'var(--gray-bg)', padding: '0.75rem', borderRadius: '12px' }}>
+                                                                <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-light)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Delhi NCR</span>
+                                                                <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{s.detail.del.payout}</span>
                                                             </div>
-                                                            <div className="stress-detail__city">
-                                                                <span className="stress-detail__city-name">Noida + Gurugram</span>
-                                                                <span>{s.detail.noi.partners.toLocaleString()} partners</span>
-                                                                <span>{s.detail.noi.payout}</span>
-                                                                <code>{s.detail.noi.calc}</code>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {s.detail.chn && (
-                                                        <div className="stress-detail__cities">
-                                                            <div className="stress-detail__city">
-                                                                <span className="stress-detail__city-name">Chennai</span>
-                                                                <span>{s.detail.chn.partners.toLocaleString()} partners</span>
-                                                                <span>{s.detail.chn.payout}</span>
-                                                                <code>{s.detail.chn.calc}</code>
-                                                            </div>
-                                                            <div className="stress-detail__city">
-                                                                <span className="stress-detail__city-name">Mumbai</span>
-                                                                <span>{s.detail.bom.partners.toLocaleString()} partners</span>
-                                                                <span>{s.detail.bom.payout}</span>
-                                                                <code>{s.detail.bom.calc}</code>
+                                                            <div style={{ background: 'var(--gray-bg)', padding: '0.75rem', borderRadius: '12px' }}>
+                                                                <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-light)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Satellite</span>
+                                                                <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-dark)' }}>{s.detail.noi.payout}</span>
                                                             </div>
                                                         </div>
                                                     )}
 
-                                                    {/* Fraud signals list for S6 */}
                                                     {s.detail.signals && (
-                                                        <ul className="stress-detail__signals">
-                                                            {s.detail.signals.map((sig, i) => (
-                                                                <li key={i}>{sig}</li>
-                                                            ))}
-                                                        </ul>
+                                                        <div style={{ marginBottom: '1rem' }}>
+                                                            <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--text-light)', textTransform: 'uppercase', display: 'block', marginBottom: '0.4rem' }}>Fraud Signals</span>
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                                                {s.detail.signals.map((sig, i) => (
+                                                                    <span key={i} style={{ fontSize: '0.65rem', background: 'var(--gray-bg)', padding: '0.2rem 0.5rem', borderRadius: '6px', color: 'var(--text-mid)', fontWeight: 600 }}>{sig}</span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
                                                     )}
 
-                                                    <p className="stress-detail__note">{s.detail.note}</p>
+                                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-light)', padding: '0.75rem', background: 'var(--gray-bg)', borderRadius: '10px', marginTop: '0.5rem', borderLeft: '3px solid var(--border)' }}>
+                                                        {s.detail.note}
+                                                    </p>
                                                 </div>
                                             </td>
                                         </tr>
                                     )}
-                                </>
+                                </React.Fragment>
                             );
                         })}
                     </tbody>
                 </table>
             </div>
 
-            {/* Payout bar chart */}
-            <div className="stress-chart">
-                <p className="stress-chart__label">Estimated payout exposure per scenario</p>
-                <div className="stress-chart__bars">
+            <div style={{ marginTop: '2.5rem', background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: '24px', padding: '1.5rem 2rem' }}>
+                <p style={{ fontFamily: 'Nunito', fontWeight: 900, fontSize: '1rem', color: 'var(--text-dark)', marginBottom: '1.5rem' }}>Actuarial Payout Exposure</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     {SCENARIOS.map(s => {
                         const maxPayout = 10800000;
                         const pct = s.payoutRaw === 0 ? 2 : Math.round((s.payoutRaw / maxPayout) * 100);
                         const badge = BADGE_STYLES[s.badge];
                         return (
-                            <div key={s.id} className="stress-chart__bar-row">
-                                <span className="stress-chart__bar-id">{s.id}</span>
-                                <div className="stress-chart__bar-track">
+                            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <span style={{ width: 20, fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-light)' }}>{s.id}</span>
+                                <div style={{ flex: 1, height: 10, background: 'var(--gray-bg)', borderRadius: '5px', overflow: 'hidden' }}>
                                     <div
-                                        className="stress-chart__bar-fill"
-                                        style={{ width: `${pct}%`, background: badge.color }}
+                                        style={{ width: `${pct}%`, height: '100%', background: badge.color, borderRadius: '5px', transition: 'width 1s ease' }}
                                     />
                                 </div>
-                                <span className="stress-chart__bar-value">{s.payout}</span>
+                                <span style={{ width: 60, fontSize: '0.8rem', fontWeight: 900, color: 'var(--text-dark)', textAlign: 'right' }}>{s.payout}</span>
                             </div>
                         );
                     })}
