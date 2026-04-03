@@ -330,7 +330,7 @@ const ScooterIllustration = () => (
 );
 
 /* ─── Main component ───────────────────────────────────────── */
-export default function RapidCoverOnboarding({ onGetStarted }) {
+export default function RapidCoverOnboarding({ onGetStarted, onLogin }) {
   const [activeDot, setActiveDot] = useState(1);
 
   useEffect(() => {
@@ -398,6 +398,15 @@ export default function RapidCoverOnboarding({ onGetStarted }) {
           >
             Get Started
           </button>
+
+          {onLogin && (
+            <div 
+              style={{ textAlign: 'center', marginTop: 16, fontSize: 14.5, color: 'var(--green-dark)', fontWeight: 700, cursor: 'pointer', zIndex: 10, position: 'relative' }}
+              onClick={onLogin}
+            >
+              Already have an account? Log in
+            </div>
+          )}
 
           <div className="rc-slide-hint">
             <span className="label">Slide</span>
