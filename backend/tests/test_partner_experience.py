@@ -157,7 +157,7 @@ class TestExperienceState:
 
     def test_returns_null_safe_payload_no_policy_no_trigger(self, client, db):
         """Endpoint must return without error even when partner has no policy / trigger."""
-        zone    = make_zone(db, code="TST-100", phone_suffix="100")
+        zone    = make_zone(db, code="TST-100")
         partner = make_partner(db, zone_id=zone.id, phone="9000000100")
         res     = client.get(
             "/api/v1/partners/me/experience-state",
