@@ -104,7 +104,7 @@ def get_engine_status() -> dict:
 #  Main entry point — called by scheduler every 45 seconds
 # ═════════════════════════════════════════════════════════════════════════════
 
-def check_all_triggers(force: bool = False, zone_code: str = None):
+def check_all_triggers(force: bool = False, zone_code: str = None, prefer_mock: bool = False):
     """
     Poll all zones (or a specific zone) and check trigger conditions.
 
@@ -124,8 +124,9 @@ def check_all_triggers(force: bool = False, zone_code: str = None):
             return
 
         for zone in zones:
-            _run_forecast_alerts(zone, db)
-            _check_zone_triggers(zone, db, force=force)
+            if not prefer_mock:
+                _run_forecast_alerts(zone, db)
+            _check_zone_triggers(zone, db, force=force, prefer_mock=prefer_mock)
 
     except Exception as e:
         logger.error(f"[trigger_engine] Error in check_all_triggers: {e}")
@@ -160,15 +161,15 @@ def _get_active_zones(db: Session) -> list[Zone]:
     return db.query(Zone).filter(Zone.id.in_(zone_ids)).all()
 
 
-def _check_zone_triggers(zone: Zone, db: Session, force: bool = False):
+def _check_zone_triggers(zone: Zone, db: Session, force: bool = False, prefer_mock: bool = False):
     """Check all trigger types for a single zone."""
 
     lat = zone.dark_store_lat
     lon = zone.dark_store_lng
 
     # Fetch current conditions from all data sources
-    weather = MockWeatherAPI.get_current(zone.id, lat, lon)
-    aqi_data = MockAQIAPI.get_current(zone.id, lat, lon)
+    weather = MockWeatherAPI.get_current(zone.id, lat, lon, prefer_mock=prefer_mock)
+    aqi_data = MockAQIAPI.get_current(zone.id, lat, lon, prefer_mock=prefer_mock)
     platform = MockPlatformAPI.get_store_status(zone.id)
     shutdown = MockCivicAPI.get_shutdown_status(zone.id)
 
@@ -263,11 +264,16 @@ def _handle_event(
 
     if triggered:
         if key not in active_events:
-            # Event just started — begin the duration clock
-            active_events[key] = {"start": now, "details": details}
-            _add_log(zone.id, zone.code, event_type,
-                     f"Threshold breached — duration clock started. Details: {_summarize(details)}",
-                     "warning")
+            # Force mode (admin drills / demos): one poll must fire — do not wait for a
+            # second scheduler tick to satisfy duration (normal path below).
+            if force:
+                _fire_trigger(zone, event_type, 0.0, details, db, force)
+            else:
+                # Event just started — begin the duration clock
+                active_events[key] = {"start": now, "details": details}
+                _add_log(zone.id, zone.code, event_type,
+                         f"Threshold breached — duration clock started. Details: {_summarize(details)}",
+                         "warning")
 
         else:
             # Event ongoing — check if duration requirement met
@@ -383,8 +389,14 @@ def _fire_trigger(
     no_policy_count = all_partners_in_zone - len(eligible)
 
     # Auto-process claims for this trigger
+    # Forced immediate fire uses duration_min=0 so the de-minimis clock is bypassed, but
+    # payout math still needs a positive disruption window — otherwise hourly_rate * 0 = 0
+    # and every claim is skipped. Use default hours when force-fired at zero duration.
     try:
-        claims = process_trigger_event(trigger, db, disruption_hours=duration_min / 60.0)
+        disruption_hours = duration_min / 60.0
+        if force and disruption_hours <= 0:
+            disruption_hours = None
+        claims = process_trigger_event(trigger, db, disruption_hours=disruption_hours)
 
         # Build detailed payout summary for logs
         paid_count = len(claims)
