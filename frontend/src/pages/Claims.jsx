@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
+import ProofCard from '../components/ProofCard';
 
 const POLL_INTERVAL_MS = 5_000;
 const POLL_TIMEOUT_MS = 120_000;
@@ -135,40 +136,7 @@ function PayoutBanner({ claim, onDismiss }) {
   );
 }
 
-function ClaimCard({ claim }) {
-  const style = STATUS_STYLES[claim.status] || STATUS_STYLES.pending;
-  const date = claim.created_at
-    ? new Date(claim.created_at).toLocaleDateString('en-IN', {
-      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    }) : '—';
-  const paidDate = claim.paid_at
-    ? new Date(claim.paid_at).toLocaleDateString('en-IN', {
-      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-    }) : null;
-
-  return (
-    <div className="claims-card">
-      <div className="claim-row">
-        <div>
-          <p className="claim-amt">₹{claim.amount}</p>
-          <p className="claim-date">{date}</p>
-        </div>
-        <span className={`claim-badge ${style.class}`}>
-          {style.icon} {style.label}
-        </span>
-      </div>
-      {(claim.upi_ref || paidDate || claim.fraud_score > 0.5) && (
-        <div className="claim-footer">
-          {claim.upi_ref && <p className="claim-ref">UPI Ref: {claim.upi_ref}</p>}
-          {paidDate && <p className="claim-date">Paid on: {paidDate}</p>}
-          {claim.fraud_score != null && claim.fraud_score > 0.5 && (
-            <p className="claim-fraud">⚠️ Under review (score: {claim.fraud_score.toFixed(2)})</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+// Replaced local ClaimCard with B2 ProofCard.
 
 export default function Claims() {
   const [claims, setClaims] = useState([]);
@@ -297,9 +265,20 @@ export default function Claims() {
             <p className="empty-sub">Claims appear here when a trigger fires in your zone.</p>
           </div>
         ) : (
-          <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {claims.map(claim => (
-              <ClaimCard key={claim.id} claim={claim} />
+              <ProofCard
+                key={claim.id}
+                triggerType={claim.trigger_type}
+                severity={claim.severity}
+                status={claim.status}
+                amount={claim.amount}
+                upiRef={claim.upi_ref}
+                createdAt={claim.created_at}
+                paidAt={claim.paid_at}
+                fraudScore={claim.fraud_score}
+                claimId={claim.id}
+              />
             ))}
           </div>
         )}
