@@ -199,6 +199,86 @@ class TestDrillPresets:
         print("[PASS] Apply preset conditions")
 
 
+class TestDrillForcedPayoutRegression:
+    """
+    Forced admin drills call _fire_trigger with duration_min=0. Claim creation must pass
+    disruption_hours=None so calculate_payout_amount uses DEFAULT_DISRUPTION_HOURS;
+    passing 0.0 would zero out base_payout and create no claims.
+    """
+
+    def test_zero_disruption_hours_vs_none_for_payout(self):
+        from datetime import datetime, timedelta
+        from app.models.trigger_event import TriggerEvent, TriggerType
+        from app.models.policy import Policy, PolicyTier, PolicyStatus
+        from app.services.claims_processor import calculate_payout_amount
+
+        now = datetime.utcnow()
+        trigger = TriggerEvent(
+            zone_id=1,
+            trigger_type=TriggerType.RAIN,
+            severity=3,
+            started_at=now,
+            source_data="{}",
+        )
+        policy = Policy(
+            partner_id=1,
+            tier=PolicyTier.STANDARD,
+            weekly_premium=33.0,
+            max_daily_payout=400.0,
+            max_days_per_week=3,
+            starts_at=now - timedelta(days=1),
+            expires_at=now + timedelta(days=6),
+            is_active=True,
+            status=PolicyStatus.ACTIVE,
+        )
+
+        payout_zero, _ = calculate_payout_amount(trigger, policy, disruption_hours=0.0)
+        payout_default, _ = calculate_payout_amount(trigger, policy, disruption_hours=None)
+
+        assert payout_zero == 0.0
+        assert payout_default > 0.0
+
+    def test_drill_mock_conditions_override_live_sources(self, monkeypatch):
+        from app.services.external_apis import MockWeatherAPI
+
+        MockWeatherAPI.set_conditions(321, rainfall_mm_hr=72, humidity=95)
+
+        def fake_live(*args, **kwargs):
+            return type("LiveWeather", (), {
+                "zone_id": 321,
+                "temp_celsius": 28.0,
+                "rainfall_mm_hr": 3.0,
+                "humidity": 55.0,
+                "timestamp": None,
+                "source": "live",
+            })()
+
+        monkeypatch.setattr(MockWeatherAPI, "_fetch_live", staticmethod(fake_live))
+
+        live_first = MockWeatherAPI.get_current(321)
+        mock_first = MockWeatherAPI.get_current(321, prefer_mock=True)
+
+        assert live_first.source == "live"
+        assert live_first.rainfall_mm_hr == 3.0
+        assert mock_first.source == "mock"
+        assert mock_first.rainfall_mm_hr == 72
+
+
+class TestZonePoolShareRegression:
+    def test_zone_pool_share_with_zero_reserve_does_not_zero_payout(self):
+        from app.services.premium_service import calculate_zone_pool_share
+
+        res = calculate_zone_pool_share(
+            calculated_payout=100.0,
+            city_weekly_reserve=0.0,
+            zone_density_weight=0.15,
+            total_partners_in_event=3,
+        )
+
+        assert res["final_payout"] == 100.0
+        assert res["pool_cap_applied"] is False
+
+
 class TestDrillService:
     """Tests for drill service functions."""
 
