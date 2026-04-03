@@ -1,0 +1,1 @@
+// Tests moved to partner.test.jsx (JSX extension required for @vitejs/plugin-react transform)

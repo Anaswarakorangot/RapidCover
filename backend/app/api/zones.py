@@ -97,6 +97,177 @@ def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
 
 router = APIRouter(prefix="/zones", tags=["zones"])
 
+# =============================================================================
+# Zone Reassignment 24-Hour Workflow Endpoints
+# =============================================================================
+
+from app.schemas.zone_reassignment import (
+    ZoneReassignmentProposal,
+    ZoneReassignmentResponse as NewReassignmentResponse,
+    ZoneReassignmentListResponse,
+    ZoneReassignmentActionResponse,
+)
+from app.models.zone_reassignment import ReassignmentStatus
+
+
+@router.post("/reassignments/propose", response_model=NewReassignmentResponse)
+def propose_zone_reassignment(
+    proposal: ZoneReassignmentProposal,
+    db: Session = Depends(get_db),
+):
+    """
+    Propose a zone reassignment with 24-hour acceptance window.
+
+    Creates a proposal that the partner must accept or reject within 24 hours.
+    If no action is taken, the proposal expires automatically.
+
+    This is the new workflow that replaces instant reassignment for cases
+    where partner consent is required.
+    """
+    from app.services.zone_reassignment_service import propose_reassignment
+
+    result, error = propose_reassignment(proposal.partner_id, proposal.new_zone_id, db)
+
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error,
+        )
+
+    return result
+
+
+@router.post("/reassignments/{reassignment_id}/accept", response_model=ZoneReassignmentActionResponse)
+def accept_zone_reassignment(
+    reassignment_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Accept a pending zone reassignment proposal.
+
+    Must be called within 24 hours of the proposal.
+    Updates the partner's zone_id and logs the change.
+    """
+    from app.services.zone_reassignment_service import accept_reassignment
+
+    result, error = accept_reassignment(reassignment_id, db)
+
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error,
+        )
+
+    return result
+
+
+@router.post("/reassignments/{reassignment_id}/reject", response_model=ZoneReassignmentActionResponse)
+def reject_zone_reassignment(
+    reassignment_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Reject a pending zone reassignment proposal.
+
+    The partner remains in their current zone.
+    """
+    from app.services.zone_reassignment_service import reject_reassignment
+
+    result, error = reject_reassignment(reassignment_id, db)
+
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error,
+        )
+
+    return result
+
+
+@router.get("/reassignments/{reassignment_id}", response_model=NewReassignmentResponse)
+def get_zone_reassignment(
+    reassignment_id: int,
+    db: Session = Depends(get_db),
+):
+    """Get details of a specific zone reassignment."""
+    from app.services.zone_reassignment_service import get_reassignment
+
+    result = get_reassignment(reassignment_id, db)
+
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reassignment not found",
+        )
+
+    return result
+
+
+@router.delete("/reassignments/{reassignment_id}")
+def delete_zone_reassignment(
+    reassignment_id: int,
+    db: Session = Depends(get_db),
+):
+    """Delete a zone reassignment (for testing/admin purposes)."""
+    from app.models.zone_reassignment import ZoneReassignment
+
+    reassignment = db.query(ZoneReassignment).filter(ZoneReassignment.id == reassignment_id).first()
+    if not reassignment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reassignment not found",
+        )
+
+    db.delete(reassignment)
+    db.commit()
+    return {"message": f"Reassignment {reassignment_id} deleted"}
+
+
+@router.get("/reassignments", response_model=ZoneReassignmentListResponse)
+def list_zone_reassignments(
+    partner_id: Optional[int] = None,
+    status_filter: Optional[ReassignmentStatus] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """
+    List zone reassignments with optional filters.
+
+    For admin: Lists all reassignments
+    For partner: Filter by partner_id to see their proposals
+    """
+    from app.services.zone_reassignment_service import list_reassignments
+
+    return list_reassignments(
+        db,
+        partner_id=partner_id,
+        status_filter=status_filter,
+        skip=skip,
+        limit=limit,
+    )
+
+
+@router.post("/reassignments/expire-stale")
+def expire_stale_reassignments(db: Session = Depends(get_db)):
+    """
+    Background job endpoint to expire stale proposals.
+
+    Marks any proposals past their 24-hour window as expired.
+    In production, this would be called by a scheduled job.
+    """
+    from app.services.zone_reassignment_service import expire_stale_proposals
+
+    expired_count = expire_stale_proposals(db)
+
+    return {
+        "message": f"Expired {expired_count} stale proposals",
+        "expired_count": expired_count,
+    }
+
+
+
+
 
 @router.get("/nearest")
 def get_nearest_zones(
@@ -522,150 +693,3 @@ def reassign_partner_zone(
     )
 
 
-# =============================================================================
-# Zone Reassignment 24-Hour Workflow Endpoints
-# =============================================================================
-
-from app.schemas.zone_reassignment import (
-    ZoneReassignmentProposal,
-    ZoneReassignmentResponse as NewReassignmentResponse,
-    ZoneReassignmentListResponse,
-    ZoneReassignmentActionResponse,
-)
-from app.models.zone_reassignment import ReassignmentStatus
-
-
-@router.post("/reassignments/propose", response_model=NewReassignmentResponse)
-def propose_zone_reassignment(
-    proposal: ZoneReassignmentProposal,
-    db: Session = Depends(get_db),
-):
-    """
-    Propose a zone reassignment with 24-hour acceptance window.
-
-    Creates a proposal that the partner must accept or reject within 24 hours.
-    If no action is taken, the proposal expires automatically.
-
-    This is the new workflow that replaces instant reassignment for cases
-    where partner consent is required.
-    """
-    from app.services.zone_reassignment_service import propose_reassignment
-
-    result, error = propose_reassignment(proposal.partner_id, proposal.new_zone_id, db)
-
-    if error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error,
-        )
-
-    return result
-
-
-@router.post("/reassignments/{reassignment_id}/accept", response_model=ZoneReassignmentActionResponse)
-def accept_zone_reassignment(
-    reassignment_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Accept a pending zone reassignment proposal.
-
-    Must be called within 24 hours of the proposal.
-    Updates the partner's zone_id and logs the change.
-    """
-    from app.services.zone_reassignment_service import accept_reassignment
-
-    result, error = accept_reassignment(reassignment_id, db)
-
-    if error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error,
-        )
-
-    return result
-
-
-@router.post("/reassignments/{reassignment_id}/reject", response_model=ZoneReassignmentActionResponse)
-def reject_zone_reassignment(
-    reassignment_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Reject a pending zone reassignment proposal.
-
-    The partner remains in their current zone.
-    """
-    from app.services.zone_reassignment_service import reject_reassignment
-
-    result, error = reject_reassignment(reassignment_id, db)
-
-    if error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error,
-        )
-
-    return result
-
-
-@router.get("/reassignments/{reassignment_id}", response_model=NewReassignmentResponse)
-def get_zone_reassignment(
-    reassignment_id: int,
-    db: Session = Depends(get_db),
-):
-    """Get details of a specific zone reassignment."""
-    from app.services.zone_reassignment_service import get_reassignment
-
-    result = get_reassignment(reassignment_id, db)
-
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Reassignment not found",
-        )
-
-    return result
-
-
-@router.get("/reassignments", response_model=ZoneReassignmentListResponse)
-def list_zone_reassignments(
-    partner_id: Optional[int] = None,
-    status_filter: Optional[ReassignmentStatus] = None,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db),
-):
-    """
-    List zone reassignments with optional filters.
-
-    For admin: Lists all reassignments
-    For partner: Filter by partner_id to see their proposals
-    """
-    from app.services.zone_reassignment_service import list_reassignments
-
-    return list_reassignments(
-        db,
-        partner_id=partner_id,
-        status_filter=status_filter,
-        skip=skip,
-        limit=limit,
-    )
-
-
-@router.post("/reassignments/expire-stale")
-def expire_stale_reassignments(db: Session = Depends(get_db)):
-    """
-    Background job endpoint to expire stale proposals.
-
-    Marks any proposals past their 24-hour window as expired.
-    In production, this would be called by a scheduled job.
-    """
-    from app.services.zone_reassignment_service import expire_stale_proposals
-
-    expired_count = expire_stale_proposals(db)
-
-    return {
-        "message": f"Expired {expired_count} stale proposals",
-        "expired_count": expired_count,
-    }
