@@ -8,6 +8,7 @@ from app.api.zones import router as zones_router
 from app.api.triggers import router as triggers_router
 from app.api.admin import router as admin_router
 from app.api.admin_panel import router as admin_panel_router
+from app.api.admin_drills import router as admin_drills_router
 from app.api.notifications import router as notifications_router
 
 api_router = APIRouter(prefix="/api/v1")
@@ -21,4 +22,5 @@ api_router.include_router(zones_router)
 api_router.include_router(triggers_router)
 api_router.include_router(admin_router)
 api_router.include_router(admin_panel_router)
+api_router.include_router(admin_drills_router)
 api_router.include_router(notifications_router)

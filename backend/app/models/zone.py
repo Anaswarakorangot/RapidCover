@@ -3,7 +3,6 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
-
 class Zone(Base):
     __tablename__ = "zones"
 
