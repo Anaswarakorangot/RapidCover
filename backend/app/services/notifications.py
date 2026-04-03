@@ -120,30 +120,40 @@ def send_notification_to_partner(
     """
     Send a notification to all of a partner's subscriptions.
 
+    Uses multilingual templates based on partner's language_pref.
+    Falls back to English if language not supported.
+
     Returns number of successful sends.
     """
-    template = NOTIFICATION_TEMPLATES.get(notification_type)
-    if not template:
-        logger.error(f"Unknown notification type: {notification_type}")
-        return 0
+    from app.services.notification_templates import render_notification
 
-    # Get trigger info for label
+    # Get partner for language preference
+    partner = db.query(Partner).filter(Partner.id == partner_id).first()
+    language = partner.language_pref.value if partner and partner.language_pref else "en"
+
+    # Get trigger info
     trigger = db.query(TriggerEvent).filter(TriggerEvent.id == claim.trigger_event_id).first()
-    trigger_label = TRIGGER_TYPE_LABELS.get(trigger.trigger_type, "Disruption") if trigger else "Disruption"
+    trigger_type = trigger.trigger_type if trigger else "Disruption"
+
+    # Render notification in partner's language
+    rendered = render_notification(
+        notification_type,
+        language=language,
+        amount=int(claim.amount),
+        trigger_type=trigger_type,
+        upi_ref=claim.upi_ref or "N/A",
+    )
 
     # Build payload
     payload = {
-        "title": template["title"],
-        "body": template["body"].format(
-            amount=int(claim.amount),
-            trigger_type=trigger_label,
-            upi_ref=claim.upi_ref or "N/A",
-        ),
-        "url": template["url"],
-        "tag": template["tag"].format(claim_id=claim.id),
+        "title": rendered["title"],
+        "body": rendered["body"],
+        "url": "/claims",
+        "tag": f"{notification_type}-{claim.id}",
         "type": notification_type,
         "claim_id": claim.id,
         "icon": "/icon-192.png",
+        "language_used": rendered.get("language_used", language),
     }
 
     subscriptions = get_partner_subscriptions(partner_id, db)
@@ -157,7 +167,7 @@ def send_notification_to_partner(
     db.commit()
 
     logger.info(
-        f"Sent {notification_type} notification to partner {partner_id}: "
+        f"Sent {notification_type} notification to partner {partner_id} (lang={language}): "
         f"{success_count}/{len(subscriptions)} successful"
     )
 
