@@ -128,7 +128,7 @@ function PayoutBanner({ claim, onDismiss }) {
         <p className="pb-title">Payout received!</p>
         <p className="pb-sub">
           ₹{claim.amount} · Claim #{claim.id}
-          {claim.upi_ref ? ` · UPI: ${claim.upi_ref}` : ''}
+          {claim.upi_ref ? (claim.upi_ref.startsWith('tr_') ? ` · Stripe: ${claim.upi_ref}` : ` · UPI: ${claim.upi_ref}`) : ''}
         </p>
       </div>
       <button className="pb-close" onClick={onDismiss}>×</button>
