@@ -299,7 +299,7 @@ def execute_drill(
         trigger_start = time.time()
 
         # Use check_all_triggers which handles the full flow
-        check_all_triggers(force=drill_session.force_mode, zone_code=zone.code)
+        check_all_triggers(force=drill_session.force_mode, zone_code=zone.code, prefer_mock=True)
 
         trigger_latency = int((time.time() - trigger_start) * 1000)
         drill_session.trigger_latency_ms = trigger_latency
