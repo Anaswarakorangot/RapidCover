@@ -51,7 +51,10 @@ function OnboardingRoute() {
   }
 
   return (
-    <RapidCoverOnboarding onGetStarted={() => navigate('/onboarding-flow')} />
+    <RapidCoverOnboarding 
+      onGetStarted={() => navigate('/onboarding-flow')} 
+      onLogin={() => navigate('/login')}
+    />
   );
 }
 
@@ -71,6 +74,14 @@ function AdminRoute() {
   return <Admin />;
 }
 
+// Root Route
+function RootRoute() {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return <Loader />;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  return <Navigate to="/onboarding" replace />;
+}
+
 // Routes
 function AppRoutes() {
   return (
@@ -83,7 +94,7 @@ function AppRoutes() {
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/" element={<RootRoute />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
       <Route path="/claims" element={<ProtectedRoute><Claims /></ProtectedRoute>} />

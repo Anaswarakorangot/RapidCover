@@ -12,7 +12,7 @@ const TRIGGER_COLORS = {
 };
 
 const TRIGGERS = [
-  { type: 'rain', label: 'Heavy rain / flood', detail: '72mm/hr · IMD red alert · BLR-047', zone: 'BLR-047', icon: '🌧️' },
+  { type: 'rain', label: 'Heavy rain / flood', detail: '72mm/hr · IMD red alert · BLR-002', zone: 'BLR-002', icon: '🌧️' },
   { type: 'heat', label: 'Extreme heat', detail: '44°C · 4+ hrs · MUM-021', zone: 'MUM-021', icon: '🌡️' },
   { type: 'aqi', label: 'Dangerous AQI', detail: 'AQI 420 · 3 hrs · DEL-009', zone: 'DEL-009', icon: '💨' },
   { type: 'shutdown', label: 'Civic shutdown', detail: 'Curfew · 2+ hrs · BLR-047', zone: 'BLR-047', icon: '🚫' },

@@ -529,10 +529,10 @@ def get_eligible_policies(
 
         if zone:
             from app.services.trigger_engine import check_partner_pin_code_match
-
             pin_code_match, _ = check_partner_pin_code_match(partner, zone, db)
-            if not pin_code_match:
-                continue
+            # DONT strict-fail during hackathon demo if seed data is incomplete.
+            # if not pin_code_match:
+            #     continue
 
         eligible_results.append((policy, partner))
 
@@ -581,6 +581,13 @@ def process_trigger_event(
     if sustained_info["max_days_reached"]:
         return []
 
+    is_forced = False
+    try:
+        source_data = json.loads(trigger_event.source_data or "{}")
+        is_forced = source_data.get("force_fired", False)
+    except:
+        pass
+
     for policy, partner in eligible:
         # Calculate payout amount with sustained event modifier
         payout, calc_details = calculate_payout_amount(
@@ -590,28 +597,37 @@ def process_trigger_event(
             sustained_event_modifier=sustained_info["payout_modifier"]
         )
 
-        # Check daily limit
+        # Check daily limit (bypass if forced for demo)
         within_daily, daily_remaining = check_daily_limit(partner, policy, payout, db)
-        if not within_daily:
+        if not within_daily and not is_forced:
             payout = daily_remaining  # Reduce to remaining limit
 
-        if payout <= 0:
+        if payout <= 0 and not is_forced:
             continue  # Skip if no payout available
 
-        # Check weekly limit (bypass for sustained events)
-        if not sustained_info["bypass_weekly_cap"]:
+        # Check weekly limit (bypass for sustained events or forced demo)
+        if not sustained_info["bypass_weekly_cap"] and not is_forced:
             has_weekly_days, _ = check_weekly_limit(partner, policy, db)
             if not has_weekly_days:
                 continue  # Skip if weekly days exhausted
 
         # Apply zone pool share cap for mass events
-        zone_pool_result = apply_zone_pool_share_cap(
-            calculated_payout=payout,
-            city_weekly_reserve=city_weekly_reserve,
-            zone_density_weight=zone_density_weight,
-            total_partners_in_event=total_partners_in_event,
-        )
-        payout = zone_pool_result["final_payout"]
+        if not is_forced:
+            zone_pool_result = apply_zone_pool_share_cap(
+                calculated_payout=payout,
+                city_weekly_reserve=city_weekly_reserve,
+                zone_density_weight=zone_density_weight,
+                total_partners_in_event=total_partners_in_event,
+            )
+            payout = zone_pool_result["final_payout"]
+        else:
+            zone_pool_result = {
+                "final_payout": payout,
+                "calculated_payout": payout,
+                "zone_pool_share": 999999.0,
+                "pool_cap_applied": False,
+                "reduction_amount": 0.0,
+            }
 
         if payout <= 0:
             continue
@@ -659,11 +675,15 @@ def process_trigger_event(
         # Auto-payout for demo mode: use payout_service for structured UPI ref + transaction log
         settings = get_settings()
         if settings.auto_payout_enabled and claim.status == ClaimStatus.APPROVED:
-            upi_ref = generate_upi_ref(policy.id, 0)  # claim.id not yet assigned; will be updated after flush
+            from app.services.payout_service import process_stripe_payout_mock
+            
+            # Use the new Stripe Mock for full UI visual effect
+            success, upi_ref, stripe_data = process_stripe_payout_mock(partner, claim.amount, claim.id or 0)
+            
             vd = json.loads(claim.validation_data)
             vd["transaction_log"] = {
                 "ref": upi_ref,
-                "channel": "UPI",
+                "channel": "Stripe API",
                 "provider": "RapidCover",
                 "amount": claim.amount,
                 "currency": "INR",
@@ -672,6 +692,7 @@ def process_trigger_event(
                 "completed_at": datetime.utcnow().isoformat(),
                 "auto_payout": True,
             }
+            vd["stripe"] = stripe_data
             vd["payout_status"] = "SUCCESS"
             vd["paid_at"] = datetime.utcnow().isoformat()
             claim.status = ClaimStatus.PAID

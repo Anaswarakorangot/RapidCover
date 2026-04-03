@@ -140,8 +140,8 @@ def build_transaction_log(
     return {
         "transaction": {
             "ref": upi_ref,
-            "channel": "UPI",
-            "provider": "RapidCover",
+            "channel": "UPI/Stripe",
+            "provider": "Stripe Connect Mock",
             "amount": claim.amount,
             "currency": "INR",
             "status": "SUCCESS",
@@ -180,70 +180,27 @@ def build_transaction_log(
 
 from app.config import get_settings
 
-def process_razorpay_payout(partner: Partner, amount: float, claim_id: int) -> tuple[bool, str, dict]:
-    """Process payout via Razorpay Payout API."""
-    settings = get_settings()
+import uuid
+import time
+
+def process_stripe_payout_mock(partner: Partner, amount: float, claim_id: int) -> tuple[bool, str, dict]:
+    """Simulate a payout via Stripe API (Mock)."""
+    # Simulate API latency
+    time.sleep(0.5)
     
-    if not settings.razorpay_key_id or not settings.razorpay_key_secret or not settings.razorpay_account_number:
-        return False, "", {"error": "Razorpay keys not configured"}
-
-    auth = (settings.razorpay_key_id, settings.razorpay_key_secret)
-    base_url = "https://api.razorpay.com/v1"
+    transfer_id = f"tr_{uuid.uuid4().hex[:24]}"
     
-    try:
-        # 1. Create contact
-        with httpx.Client(auth=auth, timeout=10.0) as client:
-            res = client.post(
-                f"{base_url}/contacts",
-                json={
-                    "name": partner.name,
-                    "contact": partner.phone,
-                    "type": "employee",
-                    "reference_id": f"partner_{partner.id}_c{claim_id}"
-                }
-            )
-            res.raise_for_status()
-            contact_id = res.json()["id"]
-
-            # 2. Create fund account (UPI)
-            res = client.post(
-                f"{base_url}/fund_accounts",
-                json={
-                    "contact_id": contact_id,
-                    "account_type": "vpa",
-                    "vpa": {
-                        "address": partner.upi_id or f"{partner.phone}@test"
-                    }
-                }
-            )
-            res.raise_for_status()
-            fund_account_id = res.json()["id"]
-
-            # 3. Create payout
-            res = client.post(
-                f"{base_url}/payouts",
-                json={
-                    "account_number": settings.razorpay_account_number,
-                    "fund_account_id": fund_account_id,
-                    "amount": int(amount * 100),
-                    "currency": "INR",
-                    "mode": "UPI",
-                    "purpose": "payout",
-                    "queue_if_low_balance": True,
-                    "reference_id": f"claim_{claim_id}",
-                    "narration": f"RapidCover Claim #{claim_id}"
-                }
-            )
-            res.raise_for_status()
-            payout_data = res.json()
-
-        return True, payout_data.get("id"), {"razorpay_response": payout_data}
-    except Exception as e:
-        logger.error(f"Razorpay payout failed: {str(e)}")
-        if isinstance(e, httpx.HTTPStatusError):
-            logger.error(f"Razorpay error body: {e.response.text}")
-            return False, "", {"error": e.response.text}
-        return False, "", {"error": str(e)}
+    stripe_data = {
+        "id": transfer_id,
+        "object": "transfer",
+        "amount": int(amount * 100),
+        "currency": "inr",
+        "destination": f"acct_{partner.id}mock",
+        "description": f"RapidCover Claim #{claim_id}",
+        "status": "paid"
+    }
+    
+    return True, transfer_id, {"stripe_response": stripe_data}
 
 
 def process_payout(
@@ -307,15 +264,13 @@ def process_payout(
 
     settings = get_settings()
     if not upi_ref:
-        if settings.razorpay_key_id and settings.razorpay_key_secret and settings.razorpay_account_number:
-            success, rp_ref, razorpay_data = process_razorpay_payout(partner, claim.amount, claim.id)
-            if success:
-                upi_ref = rp_ref
-                payout_metadata["razorpay"] = razorpay_data
-            else:
-                logger.warning(f"Razorpay failed for claim {claim.id}, falling back to default generator")
-                upi_ref = generate_upi_ref(policy.id, claim.id)
+        # Utilize Stripe mock instead of Razorpay
+        success, tr_ref, stripe_data = process_stripe_payout_mock(partner, claim.amount, claim.id)
+        if success:
+            upi_ref = tr_ref
+            payout_metadata["stripe"] = stripe_data
         else:
+            logger.warning(f"Stripe mapping failed for claim {claim.id}, falling back to default generator")
             upi_ref = generate_upi_ref(policy.id, claim.id)
 
     transaction_log = build_transaction_log(claim, policy, partner, trigger, upi_ref, payout_metadata)

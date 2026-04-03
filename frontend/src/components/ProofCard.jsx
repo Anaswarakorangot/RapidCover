@@ -149,18 +149,18 @@ export default function ProofCard({
           </p>
         )}
 
-        {/* UPI reference */}
+        {/* Transfer reference */}
         {upiRef && status === 'paid' && (
           <p style={{
             fontSize: 12,
             fontWeight: 700,
-            color: '#2a9e47',
-            background: '#f0fdf4',
+            color: upiRef.startsWith('tr_') ? '#4f46e5' : '#2a9e47', // Stripe blurple vs UPI green
+            background: upiRef.startsWith('tr_') ? '#e0e7ff' : '#f0fdf4',
             padding: '4px 10px',
             borderRadius: 8,
             margin: 0,
           }}>
-            UPI Ref: {upiRef}
+            {upiRef.startsWith('tr_') ? '💳 Stripe Txn: ' : 'UPI Ref: '} {upiRef}
           </p>
         )}
 

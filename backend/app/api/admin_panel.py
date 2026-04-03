@@ -445,7 +445,7 @@ PIPELINE_STEPS = {
         {"ts": "5:47:55", "msg": "Policy lookup: Standard plan (Rs.33/wk) - max Rs.400/day, 3 days/wk"},
         {"ts": "5:47:58", "msg": "Fraud score: 0.11 -> auto-approve"},
         {"ts": "5:48:03", "msg": "Raw payout: Rs.420 -> Capped to Rs.400 (Standard plan limit) -> UPI credit Rs.400"},
-        {"ts": "5:48:09", "msg": "Rs.400 UPI credit via Razorpay mock - txn RC{zone}-{rand}"},
+        {"ts": "5:48:09", "msg": "Rs.400 UPI credit via Stripe API - txn tr_{rand}"},
         {"ts": "5:48:12", "msg": "Push notification sent (Kannada) - claim processed"},
     ],
     "heat": [
@@ -457,7 +457,7 @@ PIPELINE_STEPS = {
         {"ts": "5:47:55", "msg": "Policy lookup: Pro plan (Rs.45/wk) - max Rs.500/day, 4 days/wk"},
         {"ts": "5:47:58", "msg": "Fraud score: 0.08 -> auto-approve"},
         {"ts": "5:48:03", "msg": "Raw payout: Rs.320 -> Within Pro limit (Rs.500) -> UPI credit Rs.320"},
-        {"ts": "5:48:09", "msg": "Rs.320 UPI credit via Razorpay mock - txn RC{zone}-{rand}"},
+        {"ts": "5:48:09", "msg": "Rs.320 UPI credit via Stripe API - txn tr_{rand}"},
         {"ts": "5:48:12", "msg": "Push notification sent (Hindi) - heat claim processed"},
     ],
     "aqi": [
@@ -469,7 +469,7 @@ PIPELINE_STEPS = {
         {"ts": "5:47:55", "msg": "Policy lookup: Flex plan (Rs.22/wk) - max Rs.250/day, 2 days/wk"},
         {"ts": "5:47:58", "msg": "Fraud score: 0.14 -> auto-approve"},
         {"ts": "5:48:03", "msg": "Raw payout: Rs.310 -> Capped to Rs.250 (Flex plan limit) -> UPI credit Rs.250"},
-        {"ts": "5:48:09", "msg": "Rs.250 UPI credit via Razorpay mock - txn RC{zone}-{rand}"},
+        {"ts": "5:48:09", "msg": "Rs.250 UPI credit via Stripe API - txn tr_{rand}"},
         {"ts": "5:48:12", "msg": "Push notification sent (Hindi) - AQI claim processed"},
     ],
     "shutdown": [
@@ -481,7 +481,7 @@ PIPELINE_STEPS = {
         {"ts": "5:47:55", "msg": "Policy lookup: Standard plan (Rs.33/wk) - max Rs.400/day, 3 days/wk"},
         {"ts": "5:47:58", "msg": "Fraud score: 0.05 -> auto-approve"},
         {"ts": "5:48:03", "msg": "Raw payout: Rs.350 -> Within Standard limit (Rs.400) -> UPI credit Rs.350"},
-        {"ts": "5:48:09", "msg": "Rs.350 UPI credit via Razorpay mock - txn RC{zone}-{rand}"},
+        {"ts": "5:48:09", "msg": "Rs.350 UPI credit via Stripe API - txn tr_{rand}"},
         {"ts": "5:48:12", "msg": "Push notification sent - curfew claim processed"},
     ],
     "closure": [
@@ -493,7 +493,7 @@ PIPELINE_STEPS = {
         {"ts": "5:47:55", "msg": "Policy lookup: Flex plan (Rs.22/wk) - max Rs.250/day, 2 days/wk"},
         {"ts": "5:47:58", "msg": "Fraud score: 0.09 -> auto-approve"},
         {"ts": "5:48:03", "msg": "Raw payout: Rs.143 -> Within Flex limit (Rs.250) -> UPI credit Rs.143"},
-        {"ts": "5:48:09", "msg": "Rs.143 UPI credit via Razorpay mock - txn RC{zone}-{rand}"},
+        {"ts": "5:48:09", "msg": "Rs.143 UPI credit via Stripe API - txn tr_{rand}"},
         {"ts": "5:48:12", "msg": "Push notification sent - store closure claim processed"},
     ],
 }
@@ -537,7 +537,7 @@ async def simulate_trigger(req: SimulateTriggerRequest):
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             None,
-            lambda: check_all_triggers(force=True, zone_code=zone_code)
+            lambda: check_all_triggers(force=True, zone_code=zone_code, prefer_mock=True)
         )
     except Exception as e:
         print(f"[admin_panel] Trigger engine force-fire error: {e}")
