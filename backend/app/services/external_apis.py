@@ -440,3 +440,14 @@ def reset_all_conditions():
 def get_all_active_conditions() -> dict[int, dict]:
     """Get all zones with non-default conditions."""
     return _zone_conditions.copy()
+
+
+def apply_drill_preset(zone_id: int, preset_name: str) -> dict:
+    """
+    Apply drill preset conditions to a zone.
+
+    This is a convenience wrapper that delegates to drill_service.apply_preset_conditions.
+    Importing here to avoid circular imports.
+    """
+    from app.services.drill_service import apply_preset_conditions
+    return apply_preset_conditions(zone_id, preset_name)

@@ -4,5 +4,16 @@ from app.models.policy import Policy
 from app.models.trigger_event import TriggerEvent
 from app.models.claim import Claim
 from app.models.push_subscription import PushSubscription
+from app.models.drill_session import DrillSession, DrillType, DrillStatus
 
-__all__ = ["Partner", "Zone", "Policy", "TriggerEvent", "Claim", "PushSubscription"]
+__all__ = [
+    "Partner",
+    "Zone",
+    "Policy",
+    "TriggerEvent",
+    "Claim",
+    "PushSubscription",
+    "DrillSession",
+    "DrillType",
+    "DrillStatus",
+]

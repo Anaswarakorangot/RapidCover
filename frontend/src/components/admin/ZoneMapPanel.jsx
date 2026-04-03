@@ -79,10 +79,18 @@ function ZoneCircle({ zone, onSelect, selected }) {
   );
 }
 
-export default function ZoneMapPanel() {
+export default function ZoneMapPanel({ onZoneClick }) {
   const [zones, setZones] = useState(DEMO_ZONES);
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState('All');
+
+  function handleZoneSelect(zone) {
+    setSelected(zone);
+    // Notify parent for drill panel integration
+    if (onZoneClick && zone.id) {
+      onZoneClick(zone.id);
+    }
+  }
 
   useEffect(() => {
     fetchZones();
@@ -187,7 +195,7 @@ export default function ZoneMapPanel() {
               <ZoneCircle
                 key={z.id}
                 zone={z}
-                onSelect={setSelected}
+                onSelect={handleZoneSelect}
                 selected={selected?.id === z.id}
               />
             ))}
