@@ -19,5 +19,9 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 
+# Database
+*.db
+*.db-journal
+
 # Local accidental files
 nul
