@@ -16,6 +16,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { NotificationToggle } from '../components/NotificationToggle';
+import { UpiSelector } from '../components/ui/UpiSelector';
 import api from '../services/api';
 
 /* ─── Design tokens matching Register.jsx ───────────────────────────────── */
@@ -283,17 +284,10 @@ function UpiSetup({ currentUpiId, onSave }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div className="prf-input-wrap">
-        <input
-          className={`prf-input${valid === true ? ' valid' : valid === false ? ' invalid' : ''}`}
-          placeholder="yourname@upi" value={upiId}
-          onChange={e => { setUpiId(e.target.value); setError(''); }}
-        />
-        {valid !== null && <span className="prf-input-icon" style={{ color: valid ? 'var(--green-primary)' : 'var(--warning)' }}>{valid ? '✓' : '✗'}</span>}
-      </div>
-      <p className={`prf-hint${valid === false ? ' warn' : ''}`}>
-        {valid === false ? 'Format: name@okaxis or phone@ybl' : valid === true ? 'Looks good!' : 'e.g. name@okaxis, phone@ybl'}
-      </p>
+      <UpiSelector 
+        value={upiId}
+        onChange={v => { setUpiId(v); setError(''); }}
+      />
       {error && <p style={{ fontSize: 12, color: 'var(--error)', background: '#fef2f2', padding: '6px 10px', borderRadius: 8 }}>{error}</p>}
       <div className="prf-btn-row">
         <button className="prf-btn-secondary" style={{ flex: 1 }} onClick={() => { setEditing(false); setUpiId(currentUpiId || ''); setError(''); }}>Cancel</button>
