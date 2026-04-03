@@ -165,9 +165,9 @@ class MockWeatherAPI:
             return None
 
     @staticmethod
-    def get_current(zone_id: int, lat: float = None, lon: float = None) -> WeatherData:
-        """Get current weather — live first, mock fallback."""
-        live = MockWeatherAPI._fetch_live(zone_id, lat, lon)
+    def get_current(zone_id: int, lat: float = None, lon: float = None, prefer_mock: bool = False) -> WeatherData:
+        """Get current weather — live first unless a drill explicitly prefers mock data."""
+        live = None if prefer_mock else MockWeatherAPI._fetch_live(zone_id, lat, lon)
         if live:
             return live
 
@@ -198,7 +198,7 @@ class MockWeatherAPI:
             conditions["weather"]["rainfall"] = rainfall_mm_hr
         if humidity is not None:
             conditions["weather"]["humidity"] = humidity
-        return MockWeatherAPI.get_current(zone_id)
+        return MockWeatherAPI.get_current(zone_id, prefer_mock=True)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -263,9 +263,9 @@ class MockAQIAPI:
             return None
 
     @staticmethod
-    def get_current(zone_id: int, lat: float = None, lon: float = None) -> AQIData:
-        """Get current AQI — live first, mock fallback."""
-        live = MockAQIAPI._fetch_live(zone_id, lat, lon)
+    def get_current(zone_id: int, lat: float = None, lon: float = None, prefer_mock: bool = False) -> AQIData:
+        """Get current AQI — live first unless a drill explicitly prefers mock data."""
+        live = None if prefer_mock else MockAQIAPI._fetch_live(zone_id, lat, lon)
         if live:
             return live
 
@@ -296,7 +296,7 @@ class MockAQIAPI:
             conditions["aqi"]["pm25"] = pm25
         if pm10 is not None:
             conditions["aqi"]["pm10"] = pm10
-        return MockAQIAPI.get_current(zone_id)
+        return MockAQIAPI.get_current(zone_id, prefer_mock=True)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
