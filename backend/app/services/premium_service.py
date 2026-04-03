@@ -305,9 +305,16 @@ def calculate_zone_pool_share(
       Medium (50–150):        0.35
       High (>150):            0.50
     """
-    zone_pool_share    = (city_weekly_reserve * zone_density_weight) / max(total_partners_in_event, 1)
-    final_payout       = min(calculated_payout, zone_pool_share)
-    pool_cap_applied   = calculated_payout > zone_pool_share
+    # Demo / early lifecycle can yield a 0 reserve (no "recently created" premiums yet).
+    # In that case, treat the pool cap as unavailable instead of forcing payouts to 0.
+    if city_weekly_reserve <= 0:
+        final_payout = calculated_payout
+        zone_pool_share = 0.0
+        pool_cap_applied = False
+    else:
+        zone_pool_share = (city_weekly_reserve * zone_density_weight) / max(total_partners_in_event, 1)
+        final_payout = min(calculated_payout, zone_pool_share)
+        pool_cap_applied = calculated_payout > zone_pool_share
 
     return {
         "final_payout":       round(final_payout, 2),
