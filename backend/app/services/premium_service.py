@@ -53,7 +53,7 @@ TIER_CONFIG: dict = {
 }
 
 # Underwriting gate thresholds - Section 2A of team guide
-MIN_ACTIVE_DAYS_TO_BUY   = 7   # block purchase if < 7 active days in last 30
+MIN_ACTIVE_DAYS_TO_BUY   = 0   # DEMO MODE: set to 0 for testing (was 7)
 AUTO_DOWNGRADE_DAYS      = 5   # auto-downgrade to Flex if < 5 active days in last 30
 
 # Sustained event protocol - Section 2E

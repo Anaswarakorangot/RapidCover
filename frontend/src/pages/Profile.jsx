@@ -470,10 +470,7 @@ function ZoneHistorySection({ zoneHistoryData, loading }) {
 }
 
 /* ─── RenewalBreakdownCard – real data from backend ─────────────────────── */
-function RenewalBreakdownCard({ renewalPreview, renewalLoading, user, onRenew }) {
-  // Fallback to local estimate only if backend hasn't responded yet
-  const TIER_PRICES = { flex: 22, standard: 33, pro: 45 };
-
+export function RenewalBreakdownCard({ renewalPreview, renewalLoading, onRenew }) {
   // If backend data available, use it
   if (!renewalLoading && renewalPreview?.has_policy && renewalPreview?.breakdown) {
     const bd    = renewalPreview.breakdown;
@@ -522,7 +519,6 @@ function RenewalBreakdownCard({ renewalPreview, renewalLoading, user, onRenew })
     );
   }
 
-  // Local fallback (while loading or no policy)
   if (renewalLoading) {
     return (
       <div className="prf-card">
@@ -547,39 +543,13 @@ function RenewalBreakdownCard({ renewalPreview, renewalLoading, user, onRenew })
     );
   }
 
-  // Static fallback estimate
-  const tier     = user?.current_tier || 'standard';
-  const base     = TIER_PRICES[tier] || 33;
-  const zoneAdj  = 3;
-  const seasonal = 1.15;
-  const riqi     = 1.15;
-  const activity = tier === 'pro' ? 1.35 : tier === 'flex' ? 0.80 : 1.00;
-  const loyalty  = 0.94;
-  const total    = Math.round(base * activity * riqi * seasonal * loyalty + zoneAdj);
-
   return (
     <div className="prf-card">
       <div className="prf-card-body">
         <p className="prf-section-title">🔄 Next Week Premium Breakdown</p>
-        <p className="prf-section-sub">All 7 formula factors — recalculated every Monday</p>
-        {[
-          ['Base Premium',        `₹${base}`,              `${tier} plan`,         false],
-          ['Zone Risk Factor',    `+₹${zoneAdj}`,          'Urban Core',           false],
-          ['Seasonal Index',      `×${seasonal.toFixed(2)}`, 'City-specific monthly', false],
-          ['RIQI Adjustment',     `×${riqi.toFixed(2)}`,   'Urban Fringe band',    false],
-          ['Activity Tier Factor', `×${activity.toFixed(2)}`, tier,                false],
-          ['Loyalty Discount',    `×${loyalty.toFixed(2)}`, '4-week streak',       true],
-          ['Platform Fee',        '₹0',                    'Waived',               false],
-        ].map(([k, v, note, neg]) => (
-          <div className="ren-row" key={k}>
-            <span className="ren-key">{k}<span className="ren-note">({note})</span></span>
-            <span className={`ren-val${neg ? ' neg' : ''}`}>{v}</span>
-          </div>
-        ))}
-        <div className="ren-total">
-          <span>Total Next Week</span>
-          <span className="val">₹{total}</span>
-        </div>
+        <p style={{ fontSize: 13, color: 'var(--text-light)' }}>
+          Renewal pricing is unavailable right now. Refresh after backend premium data is ready.
+        </p>
       </div>
     </div>
   );
@@ -694,7 +664,6 @@ export function Profile() {
         <RenewalBreakdownCard
           renewalPreview={renewalPreview}
           renewalLoading={renewalLoading}
-          user={user}
           onRenew={() => navigate('/policy')}
         />
 

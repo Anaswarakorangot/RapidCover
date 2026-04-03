@@ -14,7 +14,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { getMyReassignments, acceptReassignment, rejectReassignment } from '../services/proofApi';
 import { useAuth } from '../context/AuthContext';
+import SourceBadge from '../components/SourceBadge';
 
 const POLL_INTERVAL_MS = 5_000;
 const POLL_TIMEOUT_MS  = 120_000;
@@ -343,29 +345,41 @@ function ZoneAlertCard({ alert }) {
   );
 }
 
-/** Only renders when backend sends a non-null zone_reassignment */
-function ZoneReassignmentCard({ card, onAccept, onDismiss }) {
+/** Only renders when pending reassignment exists */
+function ZoneReassignmentCard({ card, onAccept, onDismiss, processing }) {
   if (!card) return null;
-  const { old_zone, new_zone, premium_delta, hours_left } = card;
+  const { old_zone, new_zone, premium_delta, expires_at } = card;
   return (
     <div className="alert-card alert-orange">
       <span style={{ fontSize: 22 }}>📍</span>
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <span className="alert-title">Zone Reassignment</span>
-          {hours_left > 0 && <span className="alert-badge">{hours_left}h to accept</span>}
+          {expires_at && <ReassignmentCountdown expiresAt={expires_at} onExpire={onDismiss} />}
         </div>
         <p className="alert-body">
-          Your zone has changed from <strong>{old_zone}</strong> to <strong>{new_zone}</strong>.
+          Your zone is changing from <strong>{old_zone}</strong> to <strong>{new_zone}</strong>.
           {premium_delta !== 0 && (
-            <span style={{ color: premium_delta > 0 ? '#c2410c' : '#166534' }}>
-              {' '}Premium {premium_delta > 0 ? `+₹${premium_delta}` : `-₹${Math.abs(premium_delta)}`}/week.
+            <span style={{ color: premium_delta > 0 ? '#166534' : '#c2410c' }}>
+              {' '}Premium {premium_delta > 0 ? `-₹${premium_delta}` : `+₹${Math.abs(premium_delta)}`}/week.
             </span>
           )}
         </p>
         <div className="alert-actions">
-          <button className="alert-btn-outline" onClick={onDismiss}>Decline</button>
-          <button className="alert-btn-fill" onClick={onAccept}>Accept New Zone</button>
+          <button
+            className="alert-btn-outline"
+            onClick={onDismiss}
+            disabled={processing}
+          >
+            {processing ? 'Processing...' : 'Decline'}
+          </button>
+          <button
+            className="alert-btn-fill"
+            onClick={onAccept}
+            disabled={processing}
+          >
+            {processing ? 'Processing...' : 'Accept New Zone'}
+          </button>
         </div>
       </div>
     </div>
@@ -423,45 +437,44 @@ function StreakProgressBar({ loyalty }) {
 }
 
 /** Premium breakdown – collapsible, same design as original */
-function WeeklyPremiumBreakdown({ breakdown, policy }) {
+export function WeeklyPremiumBreakdown({ breakdown, policy }) {
   const today    = new Date();
   const isMonday = today.getDay() === 1;
   const [open, setOpen] = useState(isMonday);
 
-  // Use backend data when available, fall back to local estimate for display only
-  if (!breakdown && !policy) return null;
+  // Only render if we have a policy
+  if (!policy) return null;
 
-  let rows, total;
-  if (breakdown) {
-    rows = [
-      { label: 'Base Premium',       note: policy?.tier ? `${policy.tier} plan` : '',      val: `₹${breakdown.base}`,                cls: '' },
-      { label: 'Zone Risk Factor',   note: 'Zone surcharge',                                val: `+₹${breakdown.zone_risk}`,          cls: 'positive' },
-      { label: 'Seasonal Index',     note: 'City-specific monthly',                         val: `×${Number(breakdown.seasonal_index).toFixed(2)}`,  cls: '' },
-      { label: 'RIQI Adjustment',    note: breakdown.riqi_band || '',                        val: `×${Number(breakdown.riqi_adjustment).toFixed(2)}`, cls: 'positive' },
-      { label: 'Activity Tier Factor', note: policy?.tier || '',                             val: `×${Number(breakdown.activity_factor).toFixed(2)}`, cls: '' },
-      { label: 'Loyalty Discount',   note: breakdown.loyalty_weeks ? `${breakdown.loyalty_weeks}-week streak` : '4-week streak', val: `×${Number(breakdown.loyalty_discount).toFixed(2)}`, cls: 'negative' },
-      { label: 'Platform Fee',       note: 'Waived',                                        val: '₹0',                                cls: '' },
-    ];
-    total = breakdown.total;
-  } else {
-    // Local fallback (only shown when breakdown endpoint unavailable)
-    const base     = BASES[policy.tier] || 33;
-    const zoneRisk = 3;
-    const seasonal = 1.15;
-    const riqi     = 1.15;
-    const activity = policy.tier === 'pro' ? 1.35 : policy.tier === 'flex' ? 0.80 : 1.00;
-    const loyalty  = 0.94;
-    total = Math.round(base * activity * riqi * seasonal * loyalty + zoneRisk);
-    rows = [
-      { label: 'Base Premium',        note: `${policy.tier} plan`,       val: `₹${base}`,              cls: '' },
-      { label: 'Zone Risk Factor',    note: 'Urban Core surcharge',       val: `+₹${zoneRisk}`,         cls: 'positive' },
-      { label: 'Seasonal Index',      note: 'City-specific monthly',      val: `×${seasonal.toFixed(2)}`, cls: '' },
-      { label: 'RIQI Adjustment',     note: 'Urban Fringe band',          val: `×${riqi.toFixed(2)}`,    cls: 'positive' },
-      { label: 'Activity Tier Factor', note: policy.tier,                 val: `×${activity.toFixed(2)}`, cls: '' },
-      { label: 'Loyalty Discount',    note: '4-week streak',              val: `×${loyalty.toFixed(2)}`, cls: 'negative' },
-      { label: 'Platform Fee',        note: 'Waived',                     val: '₹0',                    cls: '' },
-    ];
+  // Show unavailable state when backend breakdown is not available
+  // (B2: removed hardcoded fallback values per phase 2 requirements)
+  if (!breakdown) {
+    return (
+      <div className="rc-card">
+        <div className="rc-card-body">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <span className="rc-section-title" style={{ marginBottom: 0 }}>📊 Premium Breakdown</span>
+              {isMonday && <span className="monday-badge">This week</span>}
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 8 }}>
+            Premium breakdown is unavailable right now. Check back later.
+          </p>
+        </div>
+      </div>
+    );
   }
+
+  const rows = [
+    { label: 'Base Premium',       note: policy?.tier ? `${policy.tier} plan` : '',      val: `₹${breakdown.base}`,                cls: '' },
+    { label: 'Zone Risk Factor',   note: 'Zone surcharge',                                val: `+₹${breakdown.zone_risk}`,          cls: 'positive' },
+    { label: 'Seasonal Index',     note: 'City-specific monthly',                         val: `×${Number(breakdown.seasonal_index).toFixed(2)}`,  cls: '' },
+    { label: 'RIQI Adjustment',    note: breakdown.riqi_band || '',                        val: `×${Number(breakdown.riqi_adjustment).toFixed(2)}`, cls: 'positive' },
+    { label: 'Activity Tier Factor', note: policy?.tier || '',                             val: `×${Number(breakdown.activity_factor).toFixed(2)}`, cls: '' },
+    { label: 'Loyalty Discount',   note: breakdown.loyalty_weeks ? `${breakdown.loyalty_weeks}-week streak` : '4-week streak', val: `×${Number(breakdown.loyalty_discount).toFixed(2)}`, cls: 'negative' },
+    { label: 'Platform Fee',       note: 'Waived',                                        val: '₹0',                                cls: '' },
+  ];
+  const total = breakdown.total;
 
   return (
     <div className="rc-card">
@@ -517,6 +530,8 @@ export function Dashboard() {
   const [payoutDismissed,   setPayoutDismissed]   = useState(false);
   const [reassignDismissed, setReassignDismissed] = useState(false);
   const [pollingActive, setPollingActive] = useState(true);
+  const [pendingReassignment, setPendingReassignment] = useState(null);
+  const [reassignProcessing, setReassignProcessing] = useState(false);
 
   const pollRef         = useRef(null);
   const activityRef     = useRef(null);
@@ -532,11 +547,12 @@ export function Dashboard() {
   /* ── fetch all in parallel ── */
   const fetchAll = useCallback(async (isInitial = false) => {
     try {
-      const [expRes, polRes, sumRes, claimsRes] = await Promise.allSettled([
+      const [expRes, polRes, sumRes, claimsRes, reassignRes] = await Promise.allSettled([
         api.getPartnerExperienceState().catch(() => null),
         api.getActivePolicy().catch(() => null),
         api.getClaimsSummary().catch(() => null),
         api.getClaims({ limit: 5 }).catch(() => ({ claims: [] })),
+        getMyReassignments().catch(() => ({ reassignments: [] })),
       ]);
 
       if (expRes.status === 'fulfilled' && expRes.value) {
@@ -558,6 +574,17 @@ export function Dashboard() {
         setRecentClaims(Array.isArray(raw) ? raw : (raw?.claims || []));
       }
 
+      // Get pending reassignment (status === 'proposed')
+      if (reassignRes.status === 'fulfilled' && reassignRes.value) {
+        console.log('[Dashboard] Reassignments response:', reassignRes.value);
+        const allReassignments = reassignRes.value.reassignments || [];
+        const pending = allReassignments.find(r => r.status === 'proposed');
+        console.log('[Dashboard] Pending reassignment:', pending);
+        if (pending && !reassignDismissed) {
+          setPendingReassignment(pending);
+        }
+      }
+
       // Also load zone & active triggers if we have a zone_id
       if (isInitial && user?.zone_id) {
         const z  = await api.getZone(user.zone_id).catch(() => null);
@@ -572,7 +599,7 @@ export function Dashboard() {
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, [user?.zone_id, resetActivityTimer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.zone_id, resetActivityTimer, reassignDismissed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchAll(true);
@@ -591,12 +618,50 @@ export function Dashboard() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [pollingActive, fetchAll]);
 
+  /* ── reassignment accept/reject handlers ── */
+  const handleAcceptReassignment = async () => {
+    if (!pendingReassignment?.id) return;
+    setReassignProcessing(true);
+    try {
+      await acceptReassignment(pendingReassignment.id);
+      setPendingReassignment(null);
+      setReassignDismissed(true);
+      // Refresh to get updated zone_id
+      fetchAll(false);
+    } catch (err) {
+      console.error('Failed to accept reassignment:', err);
+    } finally {
+      setReassignProcessing(false);
+    }
+  };
+
+  const handleRejectReassignment = async () => {
+    if (!pendingReassignment?.id) return;
+    setReassignProcessing(true);
+    try {
+      await rejectReassignment(pendingReassignment.id);
+      setPendingReassignment(null);
+      setReassignDismissed(true);
+    } catch (err) {
+      console.error('Failed to reject reassignment:', err);
+    } finally {
+      setReassignProcessing(false);
+    }
+  };
+
   /* ── derived ── */
   const zoneAlert       = expState?.zone_alert       ?? null;
-  const zoneReassignment = expState?.zone_reassignment ?? null;
   const loyalty         = expState?.loyalty          ?? null;
   const premiumBreakdown = expState?.premium_breakdown ?? null;
   const latestPayout    = expState?.latest_payout    ?? null;
+
+  // Build reassignment card data from pending reassignment (has ID for API calls)
+  const zoneReassignmentCard = pendingReassignment ? {
+    old_zone: pendingReassignment.old_zone_name || `Zone #${pendingReassignment.old_zone_id}`,
+    new_zone: pendingReassignment.new_zone_name || `Zone #${pendingReassignment.new_zone_id}`,
+    premium_delta: pendingReassignment.premium_adjustment || 0,
+    expires_at: pendingReassignment.expires_at,
+  } : null;
 
   const daysLeft  = policy ? Math.ceil((new Date(policy.expires_at) - new Date()) / 864e5) : 0;
   const tierClass = { flex: 'flex-tier', standard: 'standard-tier', pro: 'pro-tier' }[policy?.tier] || 'no-policy';
@@ -654,12 +719,13 @@ export function Dashboard() {
         {/* ── 2. Zone Alert – only when backend sends one ── */}
         <ZoneAlertCard alert={zoneAlert} />
 
-        {/* ── 3. Zone Reassignment – only when backend sends one ── */}
-        {!reassignDismissed && (
+        {/* ── 3. Zone Reassignment – only when pending reassignment exists ── */}
+        {!reassignDismissed && zoneReassignmentCard && (
           <ZoneReassignmentCard
-            card={zoneReassignment}
-            onAccept={() => setReassignDismissed(true)}
-            onDismiss={() => setReassignDismissed(true)}
+            card={zoneReassignmentCard}
+            onAccept={handleAcceptReassignment}
+            onDismiss={handleRejectReassignment}
+            processing={reassignProcessing}
           />
         )}
 
@@ -674,16 +740,11 @@ export function Dashboard() {
                   {triggers.length}
                 </span>
               </div>
-              {triggers.map(t => {
-                const info = TRIGGER_INFO[t.trigger_type] || { icon: '⚠️', label: t.trigger_type, color: '#f9fafb', border: '#e5e7eb', text: '#374151' };
-                return (
-                  <div key={t.id} className="trigger-chip"
-                    style={{ background: info.color, borderColor: info.border, color: info.text, marginTop: 8 }}>
-                    <span>{info.icon} <strong>{info.label}</strong></span>
-                    <span style={{ fontSize: 11, fontWeight: 700 }}>Severity {t.severity}/5</span>
-                  </div>
-                );
-              })}
+              {triggers.map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e5e7eb', marginTop: '8px' }}>
+                  <SourceBadge type={t.trigger_type} severity={t.severity} size="md" />
+                </div>
+              ))}
               {policy && (
                 <p style={{ fontSize: 12, color: '#dc2626', marginTop: 6, fontWeight: 600 }}>
                   ✅ You're covered! Claims will be auto-processed.
@@ -767,26 +828,23 @@ export function Dashboard() {
                 <span className="rc-section-title" style={{ marginBottom: 0 }}>Recent Claims</span>
                 <Link to="/claims" className="sec-hdr-link">View All →</Link>
               </div>
-              {recentClaims.map(claim => {
-                const info = TRIGGER_INFO[claim.trigger_type] || { icon: '📋', label: claim.trigger_type };
-                return (
-                  <div className="claim-row" key={claim.id}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 24 }}>{info.icon}</span>
-                      <div>
-                        <p className="claim-label">{info.label}</p>
-                        <p className="claim-date">
-                          {new Date(claim.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                        </p>
-                      </div>
-                    </div>
+              {recentClaims.map(claim => (
+                <div className="claim-row" key={claim.id}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <SourceBadge type={claim.trigger_type} showLabel={false} size="lg" />
                     <div>
-                      <p className="claim-amount">₹{claim.amount}</p>
-                      <span className={`claim-status ${STATUS_CLS[claim.status] || 'st-pending'}`}>{claim.status}</span>
+                      <p className="claim-label" style={{textTransform: 'capitalize'}}>{claim.trigger_type}</p>
+                      <p className="claim-date">
+                        {new Date(claim.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      </p>
                     </div>
                   </div>
-                );
-              })}
+                  <div>
+                    <p className="claim-amount">₹{claim.amount}</p>
+                    <span className={`claim-status ${STATUS_CLS[claim.status] || 'st-pending'}`}>{claim.status}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
