@@ -254,7 +254,14 @@ export default function FraudQueuePanel() {
                         onChange={() => toggleSelect(c.claim_id)}
                       />
                     </td>
-                    <td style={{ padding: '1rem' }}><code style={{ fontWeight: 800, color: 'var(--text-dark)' }}>{c.claim_id}</code></td>
+                    <td style={{ padding: '1rem' }}>
+                      <code style={{ fontWeight: 800, color: 'var(--text-dark)' }}>{c.claim_id}</code>
+                      {c.drill_id && (
+                        <span style={{ marginLeft: '0.4rem', fontSize: '0.6rem', fontWeight: 700, padding: '0.15rem 0.35rem', borderRadius: '4px', background: '#378ADD20', color: '#378ADD', border: '1px solid #378ADD30' }}>
+                          DRILL
+                        </span>
+                      )}
+                    </td>
                     <td style={{ padding: '1rem' }}><code style={{ fontSize: '0.75rem' }}>{c.partner_id}</code></td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{c.zone}</div>

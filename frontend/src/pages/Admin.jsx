@@ -1,9 +1,10 @@
 // frontend/src/pages/Admin.jsx
 // Person 4 — fully updated admin dashboard
 // Adds: BCRPanel, StressWidget, ZoneMapPanel, FraudQueuePanel, MLStatusPanel
+// Phase 2: DrillPanel, VerificationPanel
 // Keeps: AdminStats, TriggerPanel, ExclusionsCard (untouched — don't break what works)
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AdminStats    from '../components/admin/AdminStats';
 import TriggerPanel  from '../components/admin/TriggerPanel';
 import ExclusionsCard from '../components/admin/ExclusionsCard';
@@ -12,6 +13,8 @@ import ZoneMapPanel  from '../components/admin/ZoneMapPanel';
 import FraudQueuePanel from '../components/admin/FraudQueuePanel';
 import MLStatusPanel from '../components/admin/MLStatusPanel';
 import StressWidget  from '../components/StressWidget';
+import DrillPanel    from '../components/admin/DrillPanel';
+import VerificationPanel from '../components/admin/VerificationPanel';
 import './Admin.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -21,6 +24,7 @@ export function Admin() {
   const [loading, setLoading]       = useState(true);
   const [activeTab, setActiveTab]   = useState('overview');
   const [systemStatus, setSystemStatus] = useState({ level: 'green', text: 'All systems operational' });
+  const drillZoneSelectRef = useRef(null);
 
   useEffect(() => {
     loadStats();
@@ -71,10 +75,20 @@ export function Admin() {
     { id: 'bcr',       label: '\u{1F4C9} BCR / Loss Ratio' },
     { id: 'map',       label: '\u{1F5FA} Zone Map' },
     { id: 'fraud',     label: '\u{1F50D} Fraud Queue' },
+    { id: 'drills',    label: '\u{1F3AF} Drills' },
+    { id: 'verify',    label: '\u{1F50D} Verification' },
     { id: 'stress',    label: '\u26A1 Stress Scenarios' },
     { id: 'ml',        label: '\u{1F916} ML Models' },
-    { id: 'triggers',  label: '\u{1F3AF} Trigger Sim' },
+    { id: 'triggers',  label: '\u{2699}\u{FE0F} Legacy Sim' },
   ];
+
+  // Handle zone selection from map to drill panel
+  function handleMapZoneClick(zoneCode) {
+    if (drillZoneSelectRef.current) {
+      drillZoneSelectRef.current(zoneCode);
+      setActiveTab('drills');
+    }
+  }
 
   if (loading) {
     return (
@@ -118,8 +132,10 @@ export function Admin() {
       <div className="admin-content">
         {activeTab === 'overview'  && <AdminStats stats={stats} />}
         {activeTab === 'bcr'       && <BCRPanel />}
-        {activeTab === 'map'       && <ZoneMapPanel />}
+        {activeTab === 'map'       && <ZoneMapPanel onZoneClick={handleMapZoneClick} />}
         {activeTab === 'fraud'     && <FraudQueuePanel />}
+        {activeTab === 'drills'    && <DrillPanel onZoneSelect={(fn) => { drillZoneSelectRef.current = fn; }} />}
+        {activeTab === 'verify'    && <VerificationPanel />}
         {activeTab === 'stress'    && <StressWidget />}
         {activeTab === 'ml'        && <MLStatusPanel />}
         {activeTab === 'triggers'  && (
