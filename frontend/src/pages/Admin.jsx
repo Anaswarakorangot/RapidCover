@@ -12,9 +12,14 @@ import BCRPanel      from '../components/admin/BCRPanel';
 import ZoneMapPanel  from '../components/admin/ZoneMapPanel';
 import FraudQueuePanel from '../components/admin/FraudQueuePanel';
 import MLStatusPanel from '../components/admin/MLStatusPanel';
-import StressWidget  from '../components/StressWidget';
 import DrillPanel    from '../components/admin/DrillPanel';
 import VerificationPanel from '../components/admin/VerificationPanel';
+import StressProofPanel from '../components/admin/StressProofPanel';
+import ReassignmentQueuePanel from '../components/admin/ReassignmentQueuePanel';
+import TriggerProofPanel from '../components/admin/TriggerProofPanel';
+import RiqiProvenancePanel from '../components/admin/RiqiProvenancePanel';
+import NotificationPreviewPanel from '../components/admin/NotificationPreviewPanel';
+import DemoChecklist from '../components/admin/DemoChecklist';
 import './Admin.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -71,15 +76,20 @@ export function Admin() {
     : 'admin-status__dot--red';
 
   const TABS = [
-    { id: 'overview',  label: '\u{1F4CA} Overview' },
-    { id: 'bcr',       label: '\u{1F4C9} BCR / Loss Ratio' },
-    { id: 'map',       label: '\u{1F5FA} Zone Map' },
-    { id: 'fraud',     label: '\u{1F50D} Fraud Queue' },
-    { id: 'drills',    label: '\u{1F3AF} Drills' },
-    { id: 'verify',    label: '\u{1F50D} Verification' },
-    { id: 'stress',    label: '\u26A1 Stress Scenarios' },
-    { id: 'ml',        label: '\u{1F916} ML Models' },
-    { id: 'triggers',  label: '\u{2699}\u{FE0F} Legacy Sim' },
+    { id: 'overview',        label: '\u{1F4CA} Overview' },
+    { id: 'bcr',             label: '\u{1F4C9} BCR / Loss Ratio' },
+    { id: 'map',             label: '\u{1F5FA} Zone Map' },
+    { id: 'fraud',           label: '\u{1F50D} Fraud Queue' },
+    { id: 'drills',          label: '\u{1F3AF} Drills' },
+    { id: 'verify',          label: '\u{1F50D} Verification' },
+    { id: 'stress',          label: '\u26A1 Stress Proof' },
+    { id: 'reassign',        label: '\u{1F504} Reassignments' },
+    { id: 'trigger-proof',   label: '\u{1F3AF} Trigger Proof' },
+    { id: 'riqi',            label: '\u{1F4CA} RIQI Provenance' },
+    { id: 'notif-preview',   label: '\u{1F514} Notifications' },
+    { id: 'ml',              label: '\u{1F916} ML Models' },
+    { id: 'checklist',       label: '\u2705 Demo Checklist' },
+    { id: 'triggers',        label: '\u{2699}\u{FE0F} Legacy Sim' },
   ];
 
   // Handle zone selection from map to drill panel
@@ -136,8 +146,13 @@ export function Admin() {
         {activeTab === 'fraud'     && <FraudQueuePanel />}
         {activeTab === 'drills'    && <DrillPanel onZoneSelect={(fn) => { drillZoneSelectRef.current = fn; }} />}
         {activeTab === 'verify'    && <VerificationPanel />}
-        {activeTab === 'stress'    && <StressWidget />}
+        {activeTab === 'stress'    && <StressProofPanel />}
+        {activeTab === 'reassign'  && <ReassignmentQueuePanel />}
+        {activeTab === 'trigger-proof' && <TriggerProofPanel />}
+        {activeTab === 'riqi'      && <RiqiProvenancePanel />}
+        {activeTab === 'notif-preview' && <NotificationPreviewPanel />}
         {activeTab === 'ml'        && <MLStatusPanel />}
+        {activeTab === 'checklist' && <DemoChecklist />}
         {activeTab === 'triggers'  && (
           <>
             <TriggerPanel />
