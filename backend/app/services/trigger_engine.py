@@ -470,11 +470,13 @@ def _summarize(details: dict) -> str:
 
 def check_partner_pin_code_match(partner: Partner, zone: Zone, db: Session = None) -> tuple[bool, str]:
     """
-    Validate partner PIN-code eligibility when model fields are present.
+    Validate partner PIN-code eligibility with strict checking.
 
-    Current fallback behavior:
-    - if partner.pin_code or zone.pin_codes are not yet available on the models,
-      keep the partner eligible and return a reason code explaining the fallback
+    Returns:
+        (True, "pin_code_match") - Partner pin code matches zone coverage
+        (False, "partner_location_missing") - Partner has no pin code set
+        (False, "coverage_data_missing") - Zone has no coverage pin codes configured
+        (False, "pin_code_mismatch") - Partner pin code not in zone coverage
     """
     partner_pin_code = getattr(partner, "pin_code", None)
     zone_pin_codes = getattr(zone, "pin_codes", None)
@@ -486,8 +488,12 @@ def check_partner_pin_code_match(partner: Partner, zone: Zone, db: Session = Non
         if coverage_metadata["pin_codes"]:
             zone_pin_codes = coverage_metadata["pin_codes"]
 
-    if not partner_pin_code or not zone_pin_codes:
-        return True, "pin_code_fields_unavailable"
+    # Strict validation - explicit fail reasons instead of fallback-to-true
+    if not partner_pin_code:
+        return False, "partner_location_missing"
+
+    if not zone_pin_codes or len(zone_pin_codes) == 0:
+        return False, "coverage_data_missing"
 
     if partner_pin_code in zone_pin_codes:
         return True, "pin_code_match"
