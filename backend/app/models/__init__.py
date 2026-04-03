@@ -5,6 +5,8 @@ from app.models.trigger_event import TriggerEvent
 from app.models.claim import Claim
 from app.models.push_subscription import PushSubscription
 from app.models.drill_session import DrillSession, DrillType, DrillStatus
+from app.models.zone_reassignment import ZoneReassignment, ReassignmentStatus
+from app.models.zone_risk_profile import ZoneRiskProfile
 
 __all__ = [
     "Partner",
@@ -16,4 +18,7 @@ __all__ = [
     "DrillSession",
     "DrillType",
     "DrillStatus",
+    "ZoneReassignment",
+    "ReassignmentStatus",
+    "ZoneRiskProfile",
 ]
