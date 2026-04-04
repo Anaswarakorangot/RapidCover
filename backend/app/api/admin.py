@@ -36,8 +36,44 @@ from app.services.claims_processor import (
 )
 from app.services.payout_service import process_payout
 
+from app.services.notifications import get_partner_subscriptions, send_push_notification
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.post("/test-push")
+def admin_test_push(
+    phone: str = Query(..., description="Phone number of the partner to notify"),
+    db: Session = Depends(get_db),
+):
+    """
+    Admin-only endpoint to force a test notification to a specific phone number.
+    Bypasses partner auth for demo/debugging.
+    """
+    partner = db.query(Partner).filter(Partner.phone == phone).first()
+    if not partner:
+        raise HTTPException(status_code=404, detail=f"Partner with phone {phone} not found")
+
+    subscriptions = get_partner_subscriptions(partner.id, db)
+    if not subscriptions:
+        raise HTTPException(status_code=412, detail="Partner has no active push subscriptions. Ask them to click 'Enable Alerts' on the Dashboard first.")
+
+    payload = {
+        "title": "RapidCover Demo 🚀",
+        "body": "Real-time payout notification delivered successfully!",
+        "url": "/claims",
+        "tag": f"admin-test-{partner.id}",
+        "type": "payout_alert",
+        "icon": "/icon-192.png",
+    }
+
+    success_count = 0
+    for sub in subscriptions:
+        if send_push_notification(sub, payload):
+            success_count += 1
+    
+    db.commit()
+    return {"message": "Push sent", "devices": success_count}
 
 
 # Response schemas
