@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 
 /* ─── Design tokens matching Register.jsx ───────────────────────────────── */
@@ -339,6 +339,7 @@ function PremiumBreakdown({ breakdown }) {
 /* ─── Main Policy ─────────────────────────────────────────────────────── */
 export default function Policy() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [activePolicy, setActivePolicy] = useState(null);
   const [eligibility, setEligibility] = useState(null);
@@ -357,6 +358,32 @@ export default function Policy() {
   const [exclusionsAccepted, setExclusionsAccepted] = useState(false);
   const [pendingTier, setPendingTier] = useState(null);
   const [error, setError] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState(null);
+
+  // Handle Stripe redirect (payment success/cancel)
+  useEffect(() => {
+    const payment = searchParams.get('payment');
+    const sessionId = searchParams.get('session_id');
+
+    if (payment === 'success' && sessionId) {
+      setPaymentStatus('confirming');
+      api.confirmPayment(sessionId)
+        .then(() => {
+          setPaymentStatus('success');
+          // Clear URL params
+          setSearchParams({});
+          // Reload policy data
+          load();
+        })
+        .catch((err) => {
+          setPaymentStatus('error');
+          setError(err.message);
+        });
+    } else if (payment === 'cancelled') {
+      setPaymentStatus('cancelled');
+      setSearchParams({});
+    }
+  }, [searchParams]);
 
   useEffect(() => { load(); }, []);
 
@@ -392,9 +419,16 @@ export default function Policy() {
 
   async function handlePurchase(tier) {
     setPurchasing(tier);
-    try { await api.createPolicy(tier); await load(); }
-    catch (e) { alert(e.message); }
-    finally { setPurchasing(null); }
+    try {
+      // Create Stripe checkout session and redirect
+      const { checkout_url } = await api.createCheckoutSession(tier, false);
+      window.location.href = checkout_url;
+    }
+    catch (e) {
+      alert(e.message);
+      setPurchasing(null);
+    }
+    // Don't reset purchasing state - page will redirect to Stripe
   }
 
   async function handleCancel() {
@@ -507,6 +541,29 @@ export default function Policy() {
             {error}
           </div>
         )}
+
+        {/* Payment status banner */}
+        {paymentStatus === 'confirming' && (
+          <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '16px', borderRadius: '12px', color: '#1e40af', fontSize: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 20, height: 20, border: '2px solid #bfdbfe', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            Confirming your payment...
+          </div>
+        )}
+        {paymentStatus === 'success' && (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '16px', borderRadius: '12px', color: '#166534', fontSize: 14, marginBottom: 16 }}>
+            ✅ Payment successful! Your policy is now active.
+          </div>
+        )}
+        {paymentStatus === 'cancelled' && (
+          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: '16px', borderRadius: '12px', color: '#92400e', fontSize: 14, marginBottom: 16 }}>
+            Payment was cancelled. You can try again below.
+          </div>
+        )}
+
+        {/* Demo mode notice */}
+        <div style={{ background: '#faf5ff', border: '1px solid #e9d5ff', padding: '10px 14px', borderRadius: '10px', color: '#6b21a8', fontSize: 12, marginBottom: 16 }}>
+          🧪 <strong>Demo Mode:</strong> Stripe test mode - no real money charged. Use card <code style={{ background: '#ede9fe', padding: '2px 6px', borderRadius: 4 }}>4242 4242 4242 4242</code>
+        </div>
 
         {/* Eligibility gate */}
         {gateBlocked && (

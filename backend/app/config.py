@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     razorpay_key_secret: str = ""
     razorpay_account_number: str = ""
 
+    # Stripe (TEST MODE)
+    stripe_secret_key: str = ""
+    frontend_url: str = "http://localhost:5173"
+
     # Twilio
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""

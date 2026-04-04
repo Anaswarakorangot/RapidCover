@@ -105,6 +105,24 @@ async function createPolicy(tier, autoRenew = true) {
   return handleResponse(res);
 }
 
+// ── Stripe Payments ────────────────────────────────────────────────────────────
+
+async function createCheckoutSession(tier, autoRenew = false) {
+  const res = await fetch(`${BASE}/payments/checkout?tier=${tier}&auto_renew=${autoRenew}`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+async function confirmPayment(sessionId) {
+  const res = await fetch(`${BASE}/payments/confirm?session_id=${encodeURIComponent(sessionId)}`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
 async function cancelPolicy(policyId) {
   const res = await fetch(`${BASE}/policies/${policyId}/cancel`, {
     method: 'POST',
@@ -341,6 +359,8 @@ const api = {
   getPolicyHistory,
   getPolicyQuotes,
   createPolicy,
+  createCheckoutSession,
+  confirmPayment,
   cancelPolicy,
   getRenewalQuote,
   renewPolicy,

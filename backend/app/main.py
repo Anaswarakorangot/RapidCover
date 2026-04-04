@@ -7,8 +7,12 @@ from app.database import init_db, SessionLocal
 from app.api.router import api_router
 from app.data.seed_zones import seed_zones
 from app.data.seed_partner import seed_partners
-# Import models so they register with SQLAlchemy Base
-from app.models import Partner, Zone, Policy, TriggerEvent, Claim
+# Import ALL models so they register with SQLAlchemy Base (tables will be created by init_db)
+from app.models import (
+    Partner, Zone, Policy, TriggerEvent, Claim,
+    ZoneReassignment, ReassignmentStatus, ZoneRiskProfile,
+    PushSubscription, DrillSession,
+)
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 settings = get_settings()
