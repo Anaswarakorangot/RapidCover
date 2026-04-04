@@ -46,21 +46,33 @@ def subscribe_to_push(
         existing.is_active = True
         db.commit()
         db.refresh(existing)
-        return existing
+        target_subscription = existing
+    else:
+        # Create new subscription
+        new_subscription = PushSubscription(
+            partner_id=current_partner.id,
+            endpoint=subscription.endpoint,
+            p256dh_key=subscription.p256dh_key,
+            auth_key=subscription.auth_key,
+            is_active=True,
+        )
+        db.add(new_subscription)
+        db.commit()
+        db.refresh(new_subscription)
+        target_subscription = new_subscription
+    
+    # Send welcome notification immediately (for both new and refreshed subscriptions)
+    payload = {
+        "title": "RapidCover Activated! 🛡️",
+        "body": "Push notifications enabled. You'll be notified of payouts and claim updates.",
+        "url": "/profile",
+        "tag": "welcome-notification",
+        "type": "welcome",
+        "icon": "/icon-192.png",
+    }
+    send_push_notification(target_subscription, payload)
 
-    # Create new subscription
-    new_subscription = PushSubscription(
-        partner_id=current_partner.id,
-        endpoint=subscription.endpoint,
-        p256dh_key=subscription.p256dh_key,
-        auth_key=subscription.auth_key,
-        is_active=True,
-    )
-    db.add(new_subscription)
-    db.commit()
-    db.refresh(new_subscription)
-
-    return new_subscription
+    return target_subscription
 
 
 @router.post("/unsubscribe")
