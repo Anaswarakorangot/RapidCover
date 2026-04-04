@@ -281,6 +281,7 @@ export default function Claims() {
                 paidAt={claim.paid_at}
                 fraudScore={claim.fraud_score}
                 claimId={claim.id}
+                validationData={claim.validation_data}
               />
             ))}
           </div>
