@@ -22,7 +22,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (request.method !== 'GET') return;
 
-  if (self.location.hostname === 'localhost' && self.location.port === '5173') {
+  // During development, don't intercept API calls to avoid CORS/Cache issues
+  if (url.port === '8000' || url.pathname.startsWith('/api/')) {
     event.respondWith(fetch(request));
     return;
   }
