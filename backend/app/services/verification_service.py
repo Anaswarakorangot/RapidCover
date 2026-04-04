@@ -14,6 +14,7 @@ Provides comprehensive health checks for all system components:
 import time
 from datetime import datetime
 from typing import Optional
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.schemas.drill import VerificationCheck
@@ -168,7 +169,7 @@ def check_database_connection(db: Session) -> tuple[bool, str]:
     """Verify database connection is healthy."""
     try:
         # Execute a simple query
-        result = db.execute("SELECT 1").scalar()
+        result = db.execute(text("SELECT 1")).scalar()
         if result == 1:
             return True, "Database connection healthy"
         return False, "Database query returned unexpected result"
