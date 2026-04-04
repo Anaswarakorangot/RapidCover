@@ -18,6 +18,8 @@ import { useAuth } from '../context/AuthContext';
 import { NotificationToggle } from '../components/NotificationToggle';
 import { UpiSelector } from '../components/ui/UpiSelector';
 import RapidBot from '../components/RapidBot';
+import PrivacyConsentPanel from '../components/PrivacyConsentPanel';
+import HelpSupportPanel from '../components/HelpSupportPanel';
 import api from '../services/api';
 
 /* ─── Design tokens matching Register.jsx ───────────────────────────────── */
@@ -262,7 +264,6 @@ const S = `
     display: flex; align-items: center; gap: 12px; border: 1px solid var(--green-primary);
     text-decoration: none; color: var(--green-dark); font-weight: 700;
   }
-  
   .grok-card {
     background: #1a2e1a; border-radius: 16px; padding: 18px;
     display: flex; align-items: center; gap: 14px; border: 1.5px solid rgba(61, 184, 92, 0.3);
@@ -423,6 +424,63 @@ function KycSetup({ currentKyc, onSave }) {
       <div className="prf-btn-row">
         <button className="prf-btn-secondary" style={{ flex: 1 }} onClick={() => { setEditing(false); setError(''); }}>Cancel</button>
         <button className="prf-btn-primary" style={{ flex: 2 }} onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save KYC'}</button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── BankSetup ─────────────────────────────────────────────────────────── */
+function BankSetup({ partner, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [bankName, setBankName] = useState(partner?.bank_name || '');
+  const [accNum, setAccNum] = useState(partner?.account_number || '');
+  const [ifsc, setIfsc] = useState(partner?.ifsc_code || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function save() {
+    setSaving(true); setError('');
+    try {
+      await api.updateProfile({ 
+        bank_name: bankName.trim(), 
+        account_number: accNum.trim(),
+        ifsc_code: ifsc.trim().toUpperCase()
+      });
+      onSave?.({ bank_name: bankName, account_number: accNum, ifsc_code: ifsc });
+      setEditing(false);
+    } catch (e) { setError(e.message); } finally { setSaving(false); }
+  }
+
+  if (!editing) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <div>
+        {partner?.bank_name 
+          ? <><p style={{ fontWeight: 700, fontSize: 14 }}>{partner.bank_name}</p><p style={{ fontSize: 12, color: 'var(--green-primary)', marginTop: 2 }}>✓ Account ****{partner.account_number?.slice(-4)}</p></>
+          : <p style={{ fontSize: 13, color: 'var(--text-light)', fontStyle: 'italic' }}>No bank account linked yet</p>
+        }
+      </div>
+      <button className="prf-btn-outline" onClick={() => setEditing(true)}>{partner?.bank_name ? 'Update' : 'Setup Bank'}</button>
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="prf-field">
+        <label className="prf-label">Bank Name</label>
+        <input className="prf-input" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. HDFC Bank" />
+      </div>
+      <div className="prf-field">
+        <label className="prf-label">Account Number</label>
+        <input className="prf-input" value={accNum} onChange={e => setAccNum(e.target.value)} placeholder="Full account number" />
+      </div>
+      <div className="prf-field">
+        <label className="prf-label">IFSC Code</label>
+        <input className="prf-input" value={ifsc} onChange={e => setIfsc(e.target.value.toUpperCase())} placeholder="HDFC0001234" maxLength={11} />
+      </div>
+      {error && <p style={{ fontSize: 12, color: 'var(--error)', background: '#fef2f2', padding: '6px 10px', borderRadius: 8 }}>{error}</p>}
+      <div className="prf-btn-row">
+        <button className="prf-btn-secondary" style={{ flex: 1 }} onClick={() => setEditing(false)}>Cancel</button>
+        <button className="prf-btn-primary" style={{ flex: 2 }} onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Bank Details'}</button>
       </div>
     </div>
   );
@@ -596,12 +654,17 @@ export function Profile() {
   const [saving,   setSaving]   = useState(false);
   const [upiId,    setUpiId]    = useState(user?.upi_id || '');
   const [kyc,      setKyc]      = useState(user?.kyc || null);
+  const [bankInfo, setBankInfo] = useState({ 
+    bank_name: user?.bank_name, 
+    account_number: user?.account_number, 
+    ifsc_code: user?.ifsc_code 
+  });
 
   const [zoneHistoryData, setZoneHistoryData] = useState(null);
   const [historyLoading,  setHistoryLoading]  = useState(true);
   const [renewalPreview,  setRenewalPreview]  = useState(null);
   const [renewalLoading,  setRenewalLoading]  = useState(true);
-  const [legalModal,      setLegalModal]     = useState(null); // 'terms', 'privacy', 'support', 'rapidbot'
+  const [legalModal,      setLegalModal]     = useState(null); // 'terms', 'privacy', 'support', 'rapidbot', 'privacy_consent'
 
 
   // ── Load zone history ─────────────────────────────────────────────────────
@@ -636,7 +699,7 @@ export function Profile() {
 
         {/* ── Hero ── */}
         <div className="prf-hero">
-          <div className="prf-avatar">👤</div>
+          <div className="prf-avatar">P</div>
           <div>
             <p className="prf-hero-name">{user?.name}</p>
             <p className="prf-hero-phone">{user?.phone}</p>
@@ -669,7 +732,7 @@ export function Profile() {
               </>
             ) : (
               <button className="prf-btn-outline" style={{ width: '100%' }} onClick={() => setEditing(true)}>
-                ✏️ Edit Profile
+                Edit Profile
               </button>
             )}
           </div>
@@ -679,7 +742,7 @@ export function Profile() {
         {user?.zone_id && (
           <div className="prf-card">
             <div className="prf-card-body">
-              <p className="prf-section-title">📍 Your Zone</p>
+              <p className="prf-section-title">Your Zone</p>
               <div className="zone-chip">
                 {user.zone_name
                   ? `${user.zone_name}${user.zone_code ? ` · ${user.zone_code}` : ''}`
@@ -702,16 +765,28 @@ export function Profile() {
         {/* ── UPI Linking ── */}
         <div className="prf-card">
           <div className="prf-card-body">
-            <p className="prf-section-title">💳 UPI Linking</p>
+            <p className="prf-section-title">UPI Linking</p>
             <p className="prf-section-sub">Link your UPI ID to receive claim payouts instantly</p>
             <UpiSetup currentUpiId={upiId} onSave={u => setUpiId(u)} />
+          </div>
+        </div>
+
+        {/* ── Bank Account (IMPS Fallback) ── */}
+        <div className="prf-card">
+          <div className="prf-card-body">
+            <p className="prf-section-title">Bank Account (IMPS Fallback)</p>
+            <p className="prf-section-sub">Backup payout channel if UPI fails or is unlinked</p>
+            <BankSetup 
+              partner={{...user, ...bankInfo}} 
+              onSave={b => setBankInfo(b)} 
+            />
           </div>
         </div>
 
         {/* ── KYC ── */}
         <div className="prf-card">
           <div className="prf-card-body">
-            <p className="prf-section-title">🪪 KYC Verification</p>
+            <p className="prf-section-title">KYC Verification</p>
             <p className="prf-section-sub">Complete KYC to unlock higher claim limits</p>
             <KycSetup currentKyc={kyc} onSave={k => setKyc(k)} />
           </div>
@@ -720,7 +795,7 @@ export function Profile() {
         {/* ── Notifications ── */}
         <div className="prf-card">
           <div className="prf-card-body">
-            <p className="prf-section-title">🔔 Notifications</p>
+            <p className="prf-section-title">Notifications</p>
             <NotificationToggle />
           </div>
         </div>
@@ -729,16 +804,20 @@ export function Profile() {
         <div className="prf-card">
           <div className="prf-card-body" style={{ padding: '10px 18px' }}>
             <button className="prf-action-row" onClick={() => setLegalModal('terms')}>
-              <span>📄 Terms of Service</span>
-              <span style={{ color: 'var(--text-light)' }}>→</span>
+              <span>Terms of Service</span>
+              <span style={{ color: 'var(--text-light)' }}>-&gt;</span>
             </button>
             <button className="prf-action-row" onClick={() => setLegalModal('privacy')}>
-              <span>🔒 Privacy Policy</span>
-              <span style={{ color: 'var(--text-light)' }}>→</span>
+              <span>Privacy Policy</span>
+              <span style={{ color: 'var(--text-light)' }}>-&gt;</span>
+            </button>
+            <button className="prf-action-row" onClick={() => setLegalModal('privacy_consent')}>
+              <span>Your Data & Consent</span>
+              <span style={{ color: 'var(--text-light)' }}>-&gt;</span>
             </button>
             <button className="prf-action-row" onClick={() => setLegalModal('support')}>
-              <span>💬 Help & Support</span>
-              <span style={{ color: 'var(--text-light)' }}>→</span>
+              <span>Help & Support</span>
+              <span style={{ color: 'var(--text-light)' }}>-&gt;</span>
             </button>
           </div>
         </div>
@@ -757,6 +836,7 @@ export function Profile() {
                   <h2 className="legal-title">
                     {legalModal === 'terms' && 'Terms of Service'}
                     {legalModal === 'privacy' && 'Privacy Policy'}
+                    {legalModal === 'privacy_consent' && 'Your Data & Consent'}
                     {legalModal === 'support' && 'Help & Support'}
                   </h2>
                   <button 
@@ -768,6 +848,7 @@ export function Profile() {
 
               <div className={legalModal === 'rapidbot' ? '' : 'legal-body'} style={legalModal === 'rapidbot' ? { height: '85vh' } : {}}>
                 {legalModal === 'rapidbot' && <RapidBot />}
+                {legalModal === 'privacy_consent' && <PrivacyConsentPanel />}
                 
                 {legalModal === 'terms' && (
                   <>
@@ -805,30 +886,14 @@ export function Profile() {
 
                 {legalModal === 'support' && (
                   <>
-                    <p style={{ marginBottom: 15 }}>Need help? Our AI assistant or support team is here for you.</p>
-                    <div className="grok-card" onClick={() => setLegalModal('rapidbot')}>
-                      <div className="bmsg-bot-avatar" style={{ border: '1px solid rgba(61, 184, 92, 0.3)', background: 'rgba(61, 184, 92, 0.1)' }}>R</div>
+                    <div className="grok-card" onClick={() => setLegalModal('rapidbot')} style={{ marginBottom: 20 }}>
+                      <div className="bmsg-bot-avatar" style={{ border: '1.5px solid rgba(61, 184, 92, 0.3)', background: '#ffffff', color: '#3DB85C' }}>R</div>
                       <div>
                         <div style={{ fontSize: 15 }}>Talk to RapidBot AI</div>
                         <div style={{ fontSize: 11, opacity: 0.7, fontWeight: 400 }}>Instant help with policy locks, payouts & zones</div>
                       </div>
                     </div>
-                    <div style={{ height: 16 }} />
-                    <a href="https://wa.me/919999999999" className="support-card" target="_blank" rel="noreferrer">
-                      <span style={{ fontSize: 24 }}>💬</span>
-                      <div>
-                        <div style={{ fontSize: 14 }}>WhatsApp Support</div>
-                        <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 400 }}>Instant reply within 5 mins</div>
-                      </div>
-                    </a>
-                    <div style={{ height: 12 }} />
-                    <a href="mailto:support@rapidcover.in" className="support-card" style={{ background: '#f1f5f9', color: '#475569', borderColor: '#cbd5e1' }}>
-                      <span style={{ fontSize: 24 }}>📧</span>
-                      <div>
-                        <div style={{ fontSize: 14 }}>Email Ticketing</div>
-                        <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 400 }}>support@rapidcover.in</div>
-                      </div>
-                    </a>
+                    <HelpSupportPanel />
                   </>
                 )}
               </div>

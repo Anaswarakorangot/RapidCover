@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import SourceBadge from '../components/SourceBadge';
 import ReassignmentCountdown from '../components/ReassignmentCountdown';
 import { useNotifications } from '../hooks/useNotifications';
+import OfflineFallbackCard from '../components/OfflineFallbackCard';
 
 const POLL_INTERVAL_MS = 5_000;
 const POLL_TIMEOUT_MS  = 120_000;
@@ -534,6 +535,7 @@ export function Dashboard() {
   const [pollingActive, setPollingActive] = useState(true);
   const [pendingReassignment, setPendingReassignment] = useState(null);
   const [reassignProcessing, setReassignProcessing] = useState(false);
+  const [offlineSim, setOfflineSim] = useState(false);
   const { isSupported, permission, isSubscribed, enableNotifications } = useNotifications();
   const [hasActivatedThisSession, setHasActivatedThisSession] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
@@ -709,6 +711,16 @@ export function Dashboard() {
             </p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            <button 
+              onClick={() => setOfflineSim(!offlineSim)}
+              style={{
+                fontSize: 10, background: offlineSim ? '#ef4444' : 'transparent', 
+                border: '1.5px solid ' + (offlineSim ? '#ef4444' : '#e2ece2'), padding: '2px 8px', borderRadius: 12,
+                color: offlineSim ? 'white' : 'var(--text-light)', cursor: 'pointer', marginBottom: 2, fontFamily: "'DM Sans', sans-serif"
+              }}
+            >
+              Offline Sim
+            </button>
             {policy && (
               <span style={{
                 display: 'flex', alignItems: 'center', gap: 6, background: 'var(--green-light)',
@@ -725,6 +737,8 @@ export function Dashboard() {
           </div>
         </div>
         
+        {offlineSim && <OfflineFallbackCard />}
+
         {/* ── 0. Notification Prompt (Hackathon Demo - Shows once per session until clicked) ── */}
         {!hasActivatedThisSession && isSupported && permission !== 'denied' && (
           <div className="alert-card alert-purple" style={{ cursor: 'pointer' }} onClick={handleEnableNotifications}>

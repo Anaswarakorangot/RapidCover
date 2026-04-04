@@ -144,11 +144,14 @@ def build_transaction_log(
     payout_metadata: dict,
 ) -> dict:
     """Build a structured transaction log for a payout (stored in validation_data)."""
+    # Determine payout channel
+    primary_channel = "UPI/Stripe" if partner.upi_id else "IMPS/Bank"
+    
     return {
         "transaction": {
             "ref": upi_ref,
-            "channel": "UPI/Stripe",
-            "provider": "Stripe Connect Mock",
+            "channel": primary_channel,
+            "provider": "Stripe Connect Mock" if partner.upi_id else "IMPS Gateway Mock",
             "amount": claim.amount,
             "currency": "INR",
             "status": "SUCCESS",
@@ -286,18 +289,29 @@ def process_payout(
     stripe_error = None
 
     if not upi_ref:
-        # Utilize Stripe mock instead of Razorpay
+        # Utilize Stripe mock if UPI exists, else IMPS mock
         try:
-            stripe_success, tr_ref, stripe_data = process_stripe_payout_mock(partner, claim.amount, claim.id)
-            if stripe_success:
-                upi_ref = tr_ref
-                payout_metadata["stripe"] = stripe_data
+            if partner.upi_id:
+                stripe_success, tr_ref, stripe_data = process_stripe_payout_mock(partner, claim.amount, claim.id)
+                if stripe_success:
+                    upi_ref = tr_ref
+                    payout_metadata["stripe"] = stripe_data
+                else:
+                    stripe_error = "Stripe mock returned failure"
             else:
-                stripe_error = "Stripe mock returned failure"
+                # IMPS Fallback
+                logger.info(f"Using IMPS fallback for partner {partner.id} (no UPI)")
+                upi_ref = f"IMPS{uuid.uuid4().hex[:12].upper()}"
+                payout_metadata["imps"] = {
+                    "bank_name": partner.bank_name,
+                    "account_number": f"****{partner.account_number[-4:]}" if partner.account_number else None,
+                    "ifsc": partner.ifsc_code
+                }
+                stripe_success = True  # Consider IMPS successful immediately
         except Exception as e:
             stripe_success = False
             stripe_error = str(e)
-            logger.error(f"Stripe payout exception for claim {claim.id}: {e}")
+            logger.error(f"Payout exception for claim {claim.id}: {e}")
 
     if not stripe_success and not upi_ref:
         # Payment failed - record failure in state machine
@@ -312,7 +326,7 @@ def process_payout(
     # Confirm payment in state machine
     confirm_success = confirm_payment(
         claim, upi_ref, db,
-        additional_data=payout_metadata.get("stripe"),
+        additional_data=payout_metadata.get("stripe") or payout_metadata.get("imps"),
     )
 
     if not confirm_success:
