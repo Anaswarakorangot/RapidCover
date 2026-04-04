@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     cpcb_api_key: str = ""
     news_api_key: str = ""
     waqi_api_key: str = ""
+    groq_api_key: str = ""
 
     # Razorpay
     razorpay_key_id: str = ""
