@@ -21,7 +21,7 @@ NOTIFICATION_TEMPLATES = {
         },
         "claim_paid": {
             "title": "Payment Received! - RapidCover",
-            "body": "Rs. {amount} has been credited to your UPI. Ref: {upi_ref}",
+            "body": "💰 Rs. {amount} has been credited to your UPI account. Ref: {upi_ref}",
         },
         "claim_rejected": {
             "title": "Claim Update - RapidCover",
@@ -59,7 +59,7 @@ NOTIFICATION_TEMPLATES = {
         },
         "claim_paid": {
             "title": "भुगतान प्राप्त! - RapidCover",
-            "body": "Rs. {amount} आपके UPI में जमा हो गए हैं। Ref: {upi_ref}",
+            "body": "💰 Rs. {amount} आपके UPI खाते में जमा हो गए हैं। Ref: {upi_ref}",
         },
         "claim_rejected": {
             "title": "दावा अपडेट - RapidCover",

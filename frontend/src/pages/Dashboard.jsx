@@ -18,6 +18,7 @@ import { getMyReassignments, acceptReassignment, rejectReassignment } from '../s
 import { useAuth } from '../context/AuthContext';
 import SourceBadge from '../components/SourceBadge';
 import ReassignmentCountdown from '../components/ReassignmentCountdown';
+import { useNotifications } from '../hooks/useNotifications';
 
 const POLL_INTERVAL_MS = 5_000;
 const POLL_TIMEOUT_MS  = 120_000;
@@ -533,6 +534,9 @@ export function Dashboard() {
   const [pollingActive, setPollingActive] = useState(true);
   const [pendingReassignment, setPendingReassignment] = useState(null);
   const [reassignProcessing, setReassignProcessing] = useState(false);
+  const { isSupported, permission, isSubscribed, enableNotifications } = useNotifications();
+  const [hasActivatedThisSession, setHasActivatedThisSession] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
 
   const pollRef         = useRef(null);
   const activityRef     = useRef(null);
@@ -650,6 +654,15 @@ export function Dashboard() {
     }
   };
 
+  const handleEnableNotifications = async () => {
+    try {
+      await enableNotifications();
+      setHasActivatedThisSession(true);
+    } catch (err) {
+      console.error('Notification failed:', err);
+    }
+  };
+
   /* ── derived ── */
   const zoneAlert       = expState?.zone_alert       ?? null;
   const loyalty         = expState?.loyalty          ?? null;
@@ -711,6 +724,25 @@ export function Dashboard() {
             )}
           </div>
         </div>
+        
+        {/* ── 0. Notification Prompt (Hackathon Demo - Shows once per session until clicked) ── */}
+        {!hasActivatedThisSession && isSupported && permission !== 'denied' && (
+          <div className="alert-card alert-purple" style={{ cursor: 'pointer' }} onClick={handleEnableNotifications}>
+            <span style={{ fontSize: 22 }}>🔔</span>
+            <div style={{ flex: 1 }}>
+              <span className="alert-title">{isSubscribed ? 'Pushes Synced' : 'Enable Payout Alerts'}</span>
+              <p className="alert-body">
+                {isSubscribed ? 'Your phone is currently receiving updates' : 'Get notified the second a payment hits your UPI ID'}
+              </p>
+              <button 
+                className="alert-btn-fill" 
+                style={{ marginTop: 8, background: '#22c55e', width: 'auto', padding: '6px 16px' }}
+              >
+                {isSubscribed ? 'Re-Sync' : 'Activate'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── 1. Payout Banner – always top, only when paid ── */}
         {!payoutDismissed && (
