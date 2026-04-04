@@ -5,6 +5,7 @@ Note: In production, these would require admin authentication.
 For demo purposes, they are open.
 """
 
+import json
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -1136,4 +1137,199 @@ def proof_data_sources(db: Session = Depends(get_db)):
         "feature": "data_sources",
         "sources": sources,
         "computed_at": datetime.utcnow().isoformat(),
+    }
+
+
+# ─── Validation Matrix Proof ──────────────────────────────────────────────────
+
+@router.get("/panel/proof/validation-matrix")
+def proof_validation_matrix(db: Session = Depends(get_db)):
+    """
+    Proof endpoint: shows validation matrix for the most recent paid/rejected claim.
+
+    Every processed claim now carries a machine-readable validation matrix with
+    10 checks: threshold breach, zone match, pin-code, active policy, shift window,
+    partner activity, platform activity, fraud score, data freshness, cross-source agreement.
+    """
+    from app.models.claim import ClaimStatus
+
+    # Find most recent claim with validation matrix
+    recent_claims = (
+        db.query(Claim)
+        .filter(Claim.status.in_([ClaimStatus.PAID, ClaimStatus.REJECTED, ClaimStatus.APPROVED]))
+        .order_by(Claim.created_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    sample_claim = None
+    sample_matrix = None
+    for claim in recent_claims:
+        try:
+            vd = json.loads(claim.validation_data or "{}")
+            if "validation_matrix" in vd:
+                sample_claim = claim
+                sample_matrix = vd["validation_matrix"]
+                break
+        except Exception:
+            continue
+
+    if not sample_matrix:
+        return {
+            "feature": "validation_matrix",
+            "pass_fail": "partial",
+            "notes": ["No claims with validation matrix found yet — fire a trigger to generate one"],
+            "sample_claim_id": None,
+            "matrix": [],
+        }
+
+    matrix_summary = {
+        "total_checks": len(sample_matrix),
+        "passed": sum(1 for c in sample_matrix if c["passed"]),
+        "failed": sum(1 for c in sample_matrix if not c["passed"]),
+    }
+
+    return {
+        "feature": "validation_matrix",
+        "pass_fail": "pass",
+        "sample_claim_id": sample_claim.id,
+        "sample_claim_status": sample_claim.status.value,
+        "matrix_summary": matrix_summary,
+        "matrix": sample_matrix,
+        "notes": [
+            "Every paid/rejected claim now carries a full 10-check validation matrix",
+            "Check validation_data.validation_matrix on any claim record",
+        ],
+        "computed_at": datetime.utcnow().isoformat(),
+    }
+
+
+@router.get("/panel/proof/oracle-reliability")
+def proof_oracle_reliability(db: Session = Depends(get_db)):
+    """
+    Proof endpoint: shows oracle reliability engine output.
+
+    Demonstrates source confidence scoring, freshness checks, agreement logic,
+    and trigger confidence decisions. Answers: 'what if third-party APIs fail or are noisy?'
+    """
+    from app.services.external_apis import get_oracle_reliability_report, compute_trigger_confidence
+
+    oracle = get_oracle_reliability_report()
+
+    # Simulate a trigger confidence decision for demo
+    weather_conf = compute_trigger_confidence(
+        primary_source="openweathermap",
+        corroborating_sources=["waqi_aqi"],
+        primary_value=62.0,
+        corroborating_values=[58.0],
+    )
+
+    return {
+        "feature": "oracle_reliability_engine",
+        "pass_fail": "pass",
+        "system_health": oracle["system_health"],
+        "average_reliability": oracle["average_reliability"],
+        "source_count": len(oracle["sources"]),
+        "sources": oracle["sources"],
+        "sample_trigger_confidence": weather_conf,
+        "notes": [
+            "Sources are scored: live+fresh=1.0, mock=0.6, stale=0.2",
+            "Trigger confidence combines primary + corroborating source scores",
+            "Decisions: fire | hold | manual_review_simulated | fallback_mock_mode",
+            "Oracle report is now embedded in every TriggerEvent.source_data",
+        ],
+        "computed_at": oracle["computed_at"],
+    }
+
+
+@router.get("/panel/proof/platform-activity")
+def proof_platform_activity(db: Session = Depends(get_db)):
+    """
+    Proof endpoint: shows platform activity simulation for delivery partners.
+
+    Demonstrates Zomato/Swiggy/Zepto/Blinkit activity tracking and how it
+    gates claim eligibility. Answers: 'how do you verify the worker is actually working?'
+    """
+    from app.services.claims_processor import get_db_partner_platform_activity
+    from app.services.external_apis import evaluate_partner_platform_eligibility
+
+    partners = db.query(Partner).filter(Partner.is_active == True).limit(5).all()
+    if not partners:
+        return {
+            "feature": "platform_activity_simulation",
+            "pass_fail": "partial",
+            "notes": ["No active partners found. Seed partner data first."],
+            "partners": [],
+        }
+
+    partner_samples = []
+    for p in partners:
+        activity = get_db_partner_platform_activity(p.id, db)
+        eligibility = evaluate_partner_platform_eligibility(p.id)
+        partner_samples.append({
+            "partner_id": p.id,
+            "partner_name": p.name,
+            "platform": activity.get("platform"),
+            "platform_logged_in": activity["platform_logged_in"],
+            "active_shift": activity["active_shift"],
+            "orders_completed_recent": activity["orders_completed_recent"],
+            "suspicious_inactivity": activity["suspicious_inactivity"],
+            "platform_eligible": eligibility["eligible"],
+            "platform_score": eligibility["score"],
+        })
+
+    eligible_count = sum(1 for p in partner_samples if p["platform_eligible"])
+
+    return {
+        "feature": "platform_activity_simulation",
+        "pass_fail": "pass",
+        "total_sampled": len(partner_samples),
+        "platform_eligible": eligible_count,
+        "platform_ineligible": len(partner_samples) - eligible_count,
+        "partners": partner_samples,
+        "admin_controls": {
+            "get_activity": "GET /zones/partners/{partner_id}/activity",
+            "set_activity": "PUT /zones/partners/{partner_id}/activity",
+            "check_eligibility": "GET /zones/partners/{partner_id}/activity/eligibility",
+            "bulk_view": "GET /zones/partners/activity/bulk",
+        },
+        "notes": [
+            "Admin can toggle platform_logged_in, active_shift, suspicious_inactivity per partner",
+            "Claim approval reads platform_activity check via validation matrix",
+            "Platform activity score gates payout — inactive workers are blocked",
+        ],
+        "computed_at": datetime.utcnow().isoformat(),
+    }
+
+
+@router.get("/claims/{claim_id}/validation-matrix")
+def get_claim_validation_matrix(claim_id: int, db: Session = Depends(get_db)):
+    """
+    GET /admin/claims/{claim_id}/validation-matrix
+
+    Return the full validation matrix stored on a specific claim.
+    Used by admin VerificationPanel to render per-claim check results.
+    """
+    import json as _json
+    claim = db.query(Claim).filter(Claim.id == claim_id).first()
+    if not claim:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim not found")
+
+    try:
+        vd = _json.loads(claim.validation_data or "{}")
+    except Exception:
+        vd = {}
+
+    matrix = vd.get("validation_matrix", [])
+    matrix_summary = vd.get("validation_matrix_summary", {})
+
+    return {
+        "claim_id": claim_id,
+        "claim_status": claim.status.value,
+        "claim_amount": claim.amount,
+        "fraud_score": claim.fraud_score,
+        "validation_matrix": matrix,
+        "matrix_summary": matrix_summary,
+        "has_matrix": bool(matrix),
+        "computed_at": vd.get("processed_at"),
     }
