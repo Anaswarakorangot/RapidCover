@@ -236,6 +236,31 @@ const S = `
   .prf-file-label.has-file { border-color: var(--green-primary); background: var(--green-light); color: var(--green-dark); }
 
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Legal Modal ── */
+  .legal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+    z-index: 2000; display: flex; align-items: flex-end;
+  }
+  .legal-sheet {
+    background: white; width: 100%; max-height: 85vh;
+    border-radius: 24px 24px 0 0; padding: 24px;
+    display: flex; flex-direction: column; gap: 16px;
+    animation: slideUp 0.3s ease-out; overflow-y: auto;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  
+  .legal-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px; }
+  .legal-body  { font-size: 14px; line-height: 1.6; color: var(--text-mid); }
+  .legal-section { margin-bottom: 20px; }
+  .legal-h3 { font-weight: 700; color: var(--text-dark); margin-bottom: 8px; font-size: 15px; }
+  
+  .support-card {
+    background: var(--green-light); border-radius: 16px; padding: 16px;
+    display: flex; align-items: center; gap: 12px; border: 1px solid var(--green-primary);
+    text-decoration: none; color: var(--green-dark); font-weight: 700;
+  }
 `;
 
 /* ─── LANGUAGES ─────────────────────────────────────────────────────────── */
@@ -565,6 +590,8 @@ export function Profile() {
   const [historyLoading,  setHistoryLoading]  = useState(true);
   const [renewalPreview,  setRenewalPreview]  = useState(null);
   const [renewalLoading,  setRenewalLoading]  = useState(true);
+  const [legalModal,      setLegalModal]     = useState(null); // 'terms', 'privacy', 'support'
+
 
   // ── Load zone history ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -690,14 +717,104 @@ export function Profile() {
         {/* ── Account links ── */}
         <div className="prf-card">
           <div className="prf-card-body" style={{ padding: '10px 18px' }}>
-            {[['📄 Terms of Service'], ['🔒 Privacy Policy'], ['💬 Help & Support']].map(([label]) => (
-              <button className="prf-action-row" key={label}>
-                <span>{label}</span>
-                <span style={{ color: 'var(--text-light)' }}>→</span>
-              </button>
-            ))}
+            <button className="prf-action-row" onClick={() => setLegalModal('terms')}>
+              <span>📄 Terms of Service</span>
+              <span style={{ color: 'var(--text-light)' }}>→</span>
+            </button>
+            <button className="prf-action-row" onClick={() => setLegalModal('privacy')}>
+              <span>🔒 Privacy Policy</span>
+              <span style={{ color: 'var(--text-light)' }}>→</span>
+            </button>
+            <button className="prf-action-row" onClick={() => setLegalModal('support')}>
+              <span>💬 Help & Support</span>
+              <span style={{ color: 'var(--text-light)' }}>→</span>
+            </button>
           </div>
         </div>
+
+        {/* ── Legal Modals ── */}
+        {legalModal && (
+          <div className="legal-overlay" onClick={() => setLegalModal(null)}>
+            <div className="legal-sheet" onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <h2 className="legal-title">
+                  {legalModal === 'terms' && 'Terms of Service'}
+                  {legalModal === 'privacy' && 'Privacy Policy'}
+                  {legalModal === 'support' && 'Help & Support'}
+                </h2>
+                <button 
+                  onClick={() => setLegalModal(null)}
+                  style={{ background: 'var(--gray-bg)', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 18 }}
+                >✕</button>
+              </div>
+
+              <div className="legal-body">
+                {legalModal === 'terms' && (
+                  <>
+                    <div className="legal-section">
+                      <h3 className="legal-h3">1. Coverage Scope</h3>
+                      <p>RapidCover provides parametric insurance for gig delivery partners. Payouts are triggered automatically based on hyper-local weather and civic data.</p>
+                    </div>
+                    <div className="legal-section">
+                      <h3 className="legal-h3">2. Payout Eligibility</h3>
+                      <p>Partners must maintain an active delivery status during the disruption window. Claims are processed via real-time data oracles and are final once issued.</p>
+                    </div>
+                    <div className="legal-section">
+                      <h3 className="legal-h3">3. Fair Use</h3>
+                      <p>Any attempt to manipulate GPS data or simulate false platform activity will result in immediate policy cancellation without refund.</p>
+                    </div>
+                  </>
+                )}
+
+                {legalModal === 'privacy' && (
+                  <>
+                    <div className="legal-section">
+                      <h3 className="legal-h3">1. Data Encryption</h3>
+                      <p>Your Aadhaar and PAN details are hashed using SHA-256 before storage. We do not store plain-text identity documents.</p>
+                    </div>
+                    <div className="legal-section">
+                      <h3 className="legal-h3">2. Location Privacy</h3>
+                      <p>Location data is used exclusively for verifying your presence in your assigned zone during disruption events. We do not track you outside of active coverage windows.</p>
+                    </div>
+                    <div className="legal-section">
+                      <h3 className="legal-h3">3. Payment Security</h3>
+                      <p>UPI IDs are stored only to facilitate instant payouts via NPCI-approved gateways. We do not have access to your bank account details.</p>
+                    </div>
+                  </>
+                )}
+
+                {legalModal === 'support' && (
+                  <>
+                    <p style={{ marginBottom: 20 }}>Need help with a claim or your policy? Our support team is available 24/7 during monsoons and heatwaves.</p>
+                    <a href="https://wa.me/919999999999" className="support-card" target="_blank" rel="noreferrer">
+                      <span style={{ fontSize: 24 }}>💬</span>
+                      <div>
+                        <div style={{ fontSize: 14 }}>WhatsApp Support</div>
+                        <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 400 }}>Instant reply within 5 mins</div>
+                      </div>
+                    </a>
+                    <div style={{ height: 12 }} />
+                    <a href="mailto:support@rapidcover.in" className="support-card" style={{ background: '#f1f5f9', color: '#475569', borderColor: '#cbd5e1' }}>
+                      <span style={{ fontSize: 24 }}>📧</span>
+                      <div>
+                        <div style={{ fontSize: 14 }}>Email Ticketing</div>
+                        <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 400 }}>support@rapidcover.in</div>
+                      </div>
+                    </a>
+                  </>
+                )}
+              </div>
+              
+              <button 
+                className="prf-btn-primary" 
+                style={{ marginTop: 20 }}
+                onClick={() => setLegalModal(null)}
+              >
+                Understood
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Logout ── */}
         <button className="prf-btn-danger" onClick={() => { logout(); navigate('/login'); }}>Logout</button>
