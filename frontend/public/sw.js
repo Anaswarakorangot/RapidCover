@@ -1,10 +1,14 @@
 // RapidCover Service Worker
 
 const CACHE_NAME = 'rapidcover-v2';
-const STATIC_ASSETS = ['/', '/index.html', '/icon-192.png', '/icon-512.png'];
+const STATIC_ASSETS = ['/', '/index.html', '/favicon.svg', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)));
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
+      .catch(err => console.log('[SW] Pre-cache failed (some assets might be missing):', err))
+  );
   self.skipWaiting();
 });
 
