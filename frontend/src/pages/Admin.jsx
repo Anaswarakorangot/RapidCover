@@ -11,7 +11,6 @@ import ExclusionsCard from '../components/admin/ExclusionsCard';
 import BCRPanel      from '../components/admin/BCRPanel';
 import ZoneMapPanel  from '../components/admin/ZoneMapPanel';
 import FraudQueuePanel from '../components/admin/FraudQueuePanel';
-import MLStatusPanel from '../components/admin/MLStatusPanel';
 import DrillPanel    from '../components/admin/DrillPanel';
 import VerificationPanel from '../components/admin/VerificationPanel';
 import StressProofPanel from '../components/admin/StressProofPanel';
@@ -20,6 +19,7 @@ import TriggerProofPanel from '../components/admin/TriggerProofPanel';
 import RiqiProvenancePanel from '../components/admin/RiqiProvenancePanel';
 import NotificationPreviewPanel from '../components/admin/NotificationPreviewPanel';
 import DemoChecklist from '../components/admin/DemoChecklist';
+import SocialOraclePanel from '../components/admin/SocialOraclePanel';
 import './Admin.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -87,8 +87,8 @@ export function Admin() {
     { id: 'trigger-proof',   label: '\u{1F3AF} Trigger Proof' },
     { id: 'riqi',            label: '\u{1F4CA} RIQI Provenance' },
     { id: 'notif-preview',   label: '\u{1F514} Notifications' },
-    { id: 'ml',              label: '\u{1F916} ML Models' },
     { id: 'checklist',       label: '\u2705 Demo Checklist' },
+    { id: 'oracle',          label: '\u{1F52E} Auto-Oracle' },
     { id: 'triggers',        label: '\u{2699}\u{FE0F} Legacy Sim' },
   ];
 
@@ -151,8 +151,8 @@ export function Admin() {
         {activeTab === 'trigger-proof' && <TriggerProofPanel />}
         {activeTab === 'riqi'      && <RiqiProvenancePanel />}
         {activeTab === 'notif-preview' && <NotificationPreviewPanel />}
-        {activeTab === 'ml'        && <MLStatusPanel />}
         {activeTab === 'checklist' && <DemoChecklist />}
+        {activeTab === 'oracle'    && <SocialOraclePanel />}
         {activeTab === 'triggers'  && (
           <>
             <TriggerPanel />
