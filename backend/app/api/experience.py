@@ -392,6 +392,117 @@ def get_zone_history(
     }
 
 
+@router.get(
+    "/me/reassignments",
+    summary="List partner's zone reassignment proposals",
+)
+def get_my_reassignments(
+    partner: Partner = Depends(get_current_partner),
+    db: Session = Depends(get_db),
+):
+    """
+    Return all zone reassignment proposals for the authenticated partner,
+    most-recent first.  Consumed by Dashboard.jsx to show the accept/reject card.
+
+    Response shape:
+    {
+      reassignments: [ ZoneReassignmentResponse, ... ],
+      total: int,
+      pending_count: int,
+    }
+    """
+    from app.services.zone_reassignment_service import list_reassignments
+    from app.models.zone_reassignment import ReassignmentStatus
+
+    return list_reassignments(db, partner_id=partner.id)
+
+
+@router.post(
+    "/me/reassignments/{reassignment_id}/accept",
+    summary="Accept a pending zone reassignment proposal",
+)
+def accept_my_reassignment(
+    reassignment_id: int,
+    partner: Partner = Depends(get_current_partner),
+    db: Session = Depends(get_db),
+):
+    """
+    Accept a proposed zone reassignment.
+
+    - Updates partner.zone_id to the new zone
+    - Appends an entry to partner.zone_history
+    - Returns the updated reassignment or a 4xx error
+    """
+    from fastapi import HTTPException, status as http_status
+    from app.services.zone_reassignment_service import (
+        accept_reassignment,
+        get_reassignment,
+    )
+
+    # Ownership guard
+    existing = get_reassignment(reassignment_id, db)
+    if not existing:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Reassignment not found",
+        )
+    if existing.partner_id != partner.id:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Not your reassignment",
+        )
+
+    result, error = accept_reassignment(reassignment_id, db)
+    if not result:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=error or "Could not accept reassignment",
+        )
+    return result
+
+
+@router.post(
+    "/me/reassignments/{reassignment_id}/reject",
+    summary="Reject a pending zone reassignment proposal",
+)
+def reject_my_reassignment(
+    reassignment_id: int,
+    partner: Partner = Depends(get_current_partner),
+    db: Session = Depends(get_db),
+):
+    """
+    Reject a proposed zone reassignment.
+
+    - Partner stays in current zone
+    - Proposal status → rejected
+    """
+    from fastapi import HTTPException, status as http_status
+    from app.services.zone_reassignment_service import (
+        reject_reassignment,
+        get_reassignment,
+    )
+
+    existing = get_reassignment(reassignment_id, db)
+    if not existing:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="Reassignment not found",
+        )
+    if existing.partner_id != partner.id:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Not your reassignment",
+        )
+
+    result, error = reject_reassignment(reassignment_id, db)
+    if not result:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=error or "Could not reject reassignment",
+        )
+    return result
+
+
 @router.get("/me/renewal-preview", summary="Simplified renewal quote for profile page")
 def get_renewal_preview(
     partner: Partner = Depends(get_current_partner),
