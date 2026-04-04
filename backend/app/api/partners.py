@@ -80,6 +80,21 @@ def register_partner(partner_data: PartnerCreate, db: Session = Depends(get_db))
             "kyc_status":     "skipped",
         }
 
+    # HACKATHON SECURITY: Never store raw PII. Hash identities and set verified.
+    import hashlib
+    if kyc_dict.get("aadhaar_number") or kyc_dict.get("pan_number"):
+        if kyc_dict.get("aadhaar_number"):
+            raw = str(kyc_dict["aadhaar_number"])
+            hashed = hashlib.sha256(raw.encode()).hexdigest()[:16]
+            kyc_dict["aadhaar_number"] = f"UID-{hashed}-XXXX{raw[-4:]}"
+        
+        if kyc_dict.get("pan_number"):
+            raw = str(kyc_dict["pan_number"])
+            hashed = hashlib.sha256(raw.encode()).hexdigest()[:16]
+            kyc_dict["pan_number"] = f"PAN-{hashed}"
+            
+        kyc_dict["kyc_status"] = "verified"
+
     partner = Partner(
         phone         = partner_data.phone,
         name          = partner_data.name,
