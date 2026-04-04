@@ -496,6 +496,7 @@ const STEPS = [
 function validateUPI(upi) { return /^[\w.\-]{3,}@[\w]{3,}$/.test(upi.trim()); }
 function validateAadhaar(val) { return /^\d{12}$/.test(val.replace(/\s/g, '')); }
 function validatePAN(val) { return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val.trim().toUpperCase()); }
+function validatePhone(val) { return /^[6-9]\d{9}$/.test(val.replace(/\s/g, '')); }
 
 export function Register() {
   const navigate = useNavigate();
@@ -575,8 +576,13 @@ export function Register() {
   }
 
   async function handlePhoneBlur() {
-    const p = formData.phone.trim();
-    if (!p || p.length < 10) return;
+    const p = formData.phone.trim().replace(/\s/g, '');
+    if (!p) return;
+    if (!validatePhone(p)) {
+      setPhoneStatus('invalid');
+      setPhoneMessage('Please enter a valid 10-digit mobile number.');
+      return;
+    }
     setPhoneStatus('checking');
     try {
       const avail = await api.checkAvailability(p, null);
@@ -636,7 +642,7 @@ export function Register() {
   }
 
   function canProceedFromBasic() { 
-    const isBasicValid = formData.name.trim() && formData.phone.trim() && phoneStatus !== 'invalid';
+    const isBasicValid = formData.name.trim() && validatePhone(formData.phone) && phoneStatus === 'valid';
     
     // If they typed a Partner ID, they MUST click the Verify button and complete the mock SSO
     if (formData.partner_id.trim()) {
