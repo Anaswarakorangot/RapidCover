@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { NotificationToggle } from '../components/NotificationToggle';
 import { UpiSelector } from '../components/ui/UpiSelector';
+import RapidBot from '../components/RapidBot';
 import api from '../services/api';
 
 /* ─── Design tokens matching Register.jsx ───────────────────────────────── */
@@ -261,6 +262,16 @@ const S = `
     display: flex; align-items: center; gap: 12px; border: 1px solid var(--green-primary);
     text-decoration: none; color: var(--green-dark); font-weight: 700;
   }
+  
+  .grok-card {
+    background: #1a2e1a; border-radius: 16px; padding: 18px;
+    display: flex; align-items: center; gap: 14px; border: 1.5px solid rgba(61, 184, 92, 0.3);
+    cursor: pointer; color: #fff; font-weight: 700;
+    transition: transform 0.2s, border-color 0.2s;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  }
+  .grok-card:active { transform: scale(0.97); }
+  .grok-card:hover { border-color: var(--green-primary); }
 `;
 
 /* ─── LANGUAGES ─────────────────────────────────────────────────────────── */
@@ -590,7 +601,7 @@ export function Profile() {
   const [historyLoading,  setHistoryLoading]  = useState(true);
   const [renewalPreview,  setRenewalPreview]  = useState(null);
   const [renewalLoading,  setRenewalLoading]  = useState(true);
-  const [legalModal,      setLegalModal]     = useState(null); // 'terms', 'privacy', 'support'
+  const [legalModal,      setLegalModal]     = useState(null); // 'terms', 'privacy', 'support', 'rapidbot'
 
 
   // ── Load zone history ─────────────────────────────────────────────────────
@@ -735,20 +746,29 @@ export function Profile() {
         {/* ── Legal Modals ── */}
         {legalModal && (
           <div className="legal-overlay" onClick={() => setLegalModal(null)}>
-            <div className="legal-sheet" onClick={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <h2 className="legal-title">
-                  {legalModal === 'terms' && 'Terms of Service'}
-                  {legalModal === 'privacy' && 'Privacy Policy'}
-                  {legalModal === 'support' && 'Help & Support'}
-                </h2>
-                <button 
-                  onClick={() => setLegalModal(null)}
-                  style={{ background: 'var(--gray-bg)', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 18 }}
-                >✕</button>
-              </div>
+            <div 
+              className="legal-sheet" 
+              onClick={e => e.stopPropagation()}
+              style={legalModal === 'rapidbot' ? { padding: 0, overflow: 'hidden' } : {}}
+            >
+              {/* Header logic (hidden for RapidBot to use its own) */}
+              {legalModal !== 'rapidbot' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <h2 className="legal-title">
+                    {legalModal === 'terms' && 'Terms of Service'}
+                    {legalModal === 'privacy' && 'Privacy Policy'}
+                    {legalModal === 'support' && 'Help & Support'}
+                  </h2>
+                  <button 
+                    onClick={() => setLegalModal(null)}
+                    style={{ background: 'var(--gray-bg)', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', fontSize: 18 }}
+                  >✕</button>
+                </div>
+              )}
 
-              <div className="legal-body">
+              <div className={legalModal === 'rapidbot' ? '' : 'legal-body'} style={legalModal === 'rapidbot' ? { height: '85vh' } : {}}>
+                {legalModal === 'rapidbot' && <RapidBot />}
+                
                 {legalModal === 'terms' && (
                   <>
                     <div className="legal-section">
@@ -785,7 +805,15 @@ export function Profile() {
 
                 {legalModal === 'support' && (
                   <>
-                    <p style={{ marginBottom: 20 }}>Need help with a claim or your policy? Our support team is available 24/7 during monsoons and heatwaves.</p>
+                    <p style={{ marginBottom: 15 }}>Need help? Our AI assistant or support team is here for you.</p>
+                    <div className="grok-card" onClick={() => setLegalModal('rapidbot')}>
+                      <div className="bmsg-bot-avatar" style={{ border: '1px solid rgba(61, 184, 92, 0.3)', background: 'rgba(61, 184, 92, 0.1)' }}>R</div>
+                      <div>
+                        <div style={{ fontSize: 15 }}>Talk to RapidBot AI</div>
+                        <div style={{ fontSize: 11, opacity: 0.7, fontWeight: 400 }}>Instant help with policy locks, payouts & zones</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 16 }} />
                     <a href="https://wa.me/919999999999" className="support-card" target="_blank" rel="noreferrer">
                       <span style={{ fontSize: 24 }}>💬</span>
                       <div>
