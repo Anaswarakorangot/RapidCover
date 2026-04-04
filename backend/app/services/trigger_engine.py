@@ -37,6 +37,8 @@ from app.services.external_apis import (
     MockPlatformAPI,
     MockCivicAPI,
     get_source_health,
+    compute_trigger_confidence,
+    get_oracle_reliability_report,
 )
 
 logger = logging.getLogger("trigger_engine")
@@ -92,11 +94,13 @@ def get_trigger_log(limit: int = 50) -> list[dict]:
 
 def get_engine_status() -> dict:
     """Return engine status for admin UI."""
+    oracle = get_oracle_reliability_report()
     return {
         "active_events": len(active_events),
         "active_event_keys": list(active_events.keys()),
         "log_entries": len(_trigger_log),
         "data_sources": get_source_health(),
+        "oracle_reliability": oracle,
     }
 
 
@@ -355,12 +359,23 @@ def _fire_trigger(
     actual_val = details.get("rainfall_mm_hr") or details.get("temp_celsius") or details.get("aqi") or 1
     severity = _calculate_severity(actual_val, threshold_val) if threshold_val > 0 else 3
 
+    # Compute oracle confidence for this trigger
+    primary_source = details.get("data_source", "mock")
+    oracle_conf = compute_trigger_confidence(
+        primary_source=primary_source,
+        primary_value=details.get("rainfall_mm_hr") or details.get("temp_celsius") or details.get("aqi"),
+    )
+
     # Create trigger event
     source_data = {
         **details,
         "duration_minutes": round(duration_min),
         "force_fired": force,
         "engine_version": "v2",
+        "oracle_confidence": oracle_conf["trigger_confidence_score"],
+        "oracle_decision": oracle_conf["decision"],
+        "oracle_agreement_score": oracle_conf["agreement_score"],
+        "oracle_reason": oracle_conf["reason"],
     }
 
     trigger = TriggerEvent(

@@ -421,6 +421,7 @@ def get_engine_status():
             "log_entries": engine["log_entries"],
         },
         "data_sources": sources,
+        "oracle_reliability": engine.get("oracle_reliability", {}),
     }
 
 
@@ -650,4 +651,112 @@ def get_live_api_data(
             for name, info in health.items()
         },
         "fetched_at": datetime.utcnow().isoformat(),
+    }
+
+
+# --- GET /admin/panel/oracle-reliability -------------------------------------
+
+@router.get("/oracle-reliability")
+def get_oracle_reliability(zone_id: int = None):
+    """
+    Return full oracle reliability report for all data sources.
+
+    Shows:
+    - Per-source reliability badge (live / mock / stale)
+    - Freshness (seconds since last successful call)
+    - Agreement score between corroborating sources
+    - System health: healthy | degraded | stale | mock_mode
+
+    Used by admin LiveDataPanel and EngineStatus panel.
+    """
+    from app.services.external_apis import get_oracle_reliability_report, compute_trigger_confidence
+
+    report = get_oracle_reliability_report(zone_id=zone_id)
+
+    # Example: show what a rain trigger confidence would look like right now
+    rain_confidence = compute_trigger_confidence(
+        primary_source="openweathermap",
+        corroborating_sources=["waqi_aqi"],
+    )
+    shutdown_confidence = compute_trigger_confidence(
+        primary_source="civic_api",
+        corroborating_sources=["traffic_feed"],
+    )
+
+    return {
+        **report,
+        "example_trigger_decisions": {
+            "rain_trigger": rain_confidence,
+            "shutdown_trigger": shutdown_confidence,
+        },
+    }
+
+
+# --- GET /admin/panel/live-data ----------------------------------------------
+
+@router.get("/live-data")
+def get_live_data(db: Session = Depends(get_db)):
+    """
+    Return live data summary: source health, oracle reliability, partner activity snapshot.
+
+    Consolidates oracle engine status, data source badges, and platform activity
+    into a single panel response. Feeds the admin LiveDataPanel.
+    """
+    from app.services.external_apis import (
+        get_oracle_reliability_report,
+        compute_trigger_confidence,
+        get_source_health,
+    )
+    from app.services.claims_processor import get_db_partner_platform_activity
+    from app.services.external_apis import evaluate_partner_platform_eligibility
+
+    oracle = get_oracle_reliability_report()
+    source_health = get_source_health()
+
+    # Serialize source health datetimes
+    sources_serialized = {}
+    for name, info in source_health.items():
+        sources_serialized[name] = {
+            "status": info["status"],
+            "last_check": info["last_check"].isoformat() if info.get("last_check") else None,
+            "last_success": info["last_success"].isoformat() if info.get("last_success") else None,
+        }
+
+    # Sample platform activity (top 10 partners)
+    partners = db.query(Partner).filter(Partner.is_active == True).limit(10).all()
+    activity_summary = []
+    active_on_platform = 0
+    for p in partners:
+        activity = get_db_partner_platform_activity(p.id, db)
+        eligibility = evaluate_partner_platform_eligibility(p.id)
+        if activity["active_shift"] and activity["platform_logged_in"]:
+            active_on_platform += 1
+        activity_summary.append({
+            "partner_id": p.id,
+            "partner_name": p.name,
+            "platform": activity.get("platform", "unknown"),
+            "active_shift": activity["active_shift"],
+            "platform_logged_in": activity["platform_logged_in"],
+            "orders_completed_recent": activity["orders_completed_recent"],
+            "platform_eligible": eligibility["eligible"],
+            "platform_score": eligibility["score"],
+        })
+
+    return {
+        "oracle": {
+            "system_health": oracle["system_health"],
+            "average_reliability": oracle["average_reliability"],
+            "live_sources": oracle["live_sources"],
+            "mock_sources": oracle["mock_sources"],
+            "stale_sources": oracle["stale_sources"],
+            "sources": oracle["sources"],
+        },
+        "data_sources": sources_serialized,
+        "platform_activity": {
+            "total_sampled": len(activity_summary),
+            "active_on_platform": active_on_platform,
+            "inactive_on_platform": len(activity_summary) - active_on_platform,
+            "partners": activity_summary,
+        },
+        "computed_at": datetime.utcnow().isoformat(),
     }
