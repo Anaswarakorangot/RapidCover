@@ -137,11 +137,14 @@ def build_transaction_log(
     payout_metadata: dict,
 ) -> dict:
     """Build a structured transaction log for a payout (stored in validation_data)."""
+    # Determine payout channel
+    primary_channel = "UPI/Stripe" if partner.upi_id else "IMPS/Bank"
+    
     return {
         "transaction": {
             "ref": upi_ref,
-            "channel": "UPI/Stripe",
-            "provider": "Stripe Connect Mock",
+            "channel": primary_channel,
+            "provider": "Stripe Connect Mock" if partner.upi_id else "IMPS Gateway Mock",
             "amount": claim.amount,
             "currency": "INR",
             "status": "SUCCESS",
@@ -264,14 +267,24 @@ def process_payout(
 
     settings = get_settings()
     if not upi_ref:
-        # Utilize Stripe mock instead of Razorpay
-        success, tr_ref, stripe_data = process_stripe_payout_mock(partner, claim.amount, claim.id)
-        if success:
-            upi_ref = tr_ref
-            payout_metadata["stripe"] = stripe_data
+        # Utilize Stripe mock if UPI exists, else IMPS mock
+        if partner.upi_id:
+            success, tr_ref, stripe_data = process_stripe_payout_mock(partner, claim.amount, claim.id)
+            if success:
+                upi_ref = tr_ref
+                payout_metadata["stripe"] = stripe_data
+            else:
+                logger.warning(f"Stripe mapping failed for claim {claim.id}, falling back to default generator")
+                upi_ref = generate_upi_ref(policy.id, claim.id)
         else:
-            logger.warning(f"Stripe mapping failed for claim {claim.id}, falling back to default generator")
-            upi_ref = generate_upi_ref(policy.id, claim.id)
+            # IMPS Fallback
+            logger.info(f"Using IMPS fallback for partner {partner.id} (no UPI)")
+            upi_ref = f"IMPS{uuid.uuid4().hex[:12].upper()}"
+            payout_metadata["imps"] = {
+                "bank_name": partner.bank_name,
+                "account_number": f"****{partner.account_number[-4:]}" if partner.account_number else None,
+                "ifsc": partner.ifsc_code
+            }
 
     transaction_log = build_transaction_log(claim, policy, partner, trigger, upi_ref, payout_metadata)
 

@@ -238,15 +238,18 @@ export default function Claims() {
         {summary && (
           <div className="summary-grid">
             <div className="summary-card">
-              <p className="summary-val text-green-dark" style={{color: 'var(--green-dark)'}}>{summary.paid ?? 0}</p>
+              <p className="summary-val text-green-dark" style={{ color: 'var(--green-dark)' }}>
+                {/* Count of paid claims = total_claims - pending_claims */}
+                {(summary.total_claims ?? 0) - (summary.pending_claims ?? 0)}
+              </p>
               <p className="summary-lbl">Paid</p>
             </div>
             <div className="summary-card">
-              <p className="summary-val text-orange-500" style={{color: '#d97706'}}>{summary.pending ?? 0}</p>
+              <p className="summary-val text-orange-500" style={{ color: '#d97706' }}>{summary.pending_claims ?? 0}</p>
               <p className="summary-lbl">Pending</p>
             </div>
             <div className="summary-card">
-              <p className="summary-val">{summary.total ?? 0}</p>
+              <p className="summary-val">{summary.total_claims ?? 0}</p>
               <p className="summary-lbl">Total</p>
             </div>
           </div>
