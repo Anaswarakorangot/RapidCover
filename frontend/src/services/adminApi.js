@@ -201,14 +201,60 @@ export async function checkTriggerEligibility(partnerId, zoneId, triggerType = '
 // ── Zone Reassignment (admin-side) ────────────────────────────────────────────
 
 export async function proposeReassignment(partnerId, newZoneId) {
-  // NOTE: admin.py does not yet expose this endpoint — using the zones router instead.
-  // This wrapper is provided for when the endpoint is wired up.
   const res = await fetch(`/api/v1/admin/reassignments`, {
     method: 'POST',
     headers: jsonHeaders(),
     body: JSON.stringify({ partner_id: partnerId, new_zone_id: newZoneId }),
   });
   return handleResponse(res);
+}
+
+// ── Multi-Trigger Aggregation ─────────────────────────────────────────────────
+
+/** Get aggregation stats (total aggregated claims, triggers suppressed, savings) */
+export async function getAggregationStats() {
+  return get('/aggregation-stats');
+}
+
+/** Get aggregation details for a specific claim */
+export async function getClaimAggregation(claimId) {
+  return get(`/claims/${claimId}/aggregation`);
+}
+
+// ── Payment State Machine ─────────────────────────────────────────────────────
+
+/** Get payment state for a specific claim */
+export async function getClaimPaymentState(claimId) {
+  return get(`/claims/${claimId}/payment-state`);
+}
+
+/** Retry a failed payment */
+export async function retryPayment(claimId) {
+  return post(`/claims/${claimId}/retry-payment`);
+}
+
+/**
+ * Manually reconcile a payment.
+ * @param {number} claimId
+ * @param {{ action: 'confirm'|'reject'|'force_paid', provider_ref?: string, notes?: string }} data
+ */
+export async function reconcilePayment(claimId, data) {
+  return post(`/claims/${claimId}/reconcile`, data);
+}
+
+/** List claims with failed payments */
+export async function getPaymentFailures(limit = 50) {
+  return get('/claims/payment-failures', { limit });
+}
+
+/** List claims pending manual reconciliation */
+export async function getPendingReconciliation(limit = 50) {
+  return get('/claims/pending-reconciliation', { limit });
+}
+
+/** Get payment processing statistics */
+export async function getPaymentStats() {
+  return get('/payment-stats');
 }
 
 // ── Default export ────────────────────────────────────────────────────────────
@@ -241,6 +287,16 @@ const adminApi = {
   listNotificationTemplates,
   checkTriggerEligibility,
   proposeReassignment,
+  // Multi-trigger aggregation
+  getAggregationStats,
+  getClaimAggregation,
+  // Payment state machine
+  getClaimPaymentState,
+  retryPayment,
+  reconcilePayment,
+  getPaymentFailures,
+  getPendingReconciliation,
+  getPaymentStats,
 };
 
 export default adminApi;

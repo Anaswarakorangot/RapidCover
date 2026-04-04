@@ -21,6 +21,9 @@ import NotificationPreviewPanel from '../components/admin/NotificationPreviewPan
 import DemoChecklist from '../components/admin/DemoChecklist';
 import SocialOraclePanel from '../components/admin/SocialOraclePanel';
 import LiveDataPanel from '../components/admin/LiveDataPanel';
+import PaymentReconciliationPanel from '../components/admin/PaymentReconciliationPanel';
+import AggregationPanel from '../components/admin/AggregationPanel';
+import PartialDisruptionPanel from '../components/admin/PartialDisruptionPanel';
 import './Admin.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
@@ -81,6 +84,9 @@ export function Admin() {
     { id: 'bcr',             label: '\u{1F4C9} BCR / Loss Ratio' },
     { id: 'map',             label: '\u{1F5FA} Zone Map' },
     { id: 'fraud',           label: '\u{1F50D} Fraud Queue' },
+    { id: 'payments',        label: '\u{1F4B3} Payments' },
+    { id: 'aggregation',     label: '\u{1F517} Aggregation' },
+    { id: 'disruption',      label: '\u{1F4CA} Disruption' },
     { id: 'drills',          label: '\u{1F3AF} Drills' },
     { id: 'live-data',       label: '\u{1F4E1} Live API Data' },
     { id: 'verify',          label: '\u{1F50D} Verification' },
@@ -146,6 +152,9 @@ export function Admin() {
         {activeTab === 'bcr'       && <BCRPanel />}
         {activeTab === 'map'       && <ZoneMapPanel onZoneClick={handleMapZoneClick} />}
         {activeTab === 'fraud'     && <FraudQueuePanel />}
+        {activeTab === 'payments'  && <PaymentReconciliationPanel />}
+        {activeTab === 'aggregation' && <AggregationPanel />}
+        {activeTab === 'disruption' && <PartialDisruptionPanel />}
         {activeTab === 'drills'    && <DrillPanel onZoneSelect={(fn) => { drillZoneSelectRef.current = fn; }} />}
         {activeTab === 'live-data' && <LiveDataPanel />}
         {activeTab === 'verify'    && <VerificationPanel />}

@@ -19,6 +19,13 @@ from app.models.partner import Partner
 from app.models.zone import Zone
 from app.models.trigger_event import TriggerEvent, TriggerType
 from app.services.notifications import notify_claim_paid
+from app.services.payment_state_machine import (
+    initiate_payment,
+    confirm_payment,
+    fail_payment,
+    get_payment_status,
+    PaymentStatus,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +219,7 @@ def process_payout(
     """
     Process a payout for an approved claim.
 
+    Uses the payment state machine for idempotency and retry tracking.
     Checks city-level 120% hard cap before processing unless skip_hard_cap_check=True.
 
     Returns (success, upi_ref, transaction_log).
@@ -253,6 +261,17 @@ def process_payout(
             )
             claim.amount = remaining_capacity
 
+    # Initiate payment via state machine (creates idempotency key)
+    init_success, init_data = initiate_payment(claim, db)
+    if not init_success:
+        # Check if already confirmed (idempotent success)
+        payment_state = get_payment_status(claim)
+        if payment_state.get("current_status") == PaymentStatus.CONFIRMED.value:
+            logger.info(f"Claim {claim.id} already confirmed (idempotent)")
+            return True, claim.upi_ref or "", {"already_confirmed": True}
+        logger.warning(f"Payment initiation failed for claim {claim.id}: {init_data}")
+        return False, "", init_data
+
     trigger = db.query(TriggerEvent).filter(TriggerEvent.id == claim.trigger_event_id).first()
 
     existing = {}
@@ -263,15 +282,42 @@ def process_payout(
     payout_metadata = existing.get("payout_calculation", {})
 
     settings = get_settings()
+    stripe_success = False
+    stripe_error = None
+
     if not upi_ref:
         # Utilize Stripe mock instead of Razorpay
-        success, tr_ref, stripe_data = process_stripe_payout_mock(partner, claim.amount, claim.id)
-        if success:
-            upi_ref = tr_ref
-            payout_metadata["stripe"] = stripe_data
-        else:
-            logger.warning(f"Stripe mapping failed for claim {claim.id}, falling back to default generator")
-            upi_ref = generate_upi_ref(policy.id, claim.id)
+        try:
+            stripe_success, tr_ref, stripe_data = process_stripe_payout_mock(partner, claim.amount, claim.id)
+            if stripe_success:
+                upi_ref = tr_ref
+                payout_metadata["stripe"] = stripe_data
+            else:
+                stripe_error = "Stripe mock returned failure"
+        except Exception as e:
+            stripe_success = False
+            stripe_error = str(e)
+            logger.error(f"Stripe payout exception for claim {claim.id}: {e}")
+
+    if not stripe_success and not upi_ref:
+        # Payment failed - record failure in state machine
+        fail_payment(claim, stripe_error or "Payment provider failure", db)
+        logger.warning(f"Payment failed for claim {claim.id}: {stripe_error}")
+        return False, "", {"error": stripe_error or "Payment failed"}
+
+    # If no upi_ref yet (shouldn't happen but fallback)
+    if not upi_ref:
+        upi_ref = generate_upi_ref(policy.id, claim.id)
+
+    # Confirm payment in state machine
+    confirm_success = confirm_payment(
+        claim, upi_ref, db,
+        additional_data=payout_metadata.get("stripe"),
+    )
+
+    if not confirm_success:
+        logger.warning(f"Payment confirmation failed for claim {claim.id}")
+        return False, "", {"error": "Payment confirmation failed"}
 
     transaction_log = build_transaction_log(claim, policy, partner, trigger, upi_ref, payout_metadata)
 
@@ -285,13 +331,15 @@ def process_payout(
             "checked_at": datetime.utcnow().isoformat(),
         }
 
+    # Update validation_data with transaction log (claim already updated by confirm_payment)
+    try:
+        existing = json.loads(claim.validation_data or "{}")
+    except json.JSONDecodeError:
+        existing = {}
+
     existing["transaction_log"] = transaction_log
     existing["payout_status"] = "SUCCESS"
     existing["paid_at"] = datetime.utcnow().isoformat()
-
-    claim.status = ClaimStatus.PAID
-    claim.upi_ref = upi_ref
-    claim.paid_at = datetime.utcnow()
     claim.validation_data = json.dumps(existing)
 
     db.commit()

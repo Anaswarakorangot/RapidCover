@@ -18,6 +18,10 @@ router = APIRouter(prefix="/claims", tags=["claims"])
 def _build_claim_response(claim: Claim, trigger) -> ClaimResponse:
     """Build ClaimResponse and extract payout_metadata from validation_data."""
     payout_metadata = None
+    disruption_category = None
+    disruption_factor = None
+    payment_status = None
+
     if claim.validation_data:
         try:
             vd = json.loads(claim.validation_data)
@@ -34,6 +38,17 @@ def _build_claim_response(claim: Claim, trigger) -> ClaimResponse:
                     trigger_type=pc.get("trigger_type"),
                     zone_id=pc.get("zone_id"),
                 )
+
+                # Extract partial disruption data
+                pd = pc.get("partial_disruption")
+                if pd:
+                    disruption_category = pd.get("category")
+                    disruption_factor = pd.get("factor")
+
+            # Extract payment state machine status
+            ps = vd.get("payment_state")
+            if ps:
+                payment_status = ps.get("current_status")
         except Exception:
             pass
 
@@ -50,6 +65,9 @@ def _build_claim_response(claim: Claim, trigger) -> ClaimResponse:
         trigger_type=trigger.trigger_type if trigger else None,
         trigger_started_at=trigger.started_at if trigger else None,
         payout_metadata=payout_metadata,
+        disruption_category=disruption_category,
+        disruption_factor=disruption_factor,
+        payment_status=payment_status,
     )
 
 

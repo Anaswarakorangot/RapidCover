@@ -21,6 +21,7 @@ from app.services.external_apis import (
     AQIData,
     PlatformStatus,
     ShutdownStatus,
+    get_partial_disruption_data,
 )
 
 
@@ -242,6 +243,11 @@ def check_rain_trigger(
             "timestamp": weather_data.timestamp.isoformat(),
         }
 
+        # Include partial disruption data if set
+        partial_data = get_partial_disruption_data(zone_id)
+        if partial_data:
+            source_data.update(partial_data)
+
         trigger = TriggerEvent(
             zone_id=zone_id,
             trigger_type=TriggerType.RAIN,
@@ -279,6 +285,11 @@ def check_heat_trigger(
             "humidity": weather_data.humidity,
             "timestamp": weather_data.timestamp.isoformat(),
         }
+
+        # Include partial disruption data if set
+        partial_data = get_partial_disruption_data(zone_id)
+        if partial_data:
+            source_data.update(partial_data)
 
         trigger = TriggerEvent(
             zone_id=zone_id,
@@ -319,6 +330,11 @@ def check_aqi_trigger(
             "category": aqi_data.category,
             "timestamp": aqi_data.timestamp.isoformat(),
         }
+
+        # Include partial disruption data if set
+        partial_data = get_partial_disruption_data(zone_id)
+        if partial_data:
+            source_data.update(partial_data)
 
         trigger = TriggerEvent(
             zone_id=zone_id,
