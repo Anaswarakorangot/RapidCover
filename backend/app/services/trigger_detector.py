@@ -89,6 +89,60 @@ def track_sustained_event(zone_id: int, trigger_type: TriggerType, event_date: d
     }
 
 
+def inject_sustained_event_history(zone_id: int, trigger_type: TriggerType, days: int = 5) -> dict:
+    """
+    Inject fake consecutive days history for demo purposes.
+
+    This allows testing the 70% sustained event payout without waiting 5 real days.
+    Call this BEFORE running a drill to simulate being on day N of a sustained event.
+
+    Args:
+        zone_id: Zone to inject history for
+        trigger_type: Trigger type (rain, heat, etc.)
+        days: Number of consecutive days to simulate (default 5 for 70% payout)
+
+    Returns:
+        Dict with injected dates and expected payout modifier
+    """
+    key = f"{zone_id}:{trigger_type.value}"
+    today = datetime.utcnow()
+
+    # Generate N-1 previous consecutive days (today will be added when drill runs)
+    injected_dates = []
+    for i in range(days - 1, 0, -1):
+        date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+        injected_dates.append(date_str)
+
+    _sustained_events[key] = injected_dates
+
+    return {
+        "zone_id": zone_id,
+        "trigger_type": trigger_type.value,
+        "injected_days": days - 1,
+        "dates": injected_dates,
+        "next_run_will_be_day": days,
+        "payout_modifier_expected": SUSTAINED_EVENT_PAYOUT_MODIFIER if days >= SUSTAINED_EVENT_THRESHOLD_DAYS else 1.0,
+    }
+
+
+def clear_sustained_event_history(zone_id: int = None, trigger_type: TriggerType = None):
+    """
+    Clear sustained event history for testing.
+
+    If zone_id and trigger_type provided, clears just that combination.
+    If neither provided, clears all history.
+    """
+    global _sustained_events
+
+    if zone_id is not None and trigger_type is not None:
+        key = f"{zone_id}:{trigger_type.value}"
+        _sustained_events.pop(key, None)
+    elif zone_id is None and trigger_type is None:
+        _sustained_events = {}
+
+    return {"cleared": True}
+
+
 def get_sustained_event_info(zone_id: int, trigger_type: TriggerType) -> dict:
     """
     Get current sustained event info for a zone/trigger combination without modifying state.

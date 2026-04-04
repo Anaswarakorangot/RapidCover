@@ -40,6 +40,8 @@ from app.services.drill_service import (
     add_pipeline_event,
     DRILL_PRESETS,
 )
+from app.services.trigger_detector import inject_sustained_event_history
+from app.models.trigger_event import TriggerType
 
 router = APIRouter(prefix="/admin/panel", tags=["admin-drills"])
 
@@ -64,6 +66,24 @@ def run_drill(
 
     # Determine preset name
     preset_name = req.preset or req.drill_type.value
+
+    # Inject sustained event history for demo (to trigger 70% payout)
+    if req.simulate_sustained_days >= 5:
+        # Map drill_type to TriggerType
+        drill_to_trigger = {
+            DrillType.FLASH_FLOOD: TriggerType.RAIN,
+            DrillType.AQI_SPIKE: TriggerType.AQI,
+            DrillType.HEATWAVE: TriggerType.HEAT,
+            DrillType.STORE_CLOSURE: TriggerType.CLOSURE,
+            DrillType.CURFEW: TriggerType.SHUTDOWN,
+            DrillType.MONSOON_14DAY: TriggerType.RAIN,
+            DrillType.MULTI_CITY_AQI: TriggerType.AQI,
+            DrillType.CYCLONE: TriggerType.RAIN,
+            DrillType.BANDH: TriggerType.SHUTDOWN,
+            DrillType.COLLUSION_FRAUD: TriggerType.RAIN,
+        }
+        trigger_type = drill_to_trigger.get(req.drill_type, TriggerType.RAIN)
+        inject_sustained_event_history(zone.id, trigger_type, req.simulate_sustained_days)
 
     # Create drill session
     drill_session = create_drill_session(

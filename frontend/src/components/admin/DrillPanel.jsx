@@ -13,6 +13,12 @@ const DRILL_PRESETS = [
   { type: 'heatwave', label: 'Heatwave', icon: '🌡️', description: 'Extreme heat 46°C' },
   { type: 'store_closure', label: 'Store Closure', icon: '🏪', description: 'Dark store force majeure' },
   { type: 'curfew', label: 'Curfew', icon: '🚫', description: 'Civic shutdown order' },
+  // Phase 2 Team Guide Stress Scenarios
+  { type: 'monsoon_14day', label: '14-Day Monsoon', icon: '🌧️', description: 'Sustained monsoon (BLR+BOM), 70% payout', stress: true },
+  { type: 'multi_city_aqi', label: 'Multi-City AQI', icon: '🏭', description: 'NCR AQI spike (DEL+NOI+GGN)', stress: true },
+  { type: 'cyclone', label: 'Cyclone', icon: '🌀', description: 'Cyclone (CHN+BOM), rain + shutdown', stress: true },
+  { type: 'bandh', label: 'Bandh', icon: '✊', description: 'City-wide strike, all stores closed', stress: true },
+  { type: 'collusion_fraud', label: 'Fraud Test', icon: '🕵️', description: 'Collusion ring detection test', stress: true },
 ];
 
 const PRESET_COLORS = {
@@ -21,6 +27,12 @@ const PRESET_COLORS = {
   heatwave: '#E24B4A',
   store_closure: '#7F77DD',
   curfew: '#EF9F27',
+  // Stress scenarios
+  monsoon_14day: '#2E7D32',
+  multi_city_aqi: '#5D4037',
+  cyclone: '#0D47A1',
+  bandh: '#C62828',
+  collusion_fraud: '#6A1B9A',
 };
 
 export default function DrillPanel({ onZoneSelect }) {
@@ -28,6 +40,7 @@ export default function DrillPanel({ onZoneSelect }) {
   const [selectedZone, setSelectedZone] = useState(null);
   const [zones, setZones] = useState([]);
   const [forceMode, setForceMode] = useState(true);
+  const [simulateSustained, setSimulateSustained] = useState(false);
   const [drillId, setDrillId] = useState(null);
   const [drillStatus, setDrillStatus] = useState(null);
   const [timelineEvents, setTimelineEvents] = useState([]);
@@ -91,6 +104,7 @@ export default function DrillPanel({ onZoneSelect }) {
           drill_type: selectedPreset,
           zone_code: selectedZone,
           force: forceMode,
+          simulate_sustained_days: simulateSustained ? 5 : 0,
         }),
       });
 
@@ -256,6 +270,25 @@ export default function DrillPanel({ onZoneSelect }) {
               <div>
                 <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-dark)' }}>Force Mode</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>Bypass duration requirements for immediate trigger</div>
+              </div>
+            </label>
+          </div>
+
+          <div style={{ background: 'var(--white)', borderRadius: '18px', border: simulateSustained ? '2px solid #2E7D32' : '1.5px solid var(--border)', padding: '1.25rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={simulateSustained}
+                onChange={e => setSimulateSustained(e.target.checked)}
+                style={{ width: 18, height: 18 }}
+              />
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-dark)' }}>
+                  Simulate Sustained Event (70% payout)
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>
+                  Inject 5-day history → triggers sustained mode → 70% payout
+                </div>
               </div>
             </label>
           </div>

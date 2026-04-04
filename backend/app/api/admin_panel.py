@@ -565,3 +565,89 @@ async def simulate_trigger(req: SimulateTriggerRequest):
         media_type="application/x-ndjson",
         headers={"X-Content-Type-Options": "nosniff"},
     )
+
+
+# --- GET /admin/panel/live-data ----------------------------------------------
+
+@router.get("/live-data")
+def get_live_api_data(
+    zone_code: str = Query("BLR-KOR", description="Zone code to fetch data for"),
+    db: Session = Depends(get_db),
+):
+    """
+    Fetch current data from all external APIs for a zone.
+
+    Returns weather, AQI, platform status, and shutdown status with source info.
+    Use this to verify what data the trigger engine is seeing.
+    """
+    from app.services.external_apis import (
+        MockWeatherAPI,
+        MockAQIAPI,
+        MockPlatformAPI,
+        MockCivicAPI,
+        get_source_health,
+    )
+
+    # Find zone
+    zone = db.query(Zone).filter(Zone.code == zone_code).first()
+    if not zone:
+        # Fallback to first zone
+        zone = db.query(Zone).first()
+
+    if not zone:
+        return {"error": "No zones found. Run seed first."}
+
+    # Fetch data from all sources (will try live, fallback to mock)
+    weather = MockWeatherAPI.get_current(zone.id, zone.lat, zone.lng)
+    aqi = MockAQIAPI.get_current(zone.id, zone.lat, zone.lng)
+    platform = MockPlatformAPI.get_current(zone.id)
+    shutdown = MockCivicAPI.get_current(zone.id)
+
+    # Get source health
+    health = get_source_health()
+
+    return {
+        "zone": {
+            "id": zone.id,
+            "code": zone.code,
+            "name": zone.name,
+            "city": zone.city,
+            "lat": zone.lat,
+            "lng": zone.lng,
+        },
+        "weather": {
+            "temp_celsius": weather.temp_celsius,
+            "rainfall_mm_hr": weather.rainfall_mm_hr,
+            "humidity": weather.humidity,
+            "source": weather.source,
+            "timestamp": weather.timestamp.isoformat(),
+        },
+        "aqi": {
+            "aqi": aqi.aqi,
+            "pm25": aqi.pm25,
+            "pm10": aqi.pm10,
+            "category": aqi.category,
+            "source": aqi.source,
+            "timestamp": aqi.timestamp.isoformat(),
+        },
+        "platform": {
+            "is_open": platform.is_open,
+            "closure_reason": platform.closure_reason,
+            "source": platform.source,
+            "timestamp": platform.timestamp.isoformat(),
+        },
+        "shutdown": {
+            "is_active": shutdown.is_active,
+            "reason": shutdown.reason,
+            "source": shutdown.source,
+            "timestamp": shutdown.timestamp.isoformat(),
+        },
+        "source_health": {
+            name: {
+                "status": info["status"],
+                "last_check": info["last_check"].isoformat() if info["last_check"] else None,
+            }
+            for name, info in health.items()
+        },
+        "fetched_at": datetime.utcnow().isoformat(),
+    }

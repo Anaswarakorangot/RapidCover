@@ -9,6 +9,7 @@ class DrillRunRequest(BaseModel):
     zone_code: str = Field(..., description="Zone code e.g. BLR-047")
     force: bool = Field(default=True, description="Bypass duration requirements")
     preset: Optional[str] = Field(default=None, description="Custom preset name, defaults to drill_type value")
+    simulate_sustained_days: int = Field(default=0, description="Inject N consecutive days history for 70% payout demo (0 = disabled, 5+ triggers sustained mode)")
 
 
 class DrillStartResponse(BaseModel):
