@@ -5,7 +5,7 @@
  * All existing methods are preserved unchanged.
  */
 
-const BASE = '/api/v1';
+const BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -406,7 +406,7 @@ const api = {
 export default api;
 // ── Platform Activity (zones router) ─────────────────────────────────────────
 // Base URL for zones endpoints
-const ZONES_BASE = '/api/v1/zones';
+const ZONES_BASE = (import.meta.env.VITE_API_URL || '/api/v1') + '/zones';
 
 function zonesAuthHeaders() {
   const token = localStorage.getItem('access_token');

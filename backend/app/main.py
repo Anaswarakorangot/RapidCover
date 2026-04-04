@@ -15,6 +15,8 @@ from app.models import (
 )
 from app.services.scheduler import start_scheduler, stop_scheduler
 
+from os import getenv
+
 settings = get_settings()
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
@@ -22,6 +24,9 @@ DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+extra_origins = getenv("CORS_ORIGINS", "")
+allowed_origins = DEFAULT_CORS_ORIGINS + [o.strip() for o in extra_origins.split(",") if o.strip()]
 
 
 @asynccontextmanager
@@ -61,7 +66,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=DEFAULT_CORS_ORIGINS,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
