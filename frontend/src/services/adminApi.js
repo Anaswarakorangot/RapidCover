@@ -7,7 +7,7 @@
  * Admin endpoints are intentionally unauthenticated in this demo.
  */
 
-const BASE = '/api/v1/admin';
+const BASE = (import.meta.env.VITE_API_URL || '/api/v1') + '/admin';
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
