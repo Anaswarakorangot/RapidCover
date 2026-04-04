@@ -116,8 +116,44 @@ def _get_zone_conditions(zone_id: int) -> dict:
             "traffic": {"blocked": 0, "congestion": "medium", "delay": 5.0},
             "platform": {"is_open": True, "reason": None, "since": None},
             "shutdown": {"is_active": False, "reason": None, "since": None},
+            "partial_disruption": {},  # For partial disruption simulation data
         }
+    # Ensure partial_disruption key exists for older initialized zones
+    if "partial_disruption" not in _zone_conditions[zone_id]:
+        _zone_conditions[zone_id]["partial_disruption"] = {}
     return _zone_conditions[zone_id]
+
+
+def set_partial_disruption_data(
+    zone_id: int,
+    expected_orders: Optional[int] = None,
+    actual_orders: Optional[int] = None,
+    partial_factor_override: Optional[float] = None,
+) -> dict:
+    """Set partial disruption simulation data for a zone."""
+    conditions = _get_zone_conditions(zone_id)
+    pd = conditions["partial_disruption"]
+
+    if expected_orders is not None:
+        pd["expected_orders"] = expected_orders
+    if actual_orders is not None:
+        pd["actual_orders"] = actual_orders
+    if partial_factor_override is not None:
+        pd["partial_factor_override"] = partial_factor_override
+
+    return pd
+
+
+def get_partial_disruption_data(zone_id: int) -> dict:
+    """Get partial disruption data for a zone."""
+    conditions = _get_zone_conditions(zone_id)
+    return conditions.get("partial_disruption", {})
+
+
+def clear_partial_disruption_data(zone_id: int) -> None:
+    """Clear partial disruption data for a zone."""
+    conditions = _get_zone_conditions(zone_id)
+    conditions["partial_disruption"] = {}
 
 
 # ═════════════════════════════════════════════════════════════════════════════
