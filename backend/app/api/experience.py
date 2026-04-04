@@ -35,6 +35,7 @@ from app.services.premium_service import (
     TIER_CONFIG as SVC_TIER_CONFIG,
     MIN_ACTIVE_DAYS_TO_BUY,
     AUTO_DOWNGRADE_DAYS,
+    DEMO_EXEMPT_CITIES,
 )
 
 router = APIRouter(prefix="/partners", tags=["experience"])
@@ -320,11 +321,17 @@ def get_eligibility(
     Returns which tiers the partner may purchase.
     Frontend must use allowed_tiers / blocked_tiers / reasons directly —
     no local eligibility logic allowed.
+
+    Delhi exception: Partners in Delhi bypass the 7-day minimum rule per Team Guide.
     """
     active_days = _count_active_days_last_30(partner, db)
     loyalty_wks = _loyalty_weeks(partner, db)
+    city = _get_partner_city(partner, db)
 
-    if active_days < MIN_ACTIVE_DAYS_TO_BUY:
+    # Delhi exception: skip 7-day minimum check for demo purposes
+    is_demo_exempt = city.lower() in [c.lower() for c in DEMO_EXEMPT_CITIES]
+
+    if active_days < MIN_ACTIVE_DAYS_TO_BUY and not is_demo_exempt:
         allowed_tiers = []
         blocked_tiers = ["flex", "standard", "pro"]
         reasons = {

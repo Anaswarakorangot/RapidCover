@@ -69,6 +69,61 @@ DRILL_PRESETS = {
         "trigger_type": "shutdown",
         "description": "Civic shutdown due to curfew order",
     },
+    # ─── Phase 2 Team Guide Stress Scenarios (Section 2E) ───────────────────────
+    "monsoon_14day": {
+        "conditions": {
+            "weather": {"rainfall_mm_hr": 65, "humidity": 98},
+            "sustained": {"consecutive_days": 14, "cities": ["bangalore", "mumbai"]},
+        },
+        "trigger_type": "rain",
+        "description": "14-day sustained monsoon in BLR+BOM. Tests sustained event protocol (70% payout factor, 21-day max, reinsurance flag at day 7).",
+        "stress_scenario": True,
+        "target_cities": ["bangalore", "mumbai"],
+    },
+    "multi_city_aqi": {
+        "conditions": {
+            "aqi": {"aqi": 480, "pm25": 320, "pm10": 450},
+            "multi_city": {"cities": ["delhi", "noida", "gurgaon"]},
+        },
+        "trigger_type": "aqi",
+        "description": "Multi-city AQI spike across NCR (DEL+NOI+GGN). Tests zone pool share cap and city-level 120% hard cap.",
+        "stress_scenario": True,
+        "target_cities": ["delhi", "noida", "gurgaon"],
+    },
+    "cyclone": {
+        "conditions": {
+            "weather": {"rainfall_mm_hr": 95, "wind_kmh": 120, "humidity": 100},
+            "shutdown": {"is_active": True, "reason": "Cyclone Warning - Stay Indoors"},
+        },
+        "trigger_type": "rain",
+        "description": "Cyclone scenario in CHN+BOM. Combines rain trigger with civic shutdown. Tests multi-trigger handling.",
+        "stress_scenario": True,
+        "target_cities": ["chennai", "mumbai"],
+    },
+    "bandh": {
+        "conditions": {
+            "shutdown": {"is_active": True, "reason": "Bandh / General Strike"},
+            "platform": {"is_open": False, "reason": "Bandh - All stores closed"},
+        },
+        "trigger_type": "shutdown",
+        "description": "City-wide bandh / general strike. All stores closed. Tests shutdown + closure combination.",
+        "stress_scenario": True,
+    },
+    "collusion_fraud": {
+        "conditions": {
+            "weather": {"rainfall_mm_hr": 58, "humidity": 85},
+            "fraud_test": {
+                "fake_gps_coherence": 0.15,
+                "activity_paradox": True,
+                "claim_frequency_spike": 5,
+                "new_accounts": 3,
+            },
+        },
+        "trigger_type": "rain",
+        "description": "Fraud detection stress test. Simulates collusion ring with GPS spoofing, activity paradox, and suspicious claim patterns. Tests fraud scoring thresholds.",
+        "stress_scenario": True,
+        "fraud_test": True,
+    },
 }
 
 
@@ -80,6 +135,12 @@ def get_preset_for_drill_type(drill_type: DrillType) -> dict:
         DrillType.HEATWAVE: "heatwave",
         DrillType.STORE_CLOSURE: "store_closure",
         DrillType.CURFEW: "curfew",
+        # Phase 2 stress scenarios
+        DrillType.MONSOON_14DAY: "monsoon_14day",
+        DrillType.MULTI_CITY_AQI: "multi_city_aqi",
+        DrillType.CYCLONE: "cyclone",
+        DrillType.BANDH: "bandh",
+        DrillType.COLLUSION_FRAUD: "collusion_fraud",
     }
     preset_name = mapping.get(drill_type, "flash_flood")
     return DRILL_PRESETS.get(preset_name, DRILL_PRESETS["flash_flood"])

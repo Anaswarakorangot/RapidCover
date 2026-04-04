@@ -53,8 +53,11 @@ TIER_CONFIG: dict = {
 }
 
 # Underwriting gate thresholds - Section 2A of team guide
-MIN_ACTIVE_DAYS_TO_BUY   = 0   # DEMO MODE: set to 0 for testing (was 7)
+MIN_ACTIVE_DAYS_TO_BUY   = 7   # Minimum 7 active days before cover starts
 AUTO_DOWNGRADE_DAYS      = 5   # auto-downgrade to Flex if < 5 active days in last 30
+
+# Demo exception: Delhi zones skip the 7-day check (for judging demo)
+DEMO_EXEMPT_CITIES = ["Delhi"]  # Partners in these cities bypass MIN_ACTIVE_DAYS check
 
 # Sustained event protocol - Section 2E
 SUSTAINED_EVENT_THRESHOLD_DAYS   = 5     # trigger fires 5+ consecutive days → Sustained Event

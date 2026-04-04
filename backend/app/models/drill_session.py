@@ -10,6 +10,12 @@ class DrillType(str, enum.Enum):
     HEATWAVE = "heatwave"
     STORE_CLOSURE = "store_closure"
     CURFEW = "curfew"
+    # Phase 2 Team Guide Stress Scenarios (Section 2E)
+    MONSOON_14DAY = "monsoon_14day"           # 14-day sustained monsoon (BLR+BOM)
+    MULTI_CITY_AQI = "multi_city_aqi"         # Multi-city AQI spike (DEL+NOI+GGN)
+    CYCLONE = "cyclone"                       # Cyclone scenario (CHN+BOM)
+    BANDH = "bandh"                           # City-wide civic shutdown / bandh
+    COLLUSION_FRAUD = "collusion_fraud"       # Fraud detection stress test
 
 
 class DrillStatus(str, enum.Enum):
