@@ -20,6 +20,7 @@ import RiqiProvenancePanel from '../components/admin/RiqiProvenancePanel';
 import NotificationPreviewPanel from '../components/admin/NotificationPreviewPanel';
 import DemoChecklist from '../components/admin/DemoChecklist';
 import SocialOraclePanel from '../components/admin/SocialOraclePanel';
+import LiveDataPanel from '../components/admin/LiveDataPanel';
 import './Admin.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -81,6 +82,7 @@ export function Admin() {
     { id: 'map',             label: '\u{1F5FA} Zone Map' },
     { id: 'fraud',           label: '\u{1F50D} Fraud Queue' },
     { id: 'drills',          label: '\u{1F3AF} Drills' },
+    { id: 'live-data',       label: '\u{1F4E1} Live API Data' },
     { id: 'verify',          label: '\u{1F50D} Verification' },
     { id: 'stress',          label: '\u26A1 Stress Proof' },
     { id: 'reassign',        label: '\u{1F504} Reassignments' },
@@ -145,6 +147,7 @@ export function Admin() {
         {activeTab === 'map'       && <ZoneMapPanel onZoneClick={handleMapZoneClick} />}
         {activeTab === 'fraud'     && <FraudQueuePanel />}
         {activeTab === 'drills'    && <DrillPanel onZoneSelect={(fn) => { drillZoneSelectRef.current = fn; }} />}
+        {activeTab === 'live-data' && <LiveDataPanel />}
         {activeTab === 'verify'    && <VerificationPanel />}
         {activeTab === 'stress'    && <StressProofPanel />}
         {activeTab === 'reassign'  && <ReassignmentQueuePanel />}

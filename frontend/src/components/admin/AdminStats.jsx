@@ -1,13 +1,54 @@
 import { useEffect, useState } from 'react';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
 export default function AdminStats({ stats }) {
   const [animated, setAnimated] = useState(false);
   const [selectedZone, setSelectedZone] = useState(0); // index into zoneLossRatios
+  const [liveData, setLiveData] = useState(null);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [zones, setZones] = useState([]);
+  const [selectedLiveZone, setSelectedLiveZone] = useState('');
 
   useEffect(() => {
     const t = setTimeout(() => setAnimated(true), 100);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    fetchZones();
+  }, []);
+
+  async function fetchZones() {
+    try {
+      const res = await fetch(`${API_BASE}/zones`);
+      if (res.ok) {
+        const list = await res.json();
+        setZones(list);
+        if (list.length > 0) {
+          setSelectedLiveZone(list[0].code);
+          fetchLiveData(list[0].code);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch zones:', err);
+    }
+  }
+
+  async function fetchLiveData(zoneCode) {
+    const code = zoneCode || selectedLiveZone;
+    if (!code) return;
+    setLiveLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/panel/live-data?zone_code=${code}`);
+      if (res.ok) {
+        setLiveData(await res.json());
+      }
+    } catch (err) {
+      console.error('Failed to fetch live data:', err);
+    }
+    setLiveLoading(false);
+  }
 
   if (!stats) return null;
 
@@ -107,6 +148,156 @@ export default function AdminStats({ stats }) {
           <span className="loss-ratio-bar__threshold-label" style={{ left: '80%', color: 'var(--warning)', fontWeight: 800 }}>80% threshold</span>
           <span>100%</span>
         </div>
+      </div>
+
+      {/* Live API Data Card */}
+      <div className="admin-section-label" style={{ marginTop: '2rem' }}>LIVE API DATA</div>
+      <div style={{
+        background: 'var(--white)',
+        borderRadius: '18px',
+        border: '1.5px solid var(--border)',
+        padding: '1.25rem',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.5rem' }}>📡</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-dark)' }}>External API Status</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>Weather, AQI, Platform data</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <select
+              value={selectedLiveZone}
+              onChange={(e) => {
+                setSelectedLiveZone(e.target.value);
+                fetchLiveData(e.target.value);
+              }}
+              style={{
+                padding: '0.5rem',
+                borderRadius: '8px',
+                border: '1.5px solid var(--border)',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+              }}
+            >
+              {zones.map(z => (
+                <option key={z.code} value={z.code}>{z.code}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => fetchLiveData()}
+              disabled={liveLoading}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                background: liveLoading ? 'var(--text-light)' : 'var(--primary)',
+                color: 'white',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: liveLoading ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              {liveLoading ? '...' : '🔄 Fetch'}
+            </button>
+          </div>
+        </div>
+
+        {liveData && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+            {/* Weather */}
+            <div style={{ padding: '0.75rem', background: 'var(--bg-light)', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>🌤️ Weather</span>
+                <span style={{
+                  padding: '2px 6px',
+                  borderRadius: '8px',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  background: liveData.weather?.source === 'live' ? '#22c55e20' : '#f59e0b20',
+                  color: liveData.weather?.source === 'live' ? '#22c55e' : '#f59e0b',
+                }}>{liveData.weather?.source?.toUpperCase()}</span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-mid)' }}>
+                <div>🌡️ {liveData.weather?.temp_celsius}°C</div>
+                <div>🌧️ {liveData.weather?.rainfall_mm_hr} mm/hr</div>
+                <div>💧 {liveData.weather?.humidity}%</div>
+              </div>
+            </div>
+
+            {/* AQI */}
+            <div style={{ padding: '0.75rem', background: 'var(--bg-light)', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>💨 AQI</span>
+                <span style={{
+                  padding: '2px 6px',
+                  borderRadius: '8px',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  background: liveData.aqi?.source === 'live' ? '#22c55e20' : '#f59e0b20',
+                  color: liveData.aqi?.source === 'live' ? '#22c55e' : '#f59e0b',
+                }}>{liveData.aqi?.source?.toUpperCase()}</span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-mid)' }}>
+                <div>AQI: <strong>{liveData.aqi?.aqi}</strong></div>
+                <div>PM2.5: {liveData.aqi?.pm25}</div>
+                <div>{liveData.aqi?.category}</div>
+              </div>
+            </div>
+
+            {/* Platform */}
+            <div style={{ padding: '0.75rem', background: 'var(--bg-light)', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>🏪 Platform</span>
+                <span style={{
+                  padding: '2px 6px',
+                  borderRadius: '8px',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  background: '#f59e0b20',
+                  color: '#f59e0b',
+                }}>MOCK</span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-mid)' }}>
+                <div>{liveData.platform?.is_open ? '✅ Store Open' : '❌ Closed'}</div>
+                {liveData.platform?.closure_reason && (
+                  <div style={{ fontSize: '0.7rem' }}>{liveData.platform.closure_reason}</div>
+                )}
+              </div>
+            </div>
+
+            {/* Shutdown */}
+            <div style={{ padding: '0.75rem', background: 'var(--bg-light)', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>🚨 Civic</span>
+                <span style={{
+                  padding: '2px 6px',
+                  borderRadius: '8px',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  background: '#f59e0b20',
+                  color: '#f59e0b',
+                }}>MOCK</span>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-mid)' }}>
+                <div>{liveData.shutdown?.is_active ? '⚠️ Shutdown Active' : '✅ Normal'}</div>
+                {liveData.shutdown?.reason && (
+                  <div style={{ fontSize: '0.7rem' }}>{liveData.shutdown.reason}</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!liveData && !liveLoading && (
+          <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-light)' }}>
+            Click "Fetch" to load live API data
+          </div>
+        )}
       </div>
     </div>
   );
