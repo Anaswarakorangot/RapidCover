@@ -519,6 +519,12 @@ export function Register() {
   const [detectedZone, setDetectedZone] = useState(null);
   const [partnerIdStatus, setPartnerIdStatus] = useState('idle');
   const [partnerIdMessage, setPartnerIdMessage] = useState('');
+  const [phoneStatus, setPhoneStatus] = useState('idle');
+  const [phoneMessage, setPhoneMessage] = useState('');
+  
+  // Hackathon B2B Mock States
+  const [showVendorAuth, setShowVendorAuth] = useState(false);
+  const [vendorAuthStep, setVendorAuthStep] = useState(0);
 
   useEffect(() => {
     async function loadZones() {
@@ -565,23 +571,80 @@ export function Register() {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
     if (name === 'platform') { setPartnerIdStatus('idle'); setPartnerIdMessage(''); }
+    if (name === 'phone') { setPhoneStatus('idle'); setPhoneMessage(''); }
+  }
+
+  async function handlePhoneBlur() {
+    const p = formData.phone.trim();
+    if (!p || p.length < 10) return;
+    setPhoneStatus('checking');
+    try {
+      const avail = await api.checkAvailability(p, null);
+      if (avail.phone_taken) {
+        setPhoneStatus('invalid');
+        setPhoneMessage('Mobile number is already registered. Please login.');
+      } else {
+        setPhoneStatus('valid');
+        setPhoneMessage('');
+      }
+    } catch {
+      setPhoneStatus('invalid');
+      setPhoneMessage('Could not check availability. Try again.');
+    }
   }
 
   async function validatePartnerId() {
+    // Only check format uniqueness optionally, or just leave it for the B2B mock to handle
     const pid = formData.partner_id.trim();
     if (!pid) { setPartnerIdStatus('idle'); setPartnerIdMessage(''); return; }
     setPartnerIdStatus('checking');
     try {
-      const result = await api.validatePartnerId(pid, formData.platform);
-      setPartnerIdStatus(result.valid ? 'valid' : 'invalid');
-      setPartnerIdMessage(result.message);
+      const formatCheck = await api.validatePartnerId(pid, formData.platform);
+      if (!formatCheck.valid) {
+        setPartnerIdStatus('invalid');
+        setPartnerIdMessage(formatCheck.message);
+        return;
+      }
+      
+      const avail = await api.checkAvailability(null, pid);
+      if (avail.partner_id_taken) {
+        setPartnerIdStatus('invalid');
+        setPartnerIdMessage('Partner ID is already linked to another account');
+      } else {
+        setPartnerIdStatus('idle');
+        setPartnerIdMessage('Looks valid. Please link your account to verify.');
+      }
     } catch {
       setPartnerIdStatus('invalid');
-      setPartnerIdMessage('Unable to verify partner ID');
+      setPartnerIdMessage('Unable to verify partner format');
     }
   }
 
-  function canProceedFromBasic() { return formData.name.trim() && formData.phone.trim(); }
+  async function handleVendorAuth() {
+    setVendorAuthStep(1); // Connecting...
+    await new Promise(r => setTimeout(r, 1000));
+    setVendorAuthStep(2); // Waiting for user auth...
+  }
+
+  async function handleVendorAuthConfirm() {
+    setVendorAuthStep(3); // Verifying data...
+    await new Promise(r => setTimeout(r, 1500));
+    setShowVendorAuth(false);
+    setVendorAuthStep(0);
+    setPartnerIdStatus('verified_b2b');
+    setPartnerIdMessage(`Successfully verified with ${formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'} ✓`);
+  }
+
+  function canProceedFromBasic() { 
+    const isBasicValid = formData.name.trim() && formData.phone.trim() && phoneStatus !== 'invalid';
+    
+    // If they typed a Partner ID, they MUST click the Verify button and complete the mock SSO
+    if (formData.partner_id.trim()) {
+      return isBasicValid && partnerIdStatus === 'verified_b2b';
+    }
+    
+    return isBasicValid;
+  }
   function canProceedFromKyc() {
     if (formData.aadhaarNumber.trim() && !validateAadhaar(formData.aadhaarNumber)) return false;
     if (formData.panNumber.trim() && !validatePAN(formData.panNumber)) return false;
@@ -654,8 +717,8 @@ export function Register() {
   function handleDeclineTerms() { setShowTerms(false); }
 
   // Derived
-  const pidInputClass = `reg-input${partnerIdStatus === 'valid' ? ' valid' : partnerIdStatus === 'invalid' ? ' invalid' : ''}`;
-  const pidIcon = partnerIdStatus === 'checking' ? '⏳' : partnerIdStatus === 'valid' ? '✓' : partnerIdStatus === 'invalid' ? '✗' : null;
+  const pidInputClass = `reg-input${partnerIdStatus === 'valid' || partnerIdStatus === 'verified_b2b' ? ' valid' : partnerIdStatus === 'invalid' ? ' invalid' : ''}`;
+  const pidIcon = partnerIdStatus === 'checking' ? '⏳' : partnerIdStatus === 'valid' || partnerIdStatus === 'verified_b2b' ? '✓' : partnerIdStatus === 'invalid' ? '✗' : null;
   const upiValid = formData.upiId.trim() ? validateUPI(formData.upiId) : null;
   const aadhaarValid = formData.aadhaarNumber.trim() ? validateAadhaar(formData.aadhaarNumber) : null;
   const panValid = formData.panNumber.trim() ? validatePAN(formData.panNumber) : null;
@@ -722,7 +785,22 @@ export function Register() {
 
         <div className="reg-field">
           <label className="reg-label">Phone Number</label>
-          <input className="reg-input" name="phone" type="tel" placeholder="+91 9876543210" value={formData.phone} onChange={handleChange} />
+          <div className="reg-input-wrap">
+            <input className={`reg-input${phoneStatus === 'valid' ? ' valid' : phoneStatus === 'invalid' ? ' invalid' : ''}`} 
+              name="phone" type="tel" placeholder="+91 9876543210" 
+              value={formData.phone} onChange={handleChange} onBlur={handlePhoneBlur} 
+              style={{ paddingRight: phoneStatus !== 'idle' ? '40px' : '16px' }} />
+            {phoneStatus !== 'idle' && (
+              <span className="reg-input-icon" style={{ color: phoneStatus === 'valid' ? 'var(--green-primary)' : phoneStatus === 'checking' ? 'var(--text-mid)' : 'var(--warning)' }}>
+                {phoneStatus === 'checking' ? '⏳' : phoneStatus === 'valid' ? '✓' : '✗'}
+              </span>
+            )}
+          </div>
+          {phoneMessage && (
+            <div className={`reg-hint${phoneStatus === 'invalid' ? ' invalid' : ' valid'}`}>
+              {phoneMessage}
+            </div>
+          )}
         </div>
 
         <div className="reg-field">
@@ -740,16 +818,34 @@ export function Register() {
             <input className={pidInputClass} type="text" name="partner_id"
               placeholder={formData.platform === 'zepto' ? 'ZPT123456' : 'BLK123456'}
               value={formData.partner_id} onChange={handleChange} onBlur={validatePartnerId}
+              disabled={partnerIdStatus === 'verified_b2b'}
               style={{ paddingRight: pidIcon ? '40px' : '16px' }} />
             {pidIcon && (
-              <span className="reg-input-icon" style={{ color: partnerIdStatus === 'valid' ? 'var(--green-primary)' : 'var(--warning)' }}>
+              <span className="reg-input-icon" style={{ color: (partnerIdStatus === 'valid' || partnerIdStatus === 'verified_b2b') ? 'var(--green-primary)' : 'var(--warning)' }}>
                 {pidIcon}
               </span>
             )}
           </div>
-          <div className={`reg-hint${partnerIdMessage ? ` ${partnerIdStatus}` : ''}`}>
-            {partnerIdMessage || `Your ${formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'} partner ID`}
-          </div>
+          
+          {partnerIdStatus === 'verified_b2b' ? (
+            <div className="reg-hint valid" style={{ marginTop: 8, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 16 }}>🛡️</span> {partnerIdMessage}
+            </div>
+          ) : (
+            <>
+              <div className={`reg-hint${partnerIdMessage ? ` ${partnerIdStatus}` : ''}`}>
+                {partnerIdMessage || `Your ${formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'} partner ID`}
+              </div>
+              
+              {formData.partner_id && partnerIdStatus !== 'invalid' && partnerIdStatus !== 'checking' && (
+                <button type="button" onClick={() => { setShowVendorAuth(true); handleVendorAuth(); }} 
+                        style={{ marginTop: 12, width: '100%', padding: '12px', borderRadius: 12, background: formData.platform === 'zepto' ? '#3B1E43' : '#F6C915', color: formData.platform === 'zepto' ? '#fff' : '#000', border: 'none', fontFamily: 'Nunito', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>{formData.platform === 'zepto' ? '🍇' : '⚡'}</span>
+                  Verify with {formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'}
+                </button>
+              )}
+            </>
+          )}
         </div>
 
         <div className="reg-field">
@@ -931,6 +1027,55 @@ export function Register() {
           onAccept={handleFinalSubmit}
           onDecline={handleDeclineTerms}
         />
+      )}
+
+      {/* Vendor Auth Mock Modal */}
+      {showVendorAuth && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 20 }}>
+          <div style={{ background: '#fff', width: '100%', maxWidth: 340, borderRadius: 24, padding: 24, textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+            
+            <div style={{ width: 60, height: 60, margin: '0 auto 16px', borderRadius: 16, background: formData.platform === 'zepto' ? '#3B1E43' : '#F6C915', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30 }}>
+              {formData.platform === 'zepto' ? '🍇' : '⚡'}
+            </div>
+            
+            <h3 style={{ fontFamily: 'Nunito', fontWeight: 900, color: 'var(--text-dark)', fontSize: 20, marginBottom: 8 }}>
+              {formData.platform === 'zepto' ? 'Zepto' : 'Blinkit'} Account Link
+            </h3>
+            
+            {vendorAuthStep === 1 && (
+              <div style={{ padding: '20px 0' }}>
+                <div className="spinner" style={{ borderColor: 'rgba(0,0,0,0.1)', borderTopColor: formData.platform === 'zepto' ? '#3B1E43' : '#F6C915', width: 30, height: 30, borderWidth: 3 }} />
+                <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-mid)', fontWeight: 600 }}>Connecting to secure verification portal...</p>
+              </div>
+            )}
+            
+            {vendorAuthStep === 2 && (
+              <>
+                <p style={{ fontSize: 14, color: 'var(--text-mid)', marginBottom: 24, lineHeight: 1.5 }}>
+                  RapidCover is requesting access to verify your active delivery status and internal rating.
+                </p>
+                <div style={{ background: 'var(--gray-bg)', borderRadius: 12, padding: 12, marginBottom: 24, textAlign: 'left', fontSize: 13, color: 'var(--text-dark)' }}>
+                  <div style={{ marginBottom: 6 }}><strong>ID:</strong> {formData.partner_id}</div>
+                  <div><strong>Phone:</strong> +91 {formData.phone}</div>
+                </div>
+                <button onClick={handleVendorAuthConfirm} style={{ width: '100%', padding: 16, borderRadius: 14, background: formData.platform === 'zepto' ? '#3B1E43' : '#000', color: '#fff', border: 'none', fontFamily: 'Nunito', fontWeight: 800, fontSize: 16, cursor: 'pointer' }}>
+                  Authorize & Verify
+                </button>
+                <button onClick={() => setShowVendorAuth(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', marginTop: 16, fontWeight: 700, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </>
+            )}
+
+            {vendorAuthStep === 3 && (
+              <div style={{ padding: '20px 0' }}>
+                <div className="spinner" style={{ borderColor: 'var(--green-light)', borderTopColor: 'var(--green-primary)', width: 30, height: 30, borderWidth: 3 }} />
+                <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-mid)', fontWeight: 600 }}>Syncing profile data securely...</p>
+              </div>
+            )}
+            
+          </div>
+        </div>
       )}
 
       <div className="reg-screen">
