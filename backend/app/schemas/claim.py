@@ -36,6 +36,13 @@ class ClaimResponse(BaseModel):
     # Payout metadata from validation_data
     payout_metadata: Optional[PayoutMetadata] = None
 
+    # Partial disruption data
+    disruption_category: Optional[str] = None
+    disruption_factor: Optional[float] = None
+
+    # Payment state machine status
+    payment_status: Optional[str] = None
+
     model_config = {"from_attributes": True}
 
 

@@ -30,7 +30,92 @@ from app.services.notifications import (
     notify_claim_rejected,
 )
 from app.services.payout_service import generate_upi_ref
+from app.services.multi_trigger_resolver import (
+    check_and_resolve_aggregation,
+    update_claim_with_aggregation,
+)
 from app.config import get_settings
+
+
+# Partial Disruption Categories with payout factors
+# Based on severity level and trigger type
+DISRUPTION_CATEGORIES = {
+    "full_halt": {"factor": 1.0, "description": "Complete work stoppage"},
+    "severe_reduction": {"factor": 0.75, "description": "75% income loss"},
+    "moderate_reduction": {"factor": 0.50, "description": "50% income loss"},
+    "minor_reduction": {"factor": 0.25, "description": "25% income loss"},
+}
+
+
+def determine_disruption_category(
+    trigger_type: TriggerType,
+    severity: int,
+    source_data: Optional[dict] = None,
+) -> tuple[str, float, str]:
+    """
+    Determine the disruption category based on trigger type and severity.
+
+    Args:
+        trigger_type: The type of trigger event
+        severity: Severity level (1-5)
+        source_data: Optional source data with expected/actual order info
+
+    Returns:
+        (category, factor, reason) tuple
+    """
+    # Shutdown and Closure are always full halt - no partial for these
+    if trigger_type in [TriggerType.SHUTDOWN, TriggerType.CLOSURE]:
+        return ("full_halt", 1.0, "shutdown_or_closure_always_full")
+
+    # Check if we have order data for more precise calculation
+    if source_data:
+        expected_orders = source_data.get("expected_orders")
+        actual_orders = source_data.get("actual_orders")
+        partial_override = source_data.get("partial_factor_override")
+
+        # If explicit override provided, use it
+        if partial_override is not None:
+            override = max(0.0, min(1.0, float(partial_override)))
+            if override == 1.0:
+                return ("full_halt", 1.0, "partial_factor_override")
+            elif override >= 0.75:
+                return ("severe_reduction", override, "partial_factor_override")
+            elif override >= 0.50:
+                return ("moderate_reduction", override, "partial_factor_override")
+            else:
+                return ("minor_reduction", override, "partial_factor_override")
+
+        # Calculate from order data if available
+        if expected_orders and actual_orders is not None and expected_orders > 0:
+            reduction_ratio = 1 - (actual_orders / expected_orders)
+            reduction_ratio = max(0.0, min(1.0, reduction_ratio))
+
+            if reduction_ratio >= 0.90:
+                return ("full_halt", 1.0, f"order_reduction_{reduction_ratio:.0%}")
+            elif reduction_ratio >= 0.70:
+                return ("severe_reduction", 0.75, f"order_reduction_{reduction_ratio:.0%}")
+            elif reduction_ratio >= 0.40:
+                return ("moderate_reduction", 0.50, f"order_reduction_{reduction_ratio:.0%}")
+            elif reduction_ratio >= 0.20:
+                return ("minor_reduction", 0.25, f"order_reduction_{reduction_ratio:.0%}")
+            else:
+                # Less than 20% reduction - minimal impact, but still apply minimum
+                return ("minor_reduction", 0.25, f"order_reduction_{reduction_ratio:.0%}")
+
+    # Default: Map severity to disruption category
+    # Severity 5 -> full_halt
+    # Severity 4 -> full_halt (still severe enough for full payout)
+    # Severity 3 -> severe_reduction
+    # Severity 2 -> moderate_reduction
+    # Severity 1 -> minor_reduction
+    if severity >= 4:
+        return ("full_halt", 1.0, f"severity_{severity}_full")
+    elif severity == 3:
+        return ("severe_reduction", 0.75, "severity_3_severe")
+    elif severity == 2:
+        return ("moderate_reduction", 0.50, "severity_2_moderate")
+    else:  # severity == 1
+        return ("minor_reduction", 0.25, "severity_1_minor")
 
 
 # Payout configuration
@@ -270,6 +355,7 @@ def calculate_payout_amount(
     policy: Policy,
     disruption_hours: Optional[float] = None,
     sustained_event_modifier: float = 1.0,
+    partial_disruption_data: Optional[dict] = None,
 ) -> tuple[float, dict]:
     """
     Calculate payout amount based on trigger type, duration, and policy limits.
@@ -279,6 +365,7 @@ def calculate_payout_amount(
         policy: The policy to calculate payout for
         disruption_hours: Hours of disruption (defaults to DEFAULT_DISRUPTION_HOURS)
         sustained_event_modifier: Modifier for sustained events (default 1.0, 0.70 for sustained)
+        partial_disruption_data: Optional dict with expected_orders, actual_orders, or partial_factor_override
 
     Returns tuple of (payout_amount, calculation_details)
     """
@@ -296,12 +383,36 @@ def calculate_payout_amount(
     severity_multiplier = 1.0 + (trigger_event.severity - 1) * 0.125
     adjusted_payout = base_payout * severity_multiplier
 
+    # Determine partial disruption category and factor
+    category, partial_factor, partial_reason = determine_disruption_category(
+        trigger_event.trigger_type,
+        trigger_event.severity,
+        partial_disruption_data,
+    )
+
+    # Apply partial disruption factor
+    partial_adjusted = adjusted_payout * partial_factor
+
     # Apply sustained event modifier (70% for sustained events)
-    sustained_adjusted = adjusted_payout * sustained_event_modifier
+    sustained_adjusted = partial_adjusted * sustained_event_modifier
 
     # Apply policy daily limit
     daily_limit = policy.max_daily_payout
     final_payout = min(sustained_adjusted, daily_limit)
+
+    # Build partial disruption metadata
+    partial_disruption_meta = {
+        "category": category,
+        "factor": partial_factor,
+        "reason": partial_reason,
+    }
+    if partial_disruption_data:
+        if "expected_orders" in partial_disruption_data:
+            partial_disruption_meta["expected_orders"] = partial_disruption_data["expected_orders"]
+        if "actual_orders" in partial_disruption_data:
+            partial_disruption_meta["actual_orders"] = partial_disruption_data["actual_orders"]
+        if "partial_factor_override" in partial_disruption_data:
+            partial_disruption_meta["factor_override_used"] = True
 
     calculation_details = {
         "hourly_rate": hourly_rate,
@@ -309,6 +420,8 @@ def calculate_payout_amount(
         "base_payout": round(base_payout, 2),
         "severity_multiplier": round(severity_multiplier, 3),
         "after_severity": round(adjusted_payout, 2),
+        "partial_disruption": partial_disruption_meta,
+        "after_partial_disruption": round(partial_adjusted, 2),
         "sustained_event_modifier": sustained_event_modifier,
         "after_sustained_modifier": round(sustained_adjusted, 2),
         "daily_limit": daily_limit,
@@ -582,19 +695,29 @@ def process_trigger_event(
         return []
 
     is_forced = False
+    source_data = {}
     try:
         source_data = json.loads(trigger_event.source_data or "{}")
         is_forced = source_data.get("force_fired", False)
     except:
         pass
 
+    # Extract partial disruption data from source_data if present
+    partial_disruption_data = None
+    if source_data.get("expected_orders") or source_data.get("actual_orders") is not None or source_data.get("partial_factor_override") is not None:
+        partial_disruption_data = {
+            k: source_data[k] for k in ["expected_orders", "actual_orders", "partial_factor_override"]
+            if k in source_data
+        }
+
     for policy, partner in eligible:
-        # Calculate payout amount with sustained event modifier
+        # Calculate payout amount with sustained event modifier and partial disruption
         payout, calc_details = calculate_payout_amount(
             trigger_event,
             policy,
             disruption_hours,
-            sustained_event_modifier=sustained_info["payout_modifier"]
+            sustained_event_modifier=sustained_info["payout_modifier"],
+            partial_disruption_data=partial_disruption_data,
         )
 
         # Check daily limit (bypass if forced for demo)
@@ -643,11 +766,31 @@ def process_trigger_event(
         else:
             status = ClaimStatus.PENDING
 
+        # Check multi-trigger aggregation
+        should_create_new, existing_claim, aggregation_meta = check_and_resolve_aggregation(
+            trigger_event=trigger_event,
+            policy=policy,
+            calculated_payout=payout,
+            db=db,
+        )
+
+        if not should_create_new and existing_claim:
+            # Update existing claim with aggregation data instead of creating new
+            update_claim_with_aggregation(
+                claim=existing_claim,
+                new_payout=aggregation_meta.get("post_aggregation_payout", existing_claim.amount),
+                aggregation_metadata=aggregation_meta,
+                db=db,
+            )
+            # Skip creating a new claim - this trigger was aggregated
+            continue
+
         # Build validation data with rich payout metadata including sustained event info
         validation_data = {
             "fraud_analysis": fraud_result,
             "daily_limit_check": {"within_limit": within_daily, "remaining": daily_remaining},
             "sustained_event": sustained_info,
+            "aggregation": aggregation_meta,  # Multi-trigger aggregation data
             "payout_calculation": {
                 **calc_details,
                 "final_payout": payout,

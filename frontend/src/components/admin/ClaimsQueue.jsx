@@ -10,6 +10,23 @@ const FRAUD_VECTORS = {
   synthetic_identity: 'Synthetic identity: Aadhaar + face liveness check failed',
 };
 
+/* Disruption category config for badge display */
+const DISRUPTION_CFG = {
+  full_halt:          { icon: '🛑', label: 'Full Halt',     color: '#ef4444', bg: '#fee2e2' },
+  severe_reduction:   { icon: '⚠️', label: 'Severe',        color: '#f97316', bg: '#ffedd5' },
+  moderate_reduction: { icon: '📉', label: 'Moderate',      color: '#eab308', bg: '#fef9c3' },
+  minor_reduction:    { icon: '📊', label: 'Minor',         color: '#3b82f6', bg: '#dbeafe' },
+};
+
+/* Payment status config */
+const PAY_STATUS_CFG = {
+  not_started:       { icon: '⏸️', label: 'No payment',       color: '#6b7280' },
+  initiated:         { icon: '🔄', label: 'Processing',       color: '#1e40af' },
+  confirmed:         { icon: '✅', label: 'Confirmed',        color: '#166534' },
+  failed:            { icon: '❌', label: 'Failed',           color: '#991b1b' },
+  reconcile_pending: { icon: '⚠️', label: 'Reconcile',        color: '#854d0e' },
+};
+
 const ANOMALY_REASONS = [
   'gps_anomaly',
   'run_count_anomaly',
@@ -217,6 +234,29 @@ export default function ClaimsQueue() {
                       <span className="claim-row__id">{claimId}</span>
                       <span className={`claim-badge ${badge.cls}`}>{badge.label}</span>
                       <span className="claim-trigger-badge">{getTriggerLabel(claim.trigger_type)}</span>
+                      {/* Disruption category badge */}
+                      {claim.disruption_category && DISRUPTION_CFG[claim.disruption_category] && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 2,
+                          background: DISRUPTION_CFG[claim.disruption_category].bg,
+                          color: DISRUPTION_CFG[claim.disruption_category].color,
+                          fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 6,
+                        }}>
+                          {DISRUPTION_CFG[claim.disruption_category].icon} {DISRUPTION_CFG[claim.disruption_category].label}
+                          {claim.disruption_factor != null && ` ${(claim.disruption_factor * 100).toFixed(0)}%`}
+                        </span>
+                      )}
+                      {/* Payment state badge */}
+                      {claim.payment_status && claim.payment_status !== 'not_started' && PAY_STATUS_CFG[claim.payment_status] && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 2,
+                          fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 6,
+                          color: PAY_STATUS_CFG[claim.payment_status].color,
+                          background: `${PAY_STATUS_CFG[claim.payment_status].color}15`,
+                        }}>
+                          {PAY_STATUS_CFG[claim.payment_status].icon} {PAY_STATUS_CFG[claim.payment_status].label}
+                        </span>
+                      )}
                     </div>
                     <div className="claim-row__detail">
                       {claim.partner_name} · {claim.zone_name} · ₹{claim.amount}

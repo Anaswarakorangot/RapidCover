@@ -282,6 +282,9 @@ export default function Claims() {
                 fraudScore={claim.fraud_score}
                 claimId={claim.id}
                 validationData={claim.validation_data}
+                disruptionCategory={claim.disruption_category}
+                disruptionFactor={claim.disruption_factor}
+                paymentStatus={claim.payment_status}
               />
             ))}
           </div>

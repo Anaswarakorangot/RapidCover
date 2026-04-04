@@ -5,6 +5,24 @@
  *   - Now expandable to show "Claim Explanation" details
  *   - Shows exact metrics (e.g. 87mm/hr) and calculation breakdown
  *   - Professional icon-free UI
+ *
+ * B2 shared component. Used in Claims list, partner Dashboard, and demo proofs.
+ *
+ * Props:
+ *   triggerType        {string}       'rain' | 'heat' | 'aqi' | 'shutdown' | 'closure'
+ *   severity           {number?}      1–5, shown via SourceBadge
+ *   status             {string}       'paid' | 'approved' | 'pending' | 'rejected'
+ *   amount             {number?}      payout amount in ₹
+ *   upiRef             {string?}      UPI reference (shown only for paid)
+ *   createdAt          {string?}      ISO timestamp of claim / trigger creation
+ *   paidAt             {string?}      ISO timestamp of payout
+ *   metricValue        {string?}      Optional measurement label e.g. "87mm/hr", "AQI 410"
+ *   fraudScore         {number?}      0.0–1.0 fraud score (shows warning if > 0.5)
+ *   claimId            {number?}      Claim ID for reference
+ *   validationData     {object|string?} Detailed validation and metric logic
+ *   disruptionCategory {string?}      'full_halt' | 'severe_reduction' | 'moderate_reduction' | 'minor_reduction'
+ *   disruptionFactor   {number?}      0.0–1.0 payout factor
+ *   paymentStatus      {string?}      'not_started' | 'initiated' | 'confirmed' | 'failed' | 'reconcile_pending'
  */
 
 import { useState } from 'react';
@@ -19,6 +37,23 @@ const STATUS_CFG = {
 };
 
 const FALLBACK_STATUS = { bg: '#f3f4f6', color: '#374151', border: '#e5e7eb', label: 'UNKNOWN' };
+
+/* ─── Disruption category config ─────────────────────────────────────────── */
+const DISRUPTION_CFG = {
+  full_halt:          { icon: '🛑', label: 'Full Halt',          color: '#ef4444', bg: '#fee2e2' },
+  severe_reduction:   { icon: '⚠️', label: 'Severe Reduction',   color: '#f97316', bg: '#ffedd5' },
+  moderate_reduction: { icon: '📉', label: 'Moderate Reduction', color: '#eab308', bg: '#fef9c3' },
+  minor_reduction:    { icon: '📊', label: 'Minor Reduction',    color: '#3b82f6', bg: '#dbeafe' },
+};
+
+/* ─── Payment status config ──────────────────────────────────────────────── */
+const PAY_CFG = {
+  not_started:       { icon: '⏸️', label: 'Not started',      color: '#6b7280' },
+  initiated:         { icon: '🔄', label: 'Processing',        color: '#1e40af' },
+  confirmed:         { icon: '✅', label: 'Payment confirmed', color: '#166534' },
+  failed:            { icon: '❌', label: 'Payment failed',    color: '#991b1b' },
+  reconcile_pending: { icon: '⚠️', label: 'Under review',     color: '#854d0e' },
+};
 
 /* ─── Date helpers ───────────────────────────────────────────────────────── */
 function fmtDate(iso) {
@@ -49,9 +84,14 @@ export default function ProofCard({
   fraudScore,
   claimId,
   validationData,
+  disruptionCategory,
+  disruptionFactor,
+  paymentStatus,
 }) {
   const [expanded, setExpanded] = useState(false);
   const stCfg = STATUS_CFG[status] || FALLBACK_STATUS;
+  const dCfg = disruptionCategory ? DISRUPTION_CFG[disruptionCategory] : null;
+  const pCfg = paymentStatus ? PAY_CFG[paymentStatus] : null;
 
   // Attempt to parse validation data for the deep dive
   let trLog = null;
@@ -108,6 +148,25 @@ export default function ProofCard({
               }}
             >
               {metricValue || triggerDetail.severity_label}
+            </span>
+          )}
+          {/* Disruption category badge */}
+          {dCfg && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+                background: dCfg.bg,
+                color: dCfg.color,
+                fontSize: 10,
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: 20,
+              }}
+            >
+              {dCfg.icon} {dCfg.label}
+              {disruptionFactor != null && ` · ${(disruptionFactor * 100).toFixed(0)}%`}
             </span>
           )}
         </div>
@@ -235,6 +294,21 @@ export default function ProofCard({
           </div>
         )}
 
+        {/* Payment state indicator */}
+        {pCfg && paymentStatus !== 'not_started' && paymentStatus !== 'confirmed' && (
+          <p style={{
+            fontSize: 11,
+            color: pCfg.color,
+            background: `${pCfg.color}12`,
+            padding: '4px 10px',
+            borderRadius: 8,
+            margin: 0,
+            fontWeight: 600,
+          }}>
+            {pCfg.icon} {pCfg.label}
+          </p>
+        )}
+
         {/* Fraud warning */}
         {fraudScore != null && fraudScore > 0.5 && !expanded && (
           <p style={{
@@ -252,3 +326,4 @@ export default function ProofCard({
     </div>
   );
 }
+
