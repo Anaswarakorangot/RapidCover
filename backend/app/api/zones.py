@@ -693,3 +693,152 @@ def reassign_partner_zone(
     )
 
 
+
+# =============================================================================
+# PLATFORM ACTIVITY ENDPOINTS (Feature 3)
+# =============================================================================
+
+class PartnerPlatformActivityResponse(BaseModel):
+    partner_id: int
+    platform_logged_in: bool
+    active_shift: bool
+    orders_accepted_recent: int
+    orders_completed_recent: int
+    last_app_ping: str
+    zone_dwell_minutes: int
+    suspicious_inactivity: bool
+    platform: str
+    updated_at: str
+    source: str
+
+
+class PartnerPlatformActivityRequest(BaseModel):
+    platform_logged_in: Optional[bool] = None
+    active_shift: Optional[bool] = None
+    orders_accepted_recent: Optional[int] = None
+    orders_completed_recent: Optional[int] = None
+    last_app_ping: Optional[str] = None
+    zone_dwell_minutes: Optional[int] = None
+    suspicious_inactivity: Optional[bool] = None
+    platform: Optional[str] = None
+
+
+class PartnerPlatformEligibilityResponse(BaseModel):
+    partner_id: int
+    eligible: bool
+    score: float
+    reasons: list[dict]
+    activity: dict
+
+
+@router.get(
+    "/partners/{partner_id}/activity",
+    response_model=PartnerPlatformActivityResponse,
+    tags=["zones"],
+)
+def get_partner_activity(partner_id: int, db: Session = Depends(get_db)):
+    """
+    GET /zones/partners/{partner_id}/activity
+
+    Return current simulated platform activity for a delivery partner.
+    Shows Zomato/Swiggy/Zepto/Blinkit login state, shift, orders, and ping.
+    """
+    partner = db.query(Partner).filter(Partner.id == partner_id).first()
+    if not partner:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Partner {partner_id} not found")
+
+    from app.services.claims_processor import get_db_partner_platform_activity
+    activity = get_db_partner_platform_activity(partner_id, db)
+    return PartnerPlatformActivityResponse(**activity)
+
+
+@router.put(
+    "/partners/{partner_id}/activity",
+    response_model=PartnerPlatformActivityResponse,
+    tags=["zones"],
+)
+def update_partner_activity(
+    partner_id: int,
+    request: PartnerPlatformActivityRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    PUT /zones/partners/{partner_id}/activity
+
+    Admin control: toggle partner platform activity state.
+    Set active_shift=false to simulate partner being offline.
+    Set suspicious_inactivity=true to simulate fraud signal.
+    Claim approval logic reads this data before authorising payout.
+    """
+    from fastapi import HTTPException
+    partner = db.query(Partner).filter(Partner.id == partner_id).first()
+    if not partner:
+        raise HTTPException(status_code=404, detail=f"Partner {partner_id} not found")
+
+    from app.services.claims_processor import upsert_db_partner_platform_activity
+    updates = {k: v for k, v in request.model_dump().items() if v is not None}
+    activity = upsert_db_partner_platform_activity(partner_id, db, **updates)
+    return PartnerPlatformActivityResponse(**activity)
+
+
+@router.get(
+    "/partners/{partner_id}/activity/eligibility",
+    response_model=PartnerPlatformEligibilityResponse,
+    tags=["zones"],
+)
+def get_partner_activity_eligibility(partner_id: int, db: Session = Depends(get_db)):
+    """
+    GET /zones/partners/{partner_id}/activity/eligibility
+
+    Evaluate whether this partner's platform activity qualifies them for payout.
+    Returns check-by-check breakdown (logged in, active shift, recent orders, ping).
+    """
+    from fastapi import HTTPException
+    from app.services.external_apis import evaluate_partner_platform_eligibility
+
+    partner = db.query(Partner).filter(Partner.id == partner_id).first()
+    if not partner:
+        raise HTTPException(status_code=404, detail=f"Partner {partner_id} not found")
+
+    result = evaluate_partner_platform_eligibility(partner_id)
+    return PartnerPlatformEligibilityResponse(**result)
+
+
+@router.get("/partners/activity/bulk", tags=["zones"])
+def get_all_partners_activity(
+    zone_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    GET /zones/partners/activity/bulk
+
+    Return platform activity for all partners (optionally filtered by zone).
+    Used by admin LiveDataPanel to show fleet-wide activity at a glance.
+    """
+    from app.services.claims_processor import get_db_partner_platform_activity
+    from app.services.external_apis import evaluate_partner_platform_eligibility
+
+    query = db.query(Partner).filter(Partner.is_active == True)
+    if zone_id:
+        query = query.filter(Partner.zone_id == zone_id)
+    partners = query.limit(200).all()
+
+    results = []
+    for p in partners:
+        activity = get_db_partner_platform_activity(p.id, db)
+        eligibility = evaluate_partner_platform_eligibility(p.id)
+        results.append({
+            "partner_id": p.id,
+            "partner_name": p.name,
+            "zone_id": p.zone_id,
+            "activity": activity,
+            "platform_eligible": eligibility["eligible"],
+            "platform_score": eligibility["score"],
+        })
+
+    return {
+        "total": len(results),
+        "zone_id": zone_id,
+        "partners": results,
+    }

@@ -29,7 +29,7 @@ async function handleResponse(res) {
     try {
       const body = await res.json();
       detail = body.detail || JSON.stringify(body);
-    } catch (_) {}
+    } catch (_) { }
     throw new Error(detail);
   }
   if (res.status === 204) return null;
@@ -300,3 +300,43 @@ const adminApi = {
 };
 
 export default adminApi;
+
+// ── Validation Matrix ──────────────────────────────────────────────────────────
+
+/** Get validation matrix proof (most recent claim with matrix) */
+export async function getValidationMatrixProof() {
+  return get('/panel/proof/validation-matrix');
+}
+
+/** Get validation matrix for a specific claim */
+export async function getClaimValidationMatrix(claimId) {
+  return get(`/claims/${claimId}/validation-matrix`);
+}
+
+// ── Oracle Reliability ────────────────────────────────────────────────────────
+
+/** Get oracle reliability proof (source confidence + trigger decisions) */
+export async function getOracleReliabilityProof() {
+  return get('/panel/proof/oracle-reliability');
+}
+
+/** Get full oracle reliability report (optionally filtered to a zone_id) */
+export async function getOracleReliability(zoneId = null) {
+  const url = new URL(`${BASE}/panel/oracle-reliability`, window.location.origin);
+  if (zoneId) url.searchParams.set('zone_id', zoneId);
+  const res = await fetch(url.toString(), { headers: jsonHeaders() });
+  return handleResponse(res);
+}
+
+// ── Platform Activity ──────────────────────────────────────────────────────────
+
+/** Get platform activity proof (fleet-level summary) */
+export async function getPlatformActivityProof() {
+  return get('/panel/proof/platform-activity');
+}
+
+/** Get live data panel (oracle + sources + platform activity combined) */
+export async function getLiveData(zoneCode = null) {
+  const params = zoneCode ? { zone_code: zoneCode } : {};
+  return get('/panel/live-data', params);
+}

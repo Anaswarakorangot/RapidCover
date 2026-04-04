@@ -487,3 +487,339 @@ def apply_drill_preset(zone_id: int, preset_name: str) -> dict:
     """
     from app.services.drill_service import apply_preset_conditions
     return apply_preset_conditions(zone_id, preset_name)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  ORACLE RELIABILITY ENGINE
+#  Scores data sources and computes trigger confidence decisions.
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Freshness thresholds (seconds)
+SOURCE_FRESHNESS_LIMITS = {
+    "openweathermap": 300,   # 5 minutes
+    "waqi_aqi":       600,   # 10 minutes
+    "zepto_ops":      60,    # 1 minute (mock)
+    "traffic_feed":   120,   # 2 minutes (mock)
+    "civic_api":      120,   # 2 minutes (mock)
+}
+
+# Agreement deviation threshold (as a fraction of the value)
+AGREEMENT_DEVIATION_THRESHOLD = 0.20   # 20% deviation = disagreement
+
+
+def compute_source_confidence(source_name: str) -> dict:
+    """
+    Compute reliability score for a single data source.
+
+    Returns a dict with:
+      - source_name
+      - is_live: bool
+      - freshness_ok: bool
+      - staleness_seconds: float | None
+      - reliability_score: 0.0–1.0
+      - badge: "live" | "mock" | "stale"
+      - last_success_iso: str | None
+    """
+    now = datetime.utcnow()
+    info = _source_status.get(source_name, {})
+
+    is_live = info.get("status") == "live"
+    last_success = info.get("last_success")
+    last_check = info.get("last_check")
+
+    freshness_limit = SOURCE_FRESHNESS_LIMITS.get(source_name, 300)
+    staleness_seconds = None
+    freshness_ok = False
+
+    if last_success:
+        staleness_seconds = (now - last_success).total_seconds()
+        freshness_ok = staleness_seconds <= freshness_limit
+
+    # Score: live + fresh = 1.0, mock = 0.6, stale = 0.2
+    if is_live and freshness_ok:
+        reliability_score = 1.0
+        badge = "live"
+    elif is_live and not freshness_ok:
+        reliability_score = 0.2
+        badge = "stale"
+    else:
+        reliability_score = 0.6   # mock is useful but not ground-truth
+        badge = "mock"
+
+    return {
+        "source_name": source_name,
+        "is_live": is_live,
+        "freshness_ok": freshness_ok,
+        "staleness_seconds": round(staleness_seconds, 1) if staleness_seconds is not None else None,
+        "freshness_limit_seconds": freshness_limit,
+        "reliability_score": reliability_score,
+        "badge": badge,
+        "last_success_iso": last_success.isoformat() if last_success else None,
+        "last_check_iso": last_check.isoformat() if last_check else None,
+    }
+
+
+def compute_trigger_confidence(
+    primary_source: str,
+    corroborating_sources: list[str] = None,
+    primary_value: float = None,
+    corroborating_values: list[float] = None,
+) -> dict:
+    """
+    Compute trigger confidence given one primary + optional corroborating sources.
+
+    Decision logic:
+      - If primary stale and no corroboration → hold
+      - If ≥2 sources agree strongly → confidence high → fire
+      - If only mock source → demo mode, mark as mock
+      - If live and mock disagree beyond threshold → reduce confidence
+      - Otherwise standard scoring
+
+    Returns:
+      - trigger_confidence_score: 0.0–1.0
+      - source_confidence_scores: dict per source
+      - decision: "fire" | "hold" | "manual_review_simulated" | "fallback_mock_mode"
+      - reason: human-readable reason string
+      - agreement_score: 0.0–1.0 (1.0 = all sources agree perfectly)
+    """
+    corroborating_sources = corroborating_sources or []
+    corroborating_values = corroborating_values or []
+
+    primary_conf = compute_source_confidence(primary_source)
+    corr_confs = [compute_source_confidence(s) for s in corroborating_sources]
+    all_confs = {primary_source: primary_conf}
+    for c in corr_confs:
+        all_confs[c["source_name"]] = c
+
+    # Compute agreement score
+    all_values = []
+    if primary_value is not None:
+        all_values.append(primary_value)
+    all_values.extend([v for v in corroborating_values if v is not None])
+
+    agreement_score = 1.0
+    if len(all_values) >= 2:
+        mean_val = sum(all_values) / len(all_values)
+        if mean_val > 0:
+            max_dev = max(abs(v - mean_val) / mean_val for v in all_values)
+            agreement_score = max(0.0, 1.0 - max_dev)
+
+    # Base confidence from primary source
+    base_conf = primary_conf["reliability_score"]
+    # Boost from corroborating sources
+    if corr_confs:
+        avg_corr = sum(c["reliability_score"] for c in corr_confs) / len(corr_confs)
+        trigger_confidence = base_conf * 0.6 + avg_corr * 0.4
+    else:
+        trigger_confidence = base_conf
+
+    # Apply agreement penalty if sources disagree
+    trigger_confidence *= (0.5 + 0.5 * agreement_score)
+    trigger_confidence = round(min(1.0, max(0.0, trigger_confidence)), 3)
+
+    # Decision logic
+    primary_live = primary_conf["is_live"]
+    primary_fresh = primary_conf["freshness_ok"]
+    all_mock = all(c["badge"] == "mock" for c in all_confs.values())
+    sources_agree = agreement_score >= (1.0 - AGREEMENT_DEVIATION_THRESHOLD)
+
+    if all_mock:
+        decision = "fallback_mock_mode"
+        reason = "All sources are mock/simulated — demo mode active"
+    elif not primary_live and not corr_confs:
+        decision = "hold"
+        reason = "Primary source offline and no corroborating sources available"
+    elif not primary_fresh and not corroborating_sources:
+        decision = "hold"
+        reason = f"Primary source ({primary_source}) data is stale and unconfirmed"
+    elif trigger_confidence >= 0.7 and sources_agree:
+        decision = "fire"
+        reason = f"Confidence {trigger_confidence:.0%} — sources agree (agreement={agreement_score:.0%})"
+    elif trigger_confidence >= 0.5:
+        decision = "manual_review_simulated"
+        reason = f"Moderate confidence {trigger_confidence:.0%} — requires simulated review"
+    else:
+        decision = "hold"
+        reason = f"Low confidence {trigger_confidence:.0%} — holding trigger"
+
+    return {
+        "trigger_confidence_score": trigger_confidence,
+        "source_confidence_scores": all_confs,
+        "decision": decision,
+        "reason": reason,
+        "agreement_score": round(agreement_score, 3),
+        "primary_source": primary_source,
+        "corroborating_sources": corroborating_sources,
+        "computed_at": datetime.utcnow().isoformat(),
+    }
+
+
+def get_oracle_reliability_report(zone_id: int = None) -> dict:
+    """
+    Full oracle reliability report — all sources with freshness + overall system health.
+    """
+    all_sources = list(_source_status.keys())
+    source_reports = {s: compute_source_confidence(s) for s in all_sources}
+
+    live_count = sum(1 for r in source_reports.values() if r["badge"] == "live")
+    stale_count = sum(1 for r in source_reports.values() if r["badge"] == "stale")
+    mock_count = sum(1 for r in source_reports.values() if r["badge"] == "mock")
+
+    avg_reliability = sum(r["reliability_score"] for r in source_reports.values()) / len(source_reports) if source_reports else 0.0
+
+    if live_count >= 2:
+        system_health = "healthy"
+    elif live_count == 1:
+        system_health = "degraded"
+    elif stale_count > 0:
+        system_health = "stale"
+    else:
+        system_health = "mock_mode"
+
+    return {
+        "zone_id": zone_id,
+        "system_health": system_health,
+        "average_reliability": round(avg_reliability, 3),
+        "live_sources": live_count,
+        "stale_sources": stale_count,
+        "mock_sources": mock_count,
+        "sources": source_reports,
+        "computed_at": datetime.utcnow().isoformat(),
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  PLATFORM ACTIVITY SIMULATION
+#  Simulates per-partner delivery platform activity (Zomato/Swiggy/Zepto/Blinkit).
+# ═════════════════════════════════════════════════════════════════════════════
+
+# In-memory store: partner_id -> activity dict
+_partner_platform_activity: dict[int, dict] = {}
+
+
+def _default_partner_activity(partner_id: int) -> dict:
+    """Return default (active, working) platform activity for a partner."""
+    now = datetime.utcnow()
+    return {
+        "partner_id": partner_id,
+        "platform_logged_in": True,
+        "active_shift": True,
+        "orders_accepted_recent": random.randint(3, 12),
+        "orders_completed_recent": random.randint(2, 10),
+        "last_app_ping": now.isoformat(),
+        "zone_dwell_minutes": random.randint(20, 120),
+        "suspicious_inactivity": False,
+        "platform": random.choice(["zomato", "swiggy", "zepto", "blinkit"]),
+        "updated_at": now.isoformat(),
+        "source": "simulated",
+    }
+
+
+def get_partner_platform_activity(partner_id: int) -> dict:
+    """Get (or initialize) platform activity for a partner."""
+    if partner_id not in _partner_platform_activity:
+        _partner_platform_activity[partner_id] = _default_partner_activity(partner_id)
+    return dict(_partner_platform_activity[partner_id])
+
+
+def set_partner_platform_activity(partner_id: int, **kwargs) -> dict:
+    """
+    Update platform activity fields for a partner (admin control).
+
+    Accepted kwargs: platform_logged_in, active_shift, orders_accepted_recent,
+    orders_completed_recent, last_app_ping, zone_dwell_minutes,
+    suspicious_inactivity, platform
+    """
+    existing = get_partner_platform_activity(partner_id)
+    allowed_fields = {
+        "platform_logged_in", "active_shift", "orders_accepted_recent",
+        "orders_completed_recent", "last_app_ping", "zone_dwell_minutes",
+        "suspicious_inactivity", "platform",
+    }
+    for key, val in kwargs.items():
+        if key in allowed_fields:
+            existing[key] = val
+    existing["updated_at"] = datetime.utcnow().isoformat()
+    existing["source"] = "admin_override"
+    _partner_platform_activity[partner_id] = existing
+    return dict(existing)
+
+
+def evaluate_partner_platform_eligibility(partner_id: int) -> dict:
+    """
+    Check if a partner's platform activity qualifies them for a payout.
+
+    Rules:
+      - Must be logged into platform
+      - Must have an active shift
+      - Must have completed ≥1 order in recent window
+      - Not flagged for suspicious inactivity
+      - Must have pinged app within last 30 minutes
+
+    Returns:
+      - eligible: bool
+      - score: 0.0–1.0 (platform activity score)
+      - reasons: list of pass/fail reasons
+      - activity: the raw activity dict
+    """
+    activity = get_partner_platform_activity(partner_id)
+    reasons = []
+    score_parts = []
+
+    # Check: logged in
+    if activity["platform_logged_in"]:
+        reasons.append({"check": "platform_logged_in", "pass": True, "note": "Partner logged into platform app"})
+        score_parts.append(1.0)
+    else:
+        reasons.append({"check": "platform_logged_in", "pass": False, "note": "Partner not logged into platform"})
+        score_parts.append(0.0)
+
+    # Check: active shift
+    if activity["active_shift"]:
+        reasons.append({"check": "active_shift", "pass": True, "note": "Partner on active shift"})
+        score_parts.append(1.0)
+    else:
+        reasons.append({"check": "active_shift", "pass": False, "note": "Partner not on shift"})
+        score_parts.append(0.0)
+
+    # Check: recent orders completed
+    completed = activity.get("orders_completed_recent", 0)
+    if completed >= 1:
+        reasons.append({"check": "orders_completed_recent", "pass": True, "note": f"{completed} orders completed recently"})
+        score_parts.append(min(1.0, completed / 5.0))
+    else:
+        reasons.append({"check": "orders_completed_recent", "pass": False, "note": "No recent order completions"})
+        score_parts.append(0.0)
+
+    # Check: suspicious inactivity
+    if not activity.get("suspicious_inactivity", False):
+        reasons.append({"check": "suspicious_inactivity", "pass": True, "note": "No inactivity flags"})
+        score_parts.append(1.0)
+    else:
+        reasons.append({"check": "suspicious_inactivity", "pass": False, "note": "Suspicious inactivity flag active"})
+        score_parts.append(0.0)
+
+    # Check: last app ping within 30 min
+    try:
+        last_ping = datetime.fromisoformat(activity["last_app_ping"])
+        minutes_since_ping = (datetime.utcnow() - last_ping).total_seconds() / 60.0
+        if minutes_since_ping <= 30:
+            reasons.append({"check": "last_app_ping", "pass": True, "note": f"Last ping {minutes_since_ping:.0f}m ago"})
+            score_parts.append(1.0)
+        else:
+            reasons.append({"check": "last_app_ping", "pass": False, "note": f"Last ping {minutes_since_ping:.0f}m ago (>30m)"})
+            score_parts.append(0.0)
+    except Exception:
+        reasons.append({"check": "last_app_ping", "pass": False, "note": "Cannot parse last ping timestamp"})
+        score_parts.append(0.0)
+
+    score = sum(score_parts) / len(score_parts) if score_parts else 0.0
+    eligible = all(r["pass"] for r in reasons)
+
+    return {
+        "partner_id": partner_id,
+        "eligible": eligible,
+        "score": round(score, 3),
+        "reasons": reasons,
+        "activity": activity,
+    }

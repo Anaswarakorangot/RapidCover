@@ -404,3 +404,46 @@ const api = {
 };
 
 export default api;
+// ── Platform Activity (zones router) ─────────────────────────────────────────
+// Base URL for zones endpoints
+const ZONES_BASE = '/api/v1/zones';
+
+function zonesAuthHeaders() {
+  const token = localStorage.getItem('access_token');
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
+async function zonesHandleResponse(res) {
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { const b = await res.json(); detail = b.detail || JSON.stringify(b); } catch (_) { }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+export async function getPartnerPlatformActivity(partnerId) {
+  const res = await fetch(`${ZONES_BASE}/partners/${partnerId}/activity`, { headers: zonesAuthHeaders() });
+  return zonesHandleResponse(res);
+}
+
+export async function setPartnerPlatformActivity(partnerId, data) {
+  const res = await fetch(`${ZONES_BASE}/partners/${partnerId}/activity`, {
+    method: 'PUT',
+    headers: zonesAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  return zonesHandleResponse(res);
+}
+
+export async function getPartnerPlatformEligibility(partnerId) {
+  const res = await fetch(`${ZONES_BASE}/partners/${partnerId}/activity/eligibility`, { headers: zonesAuthHeaders() });
+  return zonesHandleResponse(res);
+}
+
+export async function getBulkPlatformActivity(zoneId = null) {
+  const url = new URL(`${ZONES_BASE}/partners/activity/bulk`, window.location.origin);
+  if (zoneId) url.searchParams.set('zone_id', zoneId);
+  const res = await fetch(url.toString(), { headers: zonesAuthHeaders() });
+  return zonesHandleResponse(res);
+}
