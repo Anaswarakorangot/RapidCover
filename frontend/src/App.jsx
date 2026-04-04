@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext.jsx';
@@ -94,12 +95,39 @@ function AppRoutes() {
   );
 }
 
+// Online status hook
+function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+  return isOnline;
+}
+
 // App
 export default function App() {
+  const isOnline = useOnlineStatus();
+  
   return (
     <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
+          {!isOnline && (
+            <div style={{
+              background: '#1a2e1a', color: '#fff', fontSize: 12, padding: '8px 16px',
+              textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, zIndex: 10000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+            }}>
+              Offline Mode - Syncing locally to RapidCover Edge
+            </div>
+          )}
           <AppRoutes />
         </NotificationProvider>
       </AuthProvider>
