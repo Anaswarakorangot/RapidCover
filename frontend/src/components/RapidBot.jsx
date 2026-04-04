@@ -243,10 +243,13 @@ export function RapidBot() {
     setIsThinking(true);
 
     try {
-      // Direct call to the backend AI chat endpoint
-      const res = await fetch('/api/v1/ai/chat', {
+      const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+      const res = await fetch(`${API_URL}/ai/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`
+        },
         body: JSON.stringify({ messages: newHistory })
       });
       
