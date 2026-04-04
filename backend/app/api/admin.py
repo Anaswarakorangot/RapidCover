@@ -27,12 +27,27 @@ from app.services.external_apis import (
     MockPlatformAPI,
     MockCivicAPI,
     reset_all_conditions,
+    set_partial_disruption_data,
+    get_partial_disruption_data,
+    clear_partial_disruption_data,
 )
 from app.services.trigger_detector import detect_and_save_triggers, end_trigger, get_all_active_triggers
 from app.services.claims_processor import (
     process_trigger_event,
     approve_claim,
     reject_claim,
+)
+from app.services.multi_trigger_resolver import (
+    get_aggregation_stats,
+    get_claim_aggregation_details,
+)
+from app.services.payment_state_machine import (
+    retry_payment,
+    reconcile_payment,
+    get_failed_payments,
+    get_pending_reconciliation,
+    get_payment_stats,
+    get_payment_status,
 )
 from app.services.payout_service import process_payout
 
@@ -120,6 +135,10 @@ class WeatherSimulation(BaseModel):
     temp_celsius: Optional[float] = None
     rainfall_mm_hr: Optional[float] = None
     humidity: Optional[float] = None
+    # Partial disruption fields
+    expected_orders: Optional[int] = None
+    actual_orders: Optional[int] = None
+    partial_factor_override: Optional[float] = None
 
 
 class AQISimulation(BaseModel):
@@ -127,16 +146,26 @@ class AQISimulation(BaseModel):
     aqi: Optional[int] = None
     pm25: Optional[float] = None
     pm10: Optional[float] = None
+    # Partial disruption fields
+    expected_orders: Optional[int] = None
+    actual_orders: Optional[int] = None
+    partial_factor_override: Optional[float] = None
 
 
 class ShutdownSimulation(BaseModel):
     zone_id: int
     reason: str = "Civic shutdown - curfew in effect"
+    # Note: Shutdown/Closure are always full_halt, but fields included for consistency
+    expected_orders: Optional[int] = None
+    actual_orders: Optional[int] = None
 
 
 class ClosureSimulation(BaseModel):
     zone_id: int
     reason: str = "Force majeure - infrastructure issue"
+    # Note: Shutdown/Closure are always full_halt, but fields included for consistency
+    expected_orders: Optional[int] = None
+    actual_orders: Optional[int] = None
 
 
 class SeedResponse(BaseModel):
@@ -150,6 +179,13 @@ class ClaimActionRequest(BaseModel):
 
 class PayoutRequest(BaseModel):
     upi_ref: Optional[str] = None
+
+
+class ReconcileRequest(BaseModel):
+    """Request for manual payment reconciliation."""
+    action: str  # "confirm", "reject", or "force_paid"
+    provider_ref: Optional[str] = None
+    notes: Optional[str] = None
 
 
 # Dashboard endpoints
@@ -412,6 +448,192 @@ def payout_claim_endpoint(
     }
 
 
+# Multi-trigger aggregation endpoints
+@router.get("/aggregation-stats")
+def get_aggregation_stats_endpoint(db: Session = Depends(get_db)):
+    """
+    Get statistics about multi-trigger aggregation.
+
+    Returns:
+    - total_aggregated_claims: Claims that aggregated multiple triggers
+    - total_triggers_suppressed: Triggers that didn't create separate claims
+    - total_savings: Total amount saved by preventing duplicate payouts
+    """
+    return get_aggregation_stats(db)
+
+
+@router.get("/claims/{claim_id}/aggregation")
+def get_claim_aggregation_endpoint(
+    claim_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Get aggregation details for a specific claim.
+
+    Returns aggregation metadata including:
+    - group_id: Unique identifier for the aggregation group
+    - is_aggregated: Whether multiple triggers were combined
+    - primary_trigger_id: The trigger with highest payout
+    - suppressed_triggers: List of trigger IDs that were aggregated
+    - pre_aggregation_payout: What would have been paid without aggregation
+    - post_aggregation_payout: Final aggregated payout
+    - savings: Amount saved by aggregation
+    """
+    aggregation = get_claim_aggregation_details(claim_id, db)
+    if aggregation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Claim not found or has no aggregation data",
+        )
+    return aggregation
+
+
+# Payment state machine endpoints
+@router.get("/claims/{claim_id}/payment-state")
+def get_claim_payment_state_endpoint(
+    claim_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Get payment state for a specific claim.
+
+    Returns payment state including:
+    - current_status: Current payment status (not_started, initiated, confirmed, failed, reconcile_pending)
+    - idempotency_key: Key for deduplication
+    - attempts: List of payment attempts with details
+    - total_attempts: Number of attempts made
+    """
+    claim = db.query(Claim).filter(Claim.id == claim_id).first()
+    if not claim:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Claim not found",
+        )
+    return get_payment_status(claim)
+
+
+@router.post("/claims/{claim_id}/retry-payment")
+def retry_payment_endpoint(
+    claim_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Retry a failed payment.
+
+    Only works for claims with payment status 'failed'.
+    Automatically escalates to reconciliation after max retries.
+    """
+    claim = db.query(Claim).filter(Claim.id == claim_id).first()
+    if not claim:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Claim not found",
+        )
+
+    success, result = retry_payment(claim, db)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Retry failed"),
+        )
+
+    return {
+        "message": "Payment retry initiated",
+        "claim_id": claim_id,
+        "attempt": result,
+    }
+
+
+@router.post("/claims/{claim_id}/reconcile")
+def reconcile_payment_endpoint(
+    claim_id: int,
+    request: ReconcileRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Manually reconcile a payment.
+
+    Actions:
+    - confirm: Confirm payment was received (requires provider_ref)
+    - reject: Reject the claim
+    - force_paid: Mark as paid without provider confirmation
+    """
+    claim = db.query(Claim).filter(Claim.id == claim_id).first()
+    if not claim:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Claim not found",
+        )
+
+    success, result = reconcile_payment(
+        claim=claim,
+        action=request.action,
+        db=db,
+        provider_ref=request.provider_ref,
+        notes=request.notes,
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Reconciliation failed"),
+        )
+
+    return {
+        "message": f"Reconciliation action '{request.action}' completed",
+        "claim_id": claim_id,
+        "result": result,
+    }
+
+
+@router.get("/claims/payment-failures")
+def list_payment_failures_endpoint(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    """
+    List claims with failed payments.
+
+    Returns claims that are APPROVED but have payment_state.current_status = 'failed'.
+    These can be retried or escalated to reconciliation.
+    """
+    return {
+        "claims": get_failed_payments(db, limit),
+        "total": len(get_failed_payments(db, limit)),
+    }
+
+
+@router.get("/claims/pending-reconciliation")
+def list_pending_reconciliation_endpoint(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    """
+    List claims pending manual reconciliation.
+
+    Returns claims with payment_state.current_status = 'reconcile_pending'.
+    These require manual intervention to confirm, reject, or force-pay.
+    """
+    return {
+        "claims": get_pending_reconciliation(db, limit),
+        "total": len(get_pending_reconciliation(db, limit)),
+    }
+
+
+@router.get("/payment-stats")
+def get_payment_stats_endpoint(db: Session = Depends(get_db)):
+    """
+    Get payment processing statistics.
+
+    Returns counts for each payment status:
+    - initiated: Payments in progress
+    - confirmed: Successfully completed
+    - failed: Failed (retryable)
+    - reconcile_pending: Awaiting manual review
+    """
+    return get_payment_stats(db)
+
+
 # Simulation endpoints
 @router.post("/simulate/weather")
 def simulate_weather(
@@ -419,7 +641,7 @@ def simulate_weather(
     auto_detect: bool = Query(True, description="Auto-detect and create triggers"),
     db: Session = Depends(get_db),
 ):
-    """Set weather conditions for a zone."""
+    """Set weather conditions for a zone with optional partial disruption data."""
     zone = db.query(Zone).filter(Zone.id == simulation.zone_id).first()
     if not zone:
         raise HTTPException(
@@ -434,11 +656,22 @@ def simulate_weather(
         humidity=simulation.humidity,
     )
 
+    # Store partial disruption data if provided
+    partial_disruption = None
+    if simulation.expected_orders is not None or simulation.actual_orders is not None or simulation.partial_factor_override is not None:
+        partial_disruption = set_partial_disruption_data(
+            zone_id=simulation.zone_id,
+            expected_orders=simulation.expected_orders,
+            actual_orders=simulation.actual_orders,
+            partial_factor_override=simulation.partial_factor_override,
+        )
+
     response = {
         "zone_id": simulation.zone_id,
         "zone_name": zone.name,
         "weather": weather.model_dump(),
         "triggers_created": [],
+        "partial_disruption": partial_disruption,
     }
 
     if auto_detect:
@@ -455,6 +688,8 @@ def simulate_weather(
             from app.services.claims_processor import process_trigger_event
             process_trigger_event(t, db)
         response["triggers_created"] = [t.id for t in triggers]
+        # Clear partial disruption data after processing
+        clear_partial_disruption_data(simulation.zone_id)
 
     return response
 
@@ -465,7 +700,7 @@ def simulate_aqi(
     auto_detect: bool = Query(True, description="Auto-detect and create triggers"),
     db: Session = Depends(get_db),
 ):
-    """Set AQI conditions for a zone."""
+    """Set AQI conditions for a zone with optional partial disruption data."""
     zone = db.query(Zone).filter(Zone.id == simulation.zone_id).first()
     if not zone:
         raise HTTPException(
@@ -480,11 +715,22 @@ def simulate_aqi(
         pm10=simulation.pm10,
     )
 
+    # Store partial disruption data if provided
+    partial_disruption = None
+    if simulation.expected_orders is not None or simulation.actual_orders is not None or simulation.partial_factor_override is not None:
+        partial_disruption = set_partial_disruption_data(
+            zone_id=simulation.zone_id,
+            expected_orders=simulation.expected_orders,
+            actual_orders=simulation.actual_orders,
+            partial_factor_override=simulation.partial_factor_override,
+        )
+
     response = {
         "zone_id": simulation.zone_id,
         "zone_name": zone.name,
         "aqi": aqi.model_dump(),
         "triggers_created": [],
+        "partial_disruption": partial_disruption,
     }
 
     if auto_detect:
@@ -501,6 +747,8 @@ def simulate_aqi(
             from app.services.claims_processor import process_trigger_event
             process_trigger_event(t, db)
         response["triggers_created"] = [t.id for t in triggers]
+        # Clear partial disruption data after processing
+        clear_partial_disruption_data(simulation.zone_id)
 
     return response
 
