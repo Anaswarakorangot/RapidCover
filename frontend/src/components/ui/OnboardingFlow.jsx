@@ -43,7 +43,7 @@ const flowStyles = `
   }
 `;
 
-export default function OnboardingFlow({ onFinish }) {
+export default function OnboardingFlow({ onFinish, onLogin }) {
   const [currentSlide, setCurrentSlide] = useState(0); // 0 = slide1, 1 = slide2
   const trackRef     = useRef(null);
   const touchStartX  = useRef(null);
@@ -116,6 +116,7 @@ export default function OnboardingFlow({ onFinish }) {
           <div className="flow-slide">
             <RapidCoverOnboarding
               onGetStarted={() => goTo(1)}   /* "Get Started" → slide 2 */
+              onLogin={onLogin}
             />
           </div>
 
