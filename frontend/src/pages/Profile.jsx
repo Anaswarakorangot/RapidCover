@@ -19,6 +19,7 @@ import { NotificationToggle } from '../components/NotificationToggle';
 import { UpiSelector } from '../components/ui/UpiSelector';
 import RapidBot from '../components/RapidBot';
 import PrivacyConsentPanel from '../components/PrivacyConsentPanel';
+import HelpSupportPanel from '../components/HelpSupportPanel';
 import api from '../services/api';
 
 /* ─── Design tokens matching Register.jsx ───────────────────────────────── */
@@ -885,28 +886,14 @@ export function Profile() {
 
                 {legalModal === 'support' && (
                   <>
-                    <p style={{ marginBottom: 15 }}>Need help? Our AI assistant or support team is here for you.</p>
-                    <div className="grok-card" onClick={() => setLegalModal('rapidbot')}>
+                    <div className="grok-card" onClick={() => setLegalModal('rapidbot')} style={{ marginBottom: 20 }}>
                       <div className="bmsg-bot-avatar" style={{ border: '1.5px solid rgba(61, 184, 92, 0.3)', background: '#ffffff', color: '#3DB85C' }}>R</div>
                       <div>
                         <div style={{ fontSize: 15 }}>Talk to RapidBot AI</div>
                         <div style={{ fontSize: 11, opacity: 0.7, fontWeight: 400 }}>Instant help with policy locks, payouts & zones</div>
                       </div>
                     </div>
-                    <div style={{ height: 16 }} />
-                    <a href="https://wa.me/919999999999" className="support-card" target="_blank" rel="noreferrer">
-                      <div>
-                        <div style={{ fontSize: 14 }}>WhatsApp Support</div>
-                        <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 400 }}>Instant reply within 5 mins</div>
-                      </div>
-                    </a>
-                    <div style={{ height: 12 }} />
-                    <a href="mailto:support@rapidcover.in" className="support-card" style={{ background: '#f1f5f9', color: '#475569', borderColor: '#cbd5e1' }}>
-                      <div>
-                        <div style={{ fontSize: 14 }}>Email Ticketing</div>
-                        <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 400 }}>support@rapidcover.in</div>
-                      </div>
-                    </a>
+                    <HelpSupportPanel />
                   </>
                 )}
               </div>
