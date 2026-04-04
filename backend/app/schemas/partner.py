@@ -17,6 +17,9 @@ class PartnerCreate(BaseModel):
     shift_start: Optional[str] = None        # e.g. "09:00"
     shift_end: Optional[str] = None          # e.g. "18:00"
     zone_history: Optional[list] = None      # e.g. [{"zone_id": 1, "from": "2026-01"}]
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    ifsc_code: Optional[str] = None
     @validator("upi_id")
     def validate_upi(cls, v):
         if v is None:
@@ -56,6 +59,9 @@ class PartnerResponse(BaseModel):
     shift_start: Optional[str] = None
     shift_end: Optional[str] = None
     zone_history: Optional[list] = None
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    ifsc_code: Optional[str] = None
     model_config = {"from_attributes": True}
 
 
@@ -69,3 +75,6 @@ class PartnerUpdate(BaseModel):
     shift_start: Optional[str] = None
     shift_end: Optional[str] = None
     zone_history: Optional[list] = None
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    ifsc_code: Optional[str] = None

@@ -41,6 +41,11 @@ class Partner(Base):
     # Zone history (list of {zone_id, from_date, to_date})
     zone_history = Column(JSON, nullable=True, default=lambda: [])
 
+    # IMPS Fallback fields
+    bank_name = Column(String(100), nullable=True)
+    account_number = Column(String(30), nullable=True)
+    ifsc_code = Column(String(20), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
