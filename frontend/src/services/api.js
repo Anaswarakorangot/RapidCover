@@ -63,6 +63,14 @@ async function register(partnerData) {
   return handleResponse(res);
 }
 
+async function requestRegisterOtp(phone) {
+  // For registration, we generate a demo OTP client-side since the phone isn't registered yet.
+  // In production, this would call a dedicated /partners/register-otp endpoint.
+  await new Promise(r => setTimeout(r, 500)); // Simulate network delay
+  const otp = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit OTP
+  return { message: 'OTP sent', otp };
+}
+
 // ── Profile ───────────────────────────────────────────────────────────────────
 
 async function getProfile() {
@@ -359,6 +367,7 @@ const api = {
   requestOtp,
   verifyOtp,
   register,
+  requestRegisterOtp,
   // Profile
   getProfile,
   updateProfile,
