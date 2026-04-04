@@ -272,6 +272,14 @@ async function validatePartnerId(partnerId, platform) {
   return handleResponse(res);
 }
 
+async function checkAvailability(phone, partnerId) {
+  const url = new URL(`${BASE}/partners/check-availability`, window.location.origin);
+  if (phone) url.searchParams.set('phone', phone);
+  if (partnerId) url.searchParams.set('partner_id', partnerId);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // EXPERIENCE STATE  –  Person 1, Phase 2
 // These five methods replace every hardcoded constant in dashboard / profile / policy.
@@ -386,6 +394,7 @@ const api = {
   unsubscribePush,
   // Validation
   validatePartnerId,
+  checkAvailability,
   // ── Experience State (Person 1, Phase 2) ─────────────────────────────────────
   getPartnerExperienceState,
   getPremiumBreakdown,

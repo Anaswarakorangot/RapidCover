@@ -80,6 +80,21 @@ def register_partner(partner_data: PartnerCreate, db: Session = Depends(get_db))
             "kyc_status":     "skipped",
         }
 
+    # HACKATHON SECURITY: Never store raw PII. Hash identities and set verified.
+    import hashlib
+    if kyc_dict.get("aadhaar_number") or kyc_dict.get("pan_number"):
+        if kyc_dict.get("aadhaar_number"):
+            raw = str(kyc_dict["aadhaar_number"])
+            hashed = hashlib.sha256(raw.encode()).hexdigest()[:16]
+            kyc_dict["aadhaar_number"] = f"UID-{hashed}-XXXX{raw[-4:]}"
+        
+        if kyc_dict.get("pan_number"):
+            raw = str(kyc_dict["pan_number"])
+            hashed = hashlib.sha256(raw.encode()).hexdigest()[:16]
+            kyc_dict["pan_number"] = f"PAN-{hashed}"
+            
+        kyc_dict["kyc_status"] = "verified"
+
     partner = Partner(
         phone         = partner_data.phone,
         name          = partner_data.name,
@@ -190,8 +205,24 @@ def update_partner_profile(
 
 
 # ------------------------------------------------------------------------------
-# PARTNER ID VALIDATION
+# PARTNER ID & AVAILABILITY VALIDATION
 # ------------------------------------------------------------------------------
+
+@router.get("/check-availability")
+def check_availability(
+    phone: Optional[str] = Query(None, description="Phone number to check"),
+    partner_id: Optional[str] = Query(None, description="Partner ID to check"),
+    db: Session = Depends(get_db)
+):
+    """Check if a phone number or partner ID is already registered."""
+    result = {"phone_taken": False, "partner_id_taken": False}
+    if phone:
+        if db.query(Partner).filter(Partner.phone == phone).first():
+            result["phone_taken"] = True
+    if partner_id:
+        if db.query(Partner).filter(Partner.partner_id == partner_id).first():
+            result["partner_id_taken"] = True
+    return result
 
 @router.get("/validate-id")
 def validate_partner_id_endpoint(
