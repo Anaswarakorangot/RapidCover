@@ -442,7 +442,18 @@ def simulate_weather(
     }
 
     if auto_detect:
+        from app.models.trigger_event import TriggerEvent
+        from datetime import datetime
+        db.query(TriggerEvent).filter(
+            TriggerEvent.zone_id == simulation.zone_id,
+            TriggerEvent.ended_at.is_(None)
+        ).update({'ended_at': datetime.utcnow()})
+        db.commit()
         triggers = detect_and_save_triggers(simulation.zone_id, db)
+        # Auto-process payouts for instant demo effect
+        for t in triggers:
+            from app.services.claims_processor import process_trigger_event
+            process_trigger_event(t, db)
         response["triggers_created"] = [t.id for t in triggers]
 
     return response
@@ -477,7 +488,18 @@ def simulate_aqi(
     }
 
     if auto_detect:
+        from app.models.trigger_event import TriggerEvent
+        from datetime import datetime
+        db.query(TriggerEvent).filter(
+            TriggerEvent.zone_id == simulation.zone_id,
+            TriggerEvent.ended_at.is_(None)
+        ).update({'ended_at': datetime.utcnow()})
+        db.commit()
         triggers = detect_and_save_triggers(simulation.zone_id, db)
+        # Auto-process payouts for instant demo effect
+        for t in triggers:
+            from app.services.claims_processor import process_trigger_event
+            process_trigger_event(t, db)
         response["triggers_created"] = [t.id for t in triggers]
 
     return response
@@ -510,7 +532,18 @@ def simulate_shutdown(
     }
 
     if auto_detect:
+        from app.models.trigger_event import TriggerEvent
+        from datetime import datetime
+        db.query(TriggerEvent).filter(
+            TriggerEvent.zone_id == simulation.zone_id,
+            TriggerEvent.ended_at.is_(None)
+        ).update({'ended_at': datetime.utcnow()})
+        db.commit()
         triggers = detect_and_save_triggers(simulation.zone_id, db)
+        # Auto-process payouts for instant demo effect
+        for t in triggers:
+            from app.services.claims_processor import process_trigger_event
+            process_trigger_event(t, db)
         response["triggers_created"] = [t.id for t in triggers]
 
     return response
@@ -543,7 +576,18 @@ def simulate_closure(
     }
 
     if auto_detect:
+        from app.models.trigger_event import TriggerEvent
+        from datetime import datetime
+        db.query(TriggerEvent).filter(
+            TriggerEvent.zone_id == simulation.zone_id,
+            TriggerEvent.ended_at.is_(None)
+        ).update({'ended_at': datetime.utcnow()})
+        db.commit()
         triggers = detect_and_save_triggers(simulation.zone_id, db)
+        # Auto-process payouts for instant demo effect
+        for t in triggers:
+            from app.services.claims_processor import process_trigger_event
+            process_trigger_event(t, db)
         response["triggers_created"] = [t.id for t in triggers]
 
     return response
