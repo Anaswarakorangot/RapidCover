@@ -205,8 +205,24 @@ def update_partner_profile(
 
 
 # ------------------------------------------------------------------------------
-# PARTNER ID VALIDATION
+# PARTNER ID & AVAILABILITY VALIDATION
 # ------------------------------------------------------------------------------
+
+@router.get("/check-availability")
+def check_availability(
+    phone: Optional[str] = Query(None, description="Phone number to check"),
+    partner_id: Optional[str] = Query(None, description="Partner ID to check"),
+    db: Session = Depends(get_db)
+):
+    """Check if a phone number or partner ID is already registered."""
+    result = {"phone_taken": False, "partner_id_taken": False}
+    if phone:
+        if db.query(Partner).filter(Partner.phone == phone).first():
+            result["phone_taken"] = True
+    if partner_id:
+        if db.query(Partner).filter(Partner.partner_id == partner_id).first():
+            result["partner_id_taken"] = True
+    return result
 
 @router.get("/validate-id")
 def validate_partner_id_endpoint(
