@@ -135,10 +135,13 @@ def propose_reassignment(
         (ZoneReassignmentResponse, None) on success
         (None, error_message) on failure
     """
-    # Get partner
-    partner = db.query(Partner).filter(Partner.id == partner_id).first()
+    # Get partner (Allow either exact row ID OR string match on their Zepto ID like 'ZPT701213')
+    partner = db.query(Partner).filter(
+        (Partner.id == partner_id) | 
+        (Partner.partner_id.like(f"%{partner_id}%"))
+    ).first()
     if not partner:
-        return None, "Partner not found"
+        return None, "Partner not found. Try using exact Zepto ID or internal Row ID."
 
     # Get new zone
     new_zone = db.query(Zone).filter(Zone.id == new_zone_id).first()
