@@ -11,7 +11,10 @@ export default function NotificationPreviewPanel() {
   const [preview, setPreview]     = useState(null);
   const [loading, setLoading]     = useState(true);
   const [previewing, setPreviewing] = useState(false);
+  const [sending, setSending]       = useState(false);
   const [error, setError]         = useState(null);
+  const [testPhone, setTestPhone] = useState(localStorage.getItem('user_phone') || '');
+  const [lastResponse, setLastResponse] = useState(null);
 
   const [selectedType, setSelectedType] = useState('claim_created');
   const [selectedLang, setSelectedLang] = useState('en');
@@ -38,13 +41,49 @@ export default function NotificationPreviewPanel() {
   async function loadPreview() {
     setPreviewing(true);
     try {
-      const res = await fetch(`${API}/admin/panel/notifications/preview?type=${selectedType}&lang=${selectedLang}`);
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`${API}/admin/panel/notifications/preview?type=${selectedType}&lang=${selectedLang}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setPreview(await res.json());
     } catch (e) {
       setError(e.message);
     } finally {
       setPreviewing(false);
+    }
+  }
+
+  async function handleSendTest() {
+    if (!testPhone) {
+        setLastResponse({ success: false, message: 'Please enter a phone number' });
+        return;
+    }
+    setSending(true);
+    setLastResponse(null);
+    try {
+      // Use relative path to leverage Vite proxy and avoid CORS/Auth issues
+      const res = await fetch(`/api/v1/admin/test-push?phone=${encodeURIComponent(testPhone)}`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to send test push');
+      
+      if (data.devices === 0) {
+        setLastResponse({ 
+            success: true, 
+            message: `⚠️ Found 0 active devices for ${testPhone}. Ask the partner to click "Enable Alerts" on their Dashboard first!` 
+        });
+      } else {
+        setLastResponse({ 
+            success: true, 
+            message: `🚀 Push sent to ${data.devices} devices associated with ${testPhone}!` 
+        });
+      }
+    } catch (e) {
+      setLastResponse({ success: false, message: e.message });
+    } finally {
+      setSending(false);
     }
   }
 
@@ -84,7 +123,55 @@ export default function NotificationPreviewPanel() {
             ))}
           </select>
         </div>
+        <div className="notif-control-group">
+          <label className="notif-control-label">Test Phone Number</label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input 
+              type="text" 
+              className="notif-select" 
+              placeholder="e.g. 9876543210" 
+              value={testPhone} 
+              onChange={e => setTestPhone(e.target.value)}
+              style={{ width: '150px' }}
+            />
+            <button 
+              className="admin-btn" 
+              onClick={handleSendTest} 
+              disabled={sending}
+              style={{ 
+                height: '38px', 
+                whiteSpace: 'nowrap',
+                background: sending ? 'var(--text-light)' : '#22c55e',
+                color: 'white',
+                border: 'none',
+                fontWeight: 700
+              }}
+            >
+              {sending ? 'Sending...' : '🚀 Send Push'}
+            </button>
+          </div>
+        </div>
       </div>
+
+      {lastResponse && (
+        <div style={{ 
+          marginTop: '1rem', 
+          padding: '0.75rem', 
+          borderRadius: '8px', 
+          fontSize: '0.85rem',
+          backgroundColor: lastResponse.success ? 'var(--green-light)' : '#fef2f2',
+          color: lastResponse.success ? 'var(--green-dark)' : '#dc2626',
+          border: `1px solid ${lastResponse.success ? 'var(--green-primary)' : '#fecaca'}`,
+          fontWeight: 600
+        }}>
+          {lastResponse.success ? '✅' : '❌'} {lastResponse.message}
+          {!lastResponse.success && lastResponse.message.includes('404') && (
+            <p style={{ fontWeight: 400, marginTop: '4px', fontSize: '0.8rem' }}>
+              Tip: Go to the Dashboard and click "Enable Alerts" first!
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Preview card */}
       <div className="notif-preview-card" style={{ marginTop: '1.5rem' }}>
