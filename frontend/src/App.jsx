@@ -51,19 +51,10 @@ function OnboardingRoute() {
   }
 
   return (
-    <RapidCoverOnboarding 
-      onGetStarted={() => navigate('/onboarding-flow')} 
+    <OnboardingFlow 
+      onFinish={() => navigate('/register')} 
       onLogin={() => navigate('/login')}
     />
-  );
-}
-
-// Onboarding Flow (FIXED)
-function OnboardingFlowRoute() {
-  const navigate = useNavigate();
-
-  return (
-    <OnboardingFlow onFinish={() => navigate('/register')} />
   );
 }
 
@@ -87,9 +78,6 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/onboarding" element={<OnboardingRoute />} />
-      
-      {/* FIXED: properly wrapped in Route */}
-      <Route path="/onboarding-flow" element={<OnboardingFlowRoute />} />
 
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
