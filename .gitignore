@@ -25,3 +25,5 @@ __pycache__/
 
 # Local accidental files
 nul
+
+graphify-output/
