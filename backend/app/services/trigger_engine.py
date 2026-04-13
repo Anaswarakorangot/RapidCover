@@ -26,7 +26,7 @@ from app.models.zone import Zone
 from app.models.partner import Partner
 from app.models.policy import Policy
 from app.database import SessionLocal
-from app.services.claims_processor import (
+from app.services.runtime_metadata import (
     get_partner_runtime_metadata,
     get_zone_coverage_metadata,
     is_partner_available_for_trigger,
