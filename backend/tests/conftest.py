@@ -4,7 +4,9 @@ Pytest fixtures for RapidCover backend tests.
 
 import sys
 import os
+import json
 import pytest
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
 # Add backend to path
@@ -20,6 +22,17 @@ def mock_db():
     db.refresh = MagicMock()
     db.rollback = MagicMock()
     db.close = MagicMock()
+    # Default query chain returns — tests can override as needed
+    db.execute.return_value.mappings.return_value.first.return_value = None
+    db.query.return_value.filter.return_value.first.return_value = None
+    db.query.return_value.filter.return_value.all.return_value = []
+    db.query.return_value.filter.return_value.count.return_value = 0
+    db.query.return_value.filter.return_value.scalar.return_value = None
+    db.query.return_value.join.return_value.filter.return_value.first.return_value = None
+    db.query.return_value.join.return_value.filter.return_value.all.return_value = []
+    db.query.return_value.join.return_value.filter.return_value.order_by.return_value.first.return_value = None
+    db.query.return_value.order_by.return_value.all.return_value = []
+    db.query.return_value.all.return_value = []
     return db
 
 
@@ -36,6 +49,9 @@ def mock_zone():
     zone.risk_score = 50.0
     zone.is_suspended = False
     zone.density_band = "High"
+    # pin_codes not set by default — tests set explicitly
+    zone.pin_codes = None
+    zone.density_weight = None
     return zone
 
 
@@ -53,13 +69,18 @@ def mock_partner():
     partner.shift_days = ["mon", "tue", "wed", "thu", "fri"]
     partner.shift_start = "08:00"
     partner.shift_end = "20:00"
+    # pin_code not set by default — tests set explicitly
+    partner.pin_code = None
+    partner.zone_history = []
+    partner.platform = MagicMock()
+    partner.platform.value = "zepto"
+    partner.created_at = datetime.utcnow() - timedelta(days=60)
     return partner
 
 
 @pytest.fixture
 def mock_policy():
     """Create a mock policy object."""
-    from datetime import datetime, timedelta
     from app.models.policy import PolicyTier
 
     policy = MagicMock()
@@ -68,18 +89,19 @@ def mock_policy():
     policy.tier = PolicyTier.STANDARD
     policy.weekly_premium = 33.0
     policy.max_daily_payout = 400.0
-    policy.max_weekly_claims = 3
+    policy.max_days_per_week = 3        # canonical field name used by claims_processor
+    policy.max_weekly_claims = 3        # alias kept for backward compat
     policy.is_active = True
     policy.starts_at = datetime.utcnow() - timedelta(days=3)
     policy.expires_at = datetime.utcnow() + timedelta(days=4)
     policy.auto_renew = True
+    policy.stripe_session_id = None
     return policy
 
 
 @pytest.fixture
 def mock_claim():
     """Create a mock claim object."""
-    from datetime import datetime
     from app.models.claim import ClaimStatus
 
     claim = MagicMock()
@@ -92,13 +114,21 @@ def mock_claim():
     claim.upi_ref = None
     claim.created_at = datetime.utcnow()
     claim.paid_at = None
+    # validation_data needed by multi_trigger_resolver and claims_processor tests
+    claim.validation_data = json.dumps({
+        "aggregation": {
+            "group_id": "AGG-TESTFIXTURE",
+            "is_aggregated": False,
+            "primary_trigger_id": 1,
+            "triggers_in_window": [{"id": 1, "payout": 300.0}],
+        }
+    })
     return claim
 
 
 @pytest.fixture
 def mock_trigger_event():
     """Create a mock trigger event object."""
-    from datetime import datetime
     from app.models.trigger_event import TriggerType
 
     event = MagicMock()
@@ -110,4 +140,6 @@ def mock_trigger_event():
     event.severity = 3
     event.source_data = '{"rainfall_mm_hr": 72}'
     event.created_at = datetime.utcnow()
+    # zone relationship — tests that need it can set event.zone = mock_zone
+    event.zone = None
     return event
