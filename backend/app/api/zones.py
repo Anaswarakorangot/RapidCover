@@ -13,7 +13,7 @@ from app.models.policy import Policy
 from app.models.claim import Claim, ClaimStatus
 from app.models.partner import Partner
 from app.schemas.zone import ZoneResponse, ZoneCreate, ZoneRiskUpdate
-from app.services.claims_processor import (
+from app.services.runtime_metadata import (
     get_partner_runtime_metadata,
     get_zone_coverage_metadata,
     upsert_partner_runtime_metadata,
@@ -748,7 +748,7 @@ def get_partner_activity(partner_id: int, db: Session = Depends(get_db)):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail=f"Partner {partner_id} not found")
 
-    from app.services.claims_processor import get_db_partner_platform_activity
+    from app.services.runtime_metadata import get_db_partner_platform_activity
     activity = get_db_partner_platform_activity(partner_id, db)
     return PartnerPlatformActivityResponse(**activity)
 
@@ -776,7 +776,7 @@ def update_partner_activity(
     if not partner:
         raise HTTPException(status_code=404, detail=f"Partner {partner_id} not found")
 
-    from app.services.claims_processor import upsert_db_partner_platform_activity
+    from app.services.runtime_metadata import upsert_db_partner_platform_activity
     updates = {k: v for k, v in request.model_dump().items() if v is not None}
     activity = upsert_db_partner_platform_activity(partner_id, db, **updates)
     return PartnerPlatformActivityResponse(**activity)
