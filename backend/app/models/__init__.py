@@ -7,6 +7,7 @@ from app.models.push_subscription import PushSubscription
 from app.models.drill_session import DrillSession, DrillType, DrillStatus
 from app.models.zone_reassignment import ZoneReassignment, ReassignmentStatus
 from app.models.zone_risk_profile import ZoneRiskProfile
+from app.models.prediction import WeeklyPrediction, CityRiskProfile
 
 __all__ = [
     "Partner",
@@ -21,4 +22,6 @@ __all__ = [
     "ZoneReassignment",
     "ReassignmentStatus",
     "ZoneRiskProfile",
+    "WeeklyPrediction",
+    "CityRiskProfile",
 ]

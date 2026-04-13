@@ -69,7 +69,7 @@ export default function AdminStats({ stats }) {
 
   // Zone loss ratios with dropdown selector
   const zoneLRs = stats.zoneLossRatios || [];
-  const activeZone = zoneLRs[selectedZone] || zoneLRs[0] || { zone_code: 'BLR-047', lr: 71 };
+  const activeZone = zoneLRs[selectedZone] || zoneLRs[0] || { zone: 'No zones', zone_code: 'N/A', lr: 0 };
 
   return (
     <div className="admin-section" style={{ animationDelay: '0.1s' }}>

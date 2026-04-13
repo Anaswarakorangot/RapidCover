@@ -12,6 +12,8 @@ from typing import Optional
 import httpx
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import uuid
+import time
 
 from app.models.claim import Claim, ClaimStatus
 from app.models.policy import Policy
@@ -26,6 +28,7 @@ from app.services.payment_state_machine import (
     get_payment_status,
     PaymentStatus,
 )
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -144,14 +147,24 @@ def build_transaction_log(
     payout_metadata: dict,
 ) -> dict:
     """Build a structured transaction log for a payout (stored in validation_data)."""
-    # Determine payout channel
-    primary_channel = "UPI/Stripe" if partner.upi_id else "IMPS/Bank"
+    if "razorpay" in payout_metadata:
+        primary_channel = "UPI" if partner.upi_id else "IMPS"
+        provider = "Razorpay Mock"
+    elif "stripe" in payout_metadata:
+        primary_channel = "UPI/Stripe" if partner.upi_id else "Bank/Stripe"
+        provider = "Stripe Connect Mock"
+    elif "direct_transfer" in payout_metadata:
+        primary_channel = payout_metadata["direct_transfer"].get("mode", "UPI")
+        provider = "Direct Transfer Mock"
+    else:
+        primary_channel = "UPI" if partner.upi_id else "IMPS/Bank"
+        provider = "Unknown Mock Provider"
     
     return {
         "transaction": {
             "ref": upi_ref,
             "channel": primary_channel,
-            "provider": "Stripe Connect Mock" if partner.upi_id else "IMPS Gateway Mock",
+            "provider": provider,
             "amount": claim.amount,
             "currency": "INR",
             "status": "SUCCESS",
@@ -188,11 +201,6 @@ def build_transaction_log(
         "version": "1.0",
     }
 
-from app.config import get_settings
-
-import uuid
-import time
-
 def process_stripe_payout_mock(partner: Partner, amount: float, claim_id: int) -> tuple[bool, str, dict]:
     """Simulate a payout via Stripe API (Mock)."""
     # Simulate API latency
@@ -211,6 +219,34 @@ def process_stripe_payout_mock(partner: Partner, amount: float, claim_id: int) -
     }
     
     return True, transfer_id, {"stripe_response": stripe_data}
+
+
+def process_razorpay_payout_mock(partner: Partner, amount: float, claim_id: int) -> tuple[bool, str, dict]:
+    """Simulate Razorpay Payout API."""
+    payout_id = f"pout_{uuid.uuid4().hex[:24]}"
+    razorpay_data = {
+        "id": payout_id,
+        "entity": "payout",
+        "fund_account_id": f"fa_{partner.id}mock",
+        "amount": int(amount * 100),
+        "currency": "INR",
+        "mode": "UPI" if partner.upi_id else "IMPS",
+        "status": "processed",
+        "utr": f"UTR{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{claim_id:06d}",
+    }
+    return True, payout_id, {"razorpay_response": razorpay_data}
+
+
+def process_razorpay_payout(partner: Partner, amount: float, claim_id: int) -> tuple[bool, str, dict]:
+    """
+    Legacy compatibility wrapper for a non-mock Razorpay integration.
+
+    The active payout flow now uses `process_razorpay_payout_mock` inside
+    `process_payout` when Razorpay credentials are present.
+    """
+    return False, "", {
+        "error": "Direct Razorpay payout integration is not configured; use process_payout or process_razorpay_payout_mock"
+    }
 
 
 def process_payout(
@@ -285,39 +321,55 @@ def process_payout(
     payout_metadata = existing.get("payout_calculation", {})
 
     settings = get_settings()
-    stripe_success = False
-    stripe_error = None
+    provider_success = False
+    provider_error = None
 
     if not upi_ref:
-        # Utilize Stripe mock if UPI exists, else IMPS mock
+        # Prefer Razorpay when configured, then Stripe mock, then direct bank/UPI fallback.
         try:
-            if partner.upi_id:
-                stripe_success, tr_ref, stripe_data = process_stripe_payout_mock(partner, claim.amount, claim.id)
-                if stripe_success:
-                    upi_ref = tr_ref
-                    payout_metadata["stripe"] = stripe_data
+            if settings.razorpay_key_id:
+                provider_success, provider_ref, provider_data = process_razorpay_payout_mock(
+                    partner, claim.amount, claim.id
+                )
+                if provider_success:
+                    upi_ref = provider_ref
+                    payout_metadata["razorpay"] = provider_data
                 else:
-                    stripe_error = "Stripe mock returned failure"
+                    provider_error = "Razorpay mock returned failure"
+            elif settings.stripe_secret_key:
+                provider_success, provider_ref, provider_data = process_stripe_payout_mock(
+                    partner, claim.amount, claim.id
+                )
+                if provider_success:
+                    upi_ref = provider_ref
+                    payout_metadata["stripe"] = provider_data
+                else:
+                    provider_error = "Stripe mock returned failure"
             else:
-                # IMPS Fallback
-                logger.info(f"Using IMPS fallback for partner {partner.id} (no UPI)")
-                upi_ref = f"IMPS{uuid.uuid4().hex[:12].upper()}"
-                payout_metadata["imps"] = {
-                    "bank_name": partner.bank_name,
-                    "account_number": f"****{partner.account_number[-4:]}" if partner.account_number else None,
-                    "ifsc": partner.ifsc_code
+                logger.info(f"Using direct payout fallback for partner {partner.id}")
+                upi_ref = generate_upi_ref(policy.id, claim.id)
+                payout_metadata["direct_transfer"] = {
+                    "mode": "UPI" if partner.upi_id else "IMPS",
+                    "upi_id": partner.upi_id if partner.upi_id else None,
+                    "bank_name": getattr(partner, "bank_name", None),
+                    "account_number": (
+                        f"****{partner.account_number[-4:]}"
+                        if getattr(partner, "account_number", None)
+                        else None
+                    ),
+                    "ifsc": getattr(partner, "ifsc_code", None),
                 }
-                stripe_success = True  # Consider IMPS successful immediately
+                provider_success = True
         except Exception as e:
-            stripe_success = False
-            stripe_error = str(e)
+            provider_success = False
+            provider_error = str(e)
             logger.error(f"Payout exception for claim {claim.id}: {e}")
 
-    if not stripe_success and not upi_ref:
+    if not provider_success and not upi_ref:
         # Payment failed - record failure in state machine
-        fail_payment(claim, stripe_error or "Payment provider failure", db)
-        logger.warning(f"Payment failed for claim {claim.id}: {stripe_error}")
-        return False, "", {"error": stripe_error or "Payment failed"}
+        fail_payment(claim, provider_error or "Payment provider failure", db)
+        logger.warning(f"Payment failed for claim {claim.id}: {provider_error}")
+        return False, "", {"error": provider_error or "Payment failed"}
 
     # If no upi_ref yet (shouldn't happen but fallback)
     if not upi_ref:
@@ -326,7 +378,11 @@ def process_payout(
     # Confirm payment in state machine
     confirm_success = confirm_payment(
         claim, upi_ref, db,
-        additional_data=payout_metadata.get("stripe") or payout_metadata.get("imps"),
+        additional_data=(
+            payout_metadata.get("razorpay")
+            or payout_metadata.get("stripe")
+            or payout_metadata.get("direct_transfer")
+        ),
     )
 
     if not confirm_success:

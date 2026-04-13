@@ -74,40 +74,6 @@ function formatClaimId(claim, index) {
   return `RC-${zoneCode}-${String(claim.id || index + 1).padStart(3, '0')}`;
 }
 
-// Mock data for demo
-const MOCK_CLAIMS = [
-  {
-    id: 1, partner_name: 'Manoj K', zone_name: 'BLR-047', trigger_type: 'rain',
-    amount: 400, raw_amount: 400, fraud_score: 0.82, status: 'pending', anomaly: 'gps_anomaly',
-    plan_type: 'standard',
-  },
-  {
-    id: 2, partner_name: 'Raju S', zone_name: 'BLR-047', trigger_type: 'rain',
-    amount: 500, raw_amount: 500, fraud_score: 0.63, status: 'pending', anomaly: 'run_count_anomaly',
-    plan_type: 'pro',
-  },
-  {
-    id: 3, partner_name: 'Priya T', zone_name: 'MUM-021', trigger_type: 'heat',
-    amount: 250, raw_amount: 250, fraud_score: 0.09, status: 'paid', anomaly: null,
-    plan_type: 'flex',
-  },
-  {
-    id: 4, partner_name: 'Arun D', zone_name: 'DEL-009', trigger_type: 'aqi',
-    amount: 250, raw_amount: 250, fraud_score: 0.91, status: 'rejected', anomaly: 'synthetic_identity',
-    plan_type: 'flex',
-  },
-  {
-    id: 5, partner_name: 'Sneha M', zone_name: 'BLR-047', trigger_type: 'shutdown',
-    amount: 400, raw_amount: 400, fraud_score: 0.12, status: 'paid', anomaly: null,
-    plan_type: 'standard',
-  },
-  {
-    id: 6, partner_name: 'Vikram R', zone_name: 'MUM-021', trigger_type: 'rain',
-    amount: 500, raw_amount: 500, fraud_score: 0.55, status: 'pending', anomaly: 'zone_boundary',
-    plan_type: 'pro',
-  },
-];
-
 export default function ClaimsQueue() {
   const [claims, setClaims] = useState([]);
   const [triggerFilter, setTriggerFilter] = useState('all');
@@ -116,6 +82,7 @@ export default function ClaimsQueue() {
   const [actionLoading, setActionLoading] = useState(null);
   const [expandedClaim, setExpandedClaim] = useState(null);
   const [adminActions, setAdminActions] = useState({}); // { claimId: 'approved' | 'rejected' }
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     loadClaims();
@@ -123,21 +90,19 @@ export default function ClaimsQueue() {
 
   async function loadClaims() {
     setLoading(true);
+    setError(false);
     try {
       const data = await api.getAdminClaims();
-      if (data.length > 0) {
-        const enriched = data.map((c, i) => ({
-          ...c,
-          anomaly: c.fraud_score >= 0.50
-            ? ANOMALY_REASONS[i % ANOMALY_REASONS.length]
-            : null,
-        }));
-        setClaims(enriched);
-      } else {
-        setClaims(MOCK_CLAIMS);
-      }
+      const enriched = (Array.isArray(data) ? data : []).map((c, i) => ({
+        ...c,
+        anomaly: c.fraud_score >= 0.50
+          ? ANOMALY_REASONS[i % ANOMALY_REASONS.length]
+          : null,
+      }));
+      setClaims(enriched);
     } catch {
-      setClaims(MOCK_CLAIMS);
+      setClaims([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -212,6 +177,17 @@ export default function ClaimsQueue() {
       {loading ? (
         <div className="claims-loading">
           <div className="claims-spinner" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="claims-loading" style={{ minHeight: '220px', display: 'grid', placeItems: 'center', background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: '24px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Nunito', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-mid)' }}>
+              No claims match the current view
+            </div>
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '0.5rem' }}>
+              {error ? 'The admin claims endpoint is unavailable right now.' : 'Claims will appear here after triggers generate them.'}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="claims-list">

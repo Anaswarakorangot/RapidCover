@@ -6,34 +6,6 @@ import { useState, useEffect } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-const DEMO_FRAUD_QUEUE = [
-  {
-    claim_id: 'CLM-8842', partner_id: 'ZPT-441892', zone: 'Anand Vihar', zone_code: 'DEL-044',
-    trigger: 'AQI Spike', fraud_score: 0.91, flags: ['centroid_drift', 'device_fingerprint'],
-    amount: 500, timestamp: '2024-01-15T14:22:00Z', status: 'auto_reject', cluster: 'collusion-ring-A',
-  },
-  {
-    claim_id: 'CLM-8843', partner_id: 'ZPT-441893', zone: 'Anand Vihar', zone_code: 'DEL-044',
-    trigger: 'AQI Spike', fraud_score: 0.88, flags: ['device_fingerprint', 'claim_frequency'],
-    amount: 500, timestamp: '2024-01-15T14:23:00Z', status: 'manual_queue', cluster: 'collusion-ring-A',
-  },
-  {
-    claim_id: 'CLM-8844', partner_id: 'ZPT-441894', zone: 'Anand Vihar', zone_code: 'DEL-044',
-    trigger: 'AQI Spike', fraud_score: 0.85, flags: ['gps_coherence', 'centroid_drift'],
-    amount: 500, timestamp: '2024-01-15T14:23:00Z', status: 'manual_queue', cluster: 'collusion-ring-A',
-  },
-  {
-    claim_id: 'CLM-8801', partner_id: 'BLK-229031', zone: 'Bellandur', zone_code: 'BLR-089',
-    trigger: 'Rain', fraud_score: 0.78, flags: ['gps_coherence'],
-    amount: 400, timestamp: '2024-01-15T11:05:00Z', status: 'manual_queue', cluster: null,
-  },
-  {
-    claim_id: 'CLM-8812', partner_id: 'ZPT-119283', zone: 'Dadar', zone_code: 'MUM-034',
-    trigger: 'Rain', fraud_score: 0.76, flags: ['run_count_check'],
-    amount: 400, timestamp: '2024-01-15T10:41:00Z', status: 'manual_queue', cluster: null,
-  },
-];
-
 const FLAG_LABELS = {
   centroid_drift:     { label: 'GPS drift', color: '#9333ea' },
   device_fingerprint: { label: 'Device match', color: 'var(--error)' },
@@ -56,10 +28,11 @@ function scoreLabel(score) {
 }
 
 export default function FraudQueuePanel() {
-  const [queue, setQueue] = useState(DEMO_FRAUD_QUEUE);
+  const [queue, setQueue] = useState([]);
   const [selected, setSelected] = useState(new Set());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [actionLog, setActionLog] = useState([]);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     fetchQueue();
@@ -68,13 +41,21 @@ export default function FraudQueuePanel() {
   }, []);
 
   async function fetchQueue() {
+    setLoading(true);
+    setError(false);
     try {
       const res = await fetch(`${API_BASE}/admin/panel/fraud-queue`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.claims?.length) setQueue(data.claims);
+      if (!res.ok) {
+        throw new Error('Failed to load fraud queue');
       }
-    } catch { /* use demo */ }
+      const data = await res.json();
+      setQueue(Array.isArray(data) ? data : []);
+    } catch {
+      setQueue([]);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function toggleSelect(id) {
@@ -86,12 +67,12 @@ export default function FraudQueuePanel() {
   }
 
   function selectCluster(cluster) {
-    const ids = queue.filter(c => c.cluster === cluster).map(c => c.claim_id);
+    const ids = queue.filter(c => c.cluster === cluster).map(c => c.id);
     setSelected(prev => new Set([...prev, ...ids]));
   }
 
   function selectAll() {
-    setSelected(new Set(queue.map(c => c.claim_id)));
+    setSelected(new Set(queue.map(c => c.id)));
   }
 
   function clearSelection() {
@@ -112,7 +93,7 @@ export default function FraudQueuePanel() {
     } catch { /* backend not yet wired */ }
 
     // Optimistic update
-    setQueue(prev => prev.filter(c => !selected.has(c.claim_id)));
+    setQueue(prev => prev.filter(c => !selected.has(c.id)));
     setActionLog(prev => [
       { action, ids, count: ids.length, time: new Date().toLocaleTimeString('en-IN') },
       ...prev.slice(0, 4),
@@ -216,10 +197,16 @@ export default function FraudQueuePanel() {
       })}
 
       {/* Queue table */}
-      {queue.length === 0 ? (
+      {loading ? (
+        <div className="fraud-empty" style={{ textAlign: 'center', padding: '4rem 0', background: 'var(--gray-bg)', borderRadius: '24px', border: '1.5px solid var(--border)' }}>
+          <p style={{ fontFamily: 'Nunito', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-mid)' }}>Loading fraud queue...</p>
+        </div>
+      ) : queue.length === 0 ? (
         <div className="fraud-empty" style={{ textAlign: 'center', padding: '4rem 0', background: 'var(--gray-bg)', borderRadius: '24px', border: '1.5px solid var(--border)' }}>
           <p style={{ fontFamily: 'Nunito', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-mid)' }}>Queue is clear</p>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '0.5rem' }}>All suspicious claims have been processed.</p>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '0.5rem' }}>
+            {error ? 'The fraud queue endpoint is unavailable right now.' : 'All suspicious claims have been processed.'}
+          </p>
         </div>
       ) : (
         <div className="fraud-table-wrapper" style={{ background: 'var(--white)', borderRadius: '24px', border: '1.5px solid var(--border)', overflow: 'hidden' }}>
@@ -239,11 +226,11 @@ export default function FraudQueuePanel() {
             </thead>
             <tbody>
               {queue.map(c => {
-                const isSelected = selected.has(c.claim_id);
+                const isSelected = selected.has(c.id);
                 const color = scoreColor(c.fraud_score);
                 return (
                   <tr
-                    key={c.claim_id}
+                    key={c.id}
                     className={`fraud-table__row ${isSelected ? 'fraud-table__row--selected' : ''}`}
                     style={{ borderBottom: '1px solid var(--border)', background: isSelected ? 'var(--green-light)' : 'transparent', transition: 'all 0.15s' }}
                   >
@@ -251,7 +238,7 @@ export default function FraudQueuePanel() {
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={() => toggleSelect(c.claim_id)}
+                        onChange={() => toggleSelect(c.id)}
                       />
                     </td>
                     <td style={{ padding: '1rem' }}>
@@ -291,13 +278,13 @@ export default function FraudQueuePanel() {
                       <div className="fraud-row-actions" style={{ display: 'flex', gap: '0.5rem' }}>
                         <button 
                           style={{ width: 30, height: 30, borderRadius: '8px', border: '1.5px solid var(--green-primary)', background: 'transparent', color: 'var(--green-primary)', cursor: 'pointer', fontWeight: 900 }}
-                          onClick={() => { setSelected(new Set([c.claim_id])); bulkAction('approve'); }}
+                          onClick={() => { setSelected(new Set([c.id])); bulkAction('approve'); }}
                         >
                           ✓
                         </button>
                         <button 
                           style={{ width: 30, height: 30, borderRadius: '8px', border: '1.5px solid var(--error)', background: 'transparent', color: 'var(--error)', cursor: 'pointer', fontWeight: 900 }}
-                          onClick={() => { setSelected(new Set([c.claim_id])); bulkAction('reject'); }}
+                          onClick={() => { setSelected(new Set([c.id])); bulkAction('reject'); }}
                         >
                           ✕
                         </button>

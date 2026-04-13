@@ -21,6 +21,7 @@ import NotificationPreviewPanel from '../components/admin/NotificationPreviewPan
 import DemoChecklist from '../components/admin/DemoChecklist';
 import SocialOraclePanel from '../components/admin/SocialOraclePanel';
 import LiveDataPanel from '../components/admin/LiveDataPanel';
+import InsurerIntelligencePanel from '../components/admin/InsurerIntelligencePanel';
 import PaymentReconciliationPanel from '../components/admin/PaymentReconciliationPanel';
 import AggregationPanel from '../components/admin/AggregationPanel';
 import PartialDisruptionPanel from '../components/admin/PartialDisruptionPanel';
@@ -31,6 +32,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 export function Admin() {
   const [stats, setStats]           = useState(null);
   const [loading, setLoading]       = useState(true);
+  const [statsError, setStatsError] = useState(false);
   const [activeTab, setActiveTab]   = useState('overview');
   const [systemStatus, setSystemStatus] = useState({ level: 'green', text: 'All systems operational' });
   const drillZoneSelectRef = useRef(null);
@@ -44,11 +46,16 @@ export function Admin() {
 
   async function loadStats() {
     setLoading(true);
+    setStatsError(false);
     try {
       const res = await fetch(`${API_BASE}/admin/panel/stats`);
-      setStats(res.ok ? await res.json() : demoStats);
+      if (!res.ok) {
+        throw new Error('Failed to load admin stats');
+      }
+      setStats(await res.json());
     } catch {
-      setStats(demoStats);
+      setStats(null);
+      setStatsError(true);
     } finally {
       setLoading(false);
     }
@@ -82,6 +89,7 @@ export function Admin() {
   const TABS = [
     { id: 'overview',        label: '\u{1F4CA} Overview' },
     { id: 'bcr',             label: '\u{1F4C9} BCR / Loss Ratio' },
+    { id: 'intelligence',    label: '\u{1F52E} Intelligence' },
     { id: 'map',             label: '\u{1F5FA} Zone Map' },
     { id: 'fraud',           label: '\u{1F50D} Fraud Queue' },
     { id: 'payments',        label: '\u{1F4B3} Payments' },
@@ -148,8 +156,32 @@ export function Admin() {
 
       {/* Tab content */}
       <div className="admin-content">
-        {activeTab === 'overview'  && <AdminStats stats={stats} />}
+        {activeTab === 'overview'  && (
+          stats
+            ? <AdminStats stats={stats} />
+            : (
+              <section className="admin-section">
+                <div
+                  style={{
+                    background: 'var(--white)',
+                    border: '1.5px solid var(--border)',
+                    borderRadius: '24px',
+                    padding: '2rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  <h2 style={{ fontFamily: 'Nunito', fontWeight: 900, color: 'var(--text-dark)', marginBottom: '0.5rem' }}>
+                    No admin stats available
+                  </h2>
+                  <p style={{ color: 'var(--text-light)', margin: 0 }}>
+                    {statsError ? 'The panel stats endpoint is unavailable right now.' : 'No panel data has been recorded yet.'}
+                  </p>
+                </div>
+              </section>
+            )
+        )}
         {activeTab === 'bcr'       && <BCRPanel />}
+        {activeTab === 'intelligence' && <InsurerIntelligencePanel />}
         {activeTab === 'map'       && <ZoneMapPanel onZoneClick={handleMapZoneClick} />}
         {activeTab === 'fraud'     && <FraudQueuePanel />}
         {activeTab === 'payments'  && <PaymentReconciliationPanel />}
@@ -175,19 +207,3 @@ export function Admin() {
     </div>
   );
 }
-
-// Demo fallback data
-const demoStats = {
-  activePolicies: 1247,
-  claimsThisWeek: 83,
-  totalPayoutsRs: 31500,
-  lossRatioPercent: 63,
-  autoApprovalRate: 89,
-  fraudQueueCount: 6,
-  avgPayoutMinutes: 8.2,
-  zoneLossRatios: [
-    { zone: 'Koramangala', zone_code: 'BLR-047', lr: 71 },
-    { zone: 'Andheri East', zone_code: 'MUM-021', lr: 54 },
-    { zone: 'Connaught Place', zone_code: 'DEL-009', lr: 48 },
-  ],
-};
