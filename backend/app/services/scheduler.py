@@ -20,6 +20,7 @@ logger = logging.getLogger("scheduler")
 _scheduler_task: asyncio.Task = None
 _scheduler_running: bool = False
 _last_poll_time: datetime = None
+_last_reconciliation_time: datetime = None
 _poll_count: int = 0
 _poll_interval_seconds: int = 45
 
@@ -30,6 +31,7 @@ def get_scheduler_status() -> dict:
         "running": _scheduler_running,
         "poll_interval_seconds": _poll_interval_seconds,
         "last_poll": _last_poll_time.isoformat() if _last_poll_time else None,
+        "last_reconciliation": _last_reconciliation_time.isoformat() if _last_reconciliation_time else None,
         "poll_count": _poll_count,
     }
 
@@ -38,7 +40,7 @@ def get_scheduler_status() -> dict:
 
 async def _poll_loop():
     """Run trigger engine check in a loop."""
-    global _scheduler_running, _last_poll_time, _poll_count
+    global _scheduler_running, _last_poll_time, _last_reconciliation_time, _poll_count
 
     _scheduler_running = True
     logger.info(f"[scheduler] Started — polling every {_poll_interval_seconds}s")
@@ -52,6 +54,10 @@ async def _poll_loop():
 
             _last_poll_time = datetime.utcnow()
             _poll_count += 1
+
+            if _should_run_reconciliation(_last_reconciliation_time):
+                await loop.run_in_executor(None, _run_reconciliation_check)
+                _last_reconciliation_time = datetime.utcnow()
 
             if _poll_count % 10 == 0:
                 logger.info(f"[scheduler] Poll #{_poll_count} completed at {_last_poll_time}")
@@ -67,6 +73,31 @@ def _run_trigger_check():
     """Execute the trigger engine check (runs in thread pool)."""
     from app.services.trigger_engine import check_all_triggers
     check_all_triggers()
+
+
+def _should_run_reconciliation(last_run: datetime | None) -> bool:
+    """Return True when the reconciliation interval has elapsed."""
+    from app.services.reconciliation_job import RECONCILIATION_INTERVAL_SECONDS
+
+    if last_run is None:
+        return True
+
+    return (datetime.utcnow() - last_run).total_seconds() >= RECONCILIATION_INTERVAL_SECONDS
+
+
+def _run_reconciliation_check():
+    """Execute one payment reconciliation pass (runs in thread pool)."""
+    from app.services.reconciliation_job import run_reconciliation_job
+
+    result = run_reconciliation_job()
+    activity = (
+        result.get("retried", 0)
+        + result.get("retry_failed", 0)
+        + result.get("escalated_failed", 0)
+        + result.get("escalated_stuck", 0)
+    )
+    if activity:
+        logger.info(f"[scheduler] Reconciliation job result: {result}")
 
 
 # ─── Start / Stop ────────────────────────────────────────────────────────────

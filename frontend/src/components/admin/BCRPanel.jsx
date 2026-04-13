@@ -9,16 +9,6 @@ import { useState, useEffect } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-// Fallback demo data if endpoint not yet wired by Person 2
-const DEMO_BCR_DATA = [
-  { city: 'Bangalore', code: 'BLR', premiums: 310000, claims: 217000, lr: 70, suspended: false, pool_cap_pct: 78 },
-  { city: 'Mumbai', code: 'BOM', premiums: 380000, claims: 285000, lr: 75, suspended: false, pool_cap_pct: 85 },
-  { city: 'Delhi NCR', code: 'DEL', premiums: 290000, claims: 261000, lr: 90, suspended: true, pool_cap_pct: 102 },
-  { city: 'Chennai', code: 'CHN', premiums: 220000, claims: 127600, lr: 58, suspended: false, pool_cap_pct: 64 },
-  { city: 'Hyderabad', code: 'HYD', premiums: 210000, claims: 117600, lr: 56, suspended: false, pool_cap_pct: 58 },
-  { city: 'Kolkata', code: 'KOL', premiums: 175000, claims: 112000, lr: 64, suspended: false, pool_cap_pct: 71 },
-];
-
 function lrColor(lr) {
   if (lr > 100) return 'var(--error)';
   if (lr > 85) return 'var(--warning)';
@@ -52,10 +42,11 @@ function BCRBar({ lr }) {
 }
 
 export default function BCRPanel() {
-  const [cities, setCities] = useState(DEMO_BCR_DATA);
+  const [cities, setCities] = useState([]);
   const [overrides, setOverrides] = useState({}); // manual override state keyed by city code
   const [loading, setLoading] = useState(true);
   const [reinsAlert, setReinsAlert] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     fetchBCR();
@@ -64,17 +55,20 @@ export default function BCRPanel() {
   }, []);
 
   async function fetchBCR() {
+    setError(false);
     try {
       const res = await fetch(`${API_BASE}/admin/panel/bcr`);
       if (res.ok) {
         const data = await res.json();
         // Expect: { cities: [{city, code, premiums, claims, lr, suspended, pool_cap_pct}] }
-        setCities(data.cities || DEMO_BCR_DATA);
+        setCities(data.cities || []);
       } else {
-        setCities(DEMO_BCR_DATA);
+        setCities([]);
+        setError(true);
       }
     } catch {
-      setCities(DEMO_BCR_DATA);
+      setCities([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -109,7 +103,7 @@ export default function BCRPanel() {
 
   const totalPremiums = displayCities.reduce((a, c) => a + c.premiums, 0);
   const totalClaims = displayCities.reduce((a, c) => a + c.claims, 0);
-  const overallLR = Math.round((totalClaims / totalPremiums) * 100);
+  const overallLR = totalPremiums > 0 ? Math.round((totalClaims / totalPremiums) * 100) : 0;
 
   return (
     <section className="bcr-panel">
@@ -159,6 +153,18 @@ export default function BCRPanel() {
         </div>
       </div>
 
+      {loading ? (
+        <div className="bcr-empty" style={{ textAlign: 'center', padding: '3rem 0', background: 'var(--gray-bg)', borderRadius: '24px', border: '1.5px solid var(--border)' }}>
+          <p style={{ fontFamily: 'Nunito', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-mid)' }}>Loading BCR metrics...</p>
+        </div>
+      ) : displayCities.length === 0 ? (
+        <div className="bcr-empty" style={{ textAlign: 'center', padding: '3rem 0', background: 'var(--gray-bg)', borderRadius: '24px', border: '1.5px solid var(--border)' }}>
+          <p style={{ fontFamily: 'Nunito', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-mid)' }}>No city BCR data yet</p>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginTop: '0.5rem' }}>
+            {error ? 'The BCR endpoint is unavailable right now.' : 'This panel will populate once premiums and paid claims exist.'}
+          </p>
+        </div>
+      ) : (
       <div className="bcr-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
         {displayCities.map(c => {
           const bcr = (c.lr / 100).toFixed(2);
@@ -222,6 +228,7 @@ export default function BCRPanel() {
           );
         })}
       </div>
+      )}
     </section>
   );
 }

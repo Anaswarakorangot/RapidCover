@@ -76,12 +76,20 @@ class ZoneDetail(BaseModel):
 
 class FraudClaim(BaseModel):
     id: int
+    claim_id: str
     partner_name: str
+    partner_id: Optional[str] = None
+    zone: Optional[str] = None
+    zone_code: Optional[str] = None
+    trigger: str
     amount: float
     trigger_type: str
     fraud_score: float
     reason: str
     timestamp: str
+    flags: list[str] = []
+    status: str = "manual_queue"
+    cluster: Optional[str] = None
 
 
 class SuspendCityRequest(BaseModel):
@@ -144,7 +152,7 @@ def get_panel_stats(db: Session = Depends(get_db)):
         .filter(Claim.fraud_score < 0.50)
         .scalar()
     ) or 0
-    auto_approval_rate = (auto_approved / total_claims * 100) if total_claims > 0 else 89.0
+    auto_approval_rate = (auto_approved / total_claims * 100) if total_claims > 0 else 0.0
 
     # Fraud queue (claims with fraud_score >= 0.50 that are still pending)
     fraud_queue = (
@@ -161,9 +169,9 @@ def get_panel_stats(db: Session = Depends(get_db)):
     )
     if paid_claims:
         deltas = [(c.paid_at - c.created_at).total_seconds() / 60 for c in paid_claims if c.paid_at]
-        avg_payout = sum(deltas) / len(deltas) if deltas else 8.2
+        avg_payout = sum(deltas) / len(deltas) if deltas else 0.0
     else:
-        avg_payout = 8.2  # default demo value
+        avg_payout = 0.0
 
     # Per-zone loss ratios
     zones = db.query(Zone).all()
@@ -189,26 +197,6 @@ def get_panel_stats(db: Session = Depends(get_db)):
         ) or 0.0
         zlr = (zone_payouts / zone_premiums * 100) if zone_premiums > 0 else 0.0
         zone_lrs.append(ZoneLossRatio(zone=z.name, zone_code=z.code, lr=round(zlr, 1)))
-
-    # If no real data yet, provide demo defaults
-    if active_policies == 0:
-        active_policies = 1247
-    if claims_this_week == 0:
-        claims_this_week = 83
-    if total_payouts == 0:
-        total_payouts = 31500.0
-    if loss_ratio == 0:
-        loss_ratio = 63.0
-    if auto_approval_rate == 89.0 and total_claims == 0:
-        auto_approval_rate = 89.0
-    if fraud_queue == 0 and total_claims == 0:
-        fraud_queue = 6
-    if not zone_lrs:
-        zone_lrs = [
-            ZoneLossRatio(zone="Koramangala", zone_code="BLR-047", lr=71.0),
-            ZoneLossRatio(zone="Andheri East", zone_code="MUM-021", lr=54.0),
-            ZoneLossRatio(zone="Connaught Place", zone_code="DEL-009", lr=48.0),
-        ]
 
     return PanelStats(
         activePolicies=active_policies,
@@ -298,7 +286,7 @@ def get_bcr(db: Session = Depends(get_db)):
             .join(Zone, Partner.zone_id == Zone.id)
             .filter(Zone.city == city_name, Policy.is_active == True)
             .scalar()
-        ) or 1.0
+        ) or 0.0
 
         claims = (
             db.query(func.sum(Claim.amount))
@@ -308,7 +296,7 @@ def get_bcr(db: Session = Depends(get_db)):
             .scalar()
         ) or 0.0
 
-        lr = (claims / premiums * 100)
+        lr = (claims / premiums * 100) if premiums > 0 else 0.0
         is_suspended = db.query(Zone.is_suspended).filter(Zone.city == city_name).first()
         is_suspended = is_suspended[0] if is_suspended else False
 
@@ -355,22 +343,40 @@ def get_fraud_queue(db: Session = Depends(get_db)):
 
     results = []
     for c in claims:
+        policy = db.query(Policy).filter(Policy.id == c.policy_id).first()
+        partner = db.query(Partner).filter(Partner.id == policy.partner_id).first() if policy else None
+        trigger = db.query(TriggerEvent).filter(TriggerEvent.id == c.trigger_event_id).first()
+        zone = db.query(Zone).filter(Zone.id == trigger.zone_id).first() if trigger else None
+
+        reason = "Fraud score exceeded manual review threshold"
+        flags = []
+        if c.fraud_score >= 0.90:
+            reason = "Fraud score exceeded auto-reject threshold"
+            flags = ["fraud_score"]
+        elif c.fraud_score >= 0.75:
+            reason = "Fraud score requires manual review"
+            flags = ["manual_review"]
+        elif c.fraud_score >= 0.50:
+            reason = "Fraud score requires enhanced validation"
+            flags = ["enhanced_validation"]
+
         results.append(FraudClaim(
             id=c.id,
-            partner_name=c.partner.name if c.partner else "Unknown",
+            claim_id=f"CLM-{c.id:04d}",
+            partner_name=partner.name if partner else "Unknown",
+            partner_id=partner.partner_id if partner else None,
+            zone=zone.name if zone else None,
+            zone_code=zone.code if zone else None,
+            trigger=trigger.trigger_type.value.title() if trigger else "Manual",
             amount=c.amount,
-            trigger_type=c.trigger_event.trigger_type.value if c.trigger_event else "Manual",
+            trigger_type=trigger.trigger_type.value if trigger else "manual",
             fraud_score=c.fraud_score,
-            reason=c.fraud_reason or "High GPS drift detected",
-            timestamp=c.created_at.isoformat()
+            reason=reason,
+            timestamp=c.created_at.isoformat(),
+            flags=flags,
+            status="auto_reject" if c.fraud_score >= 0.90 else "manual_queue",
+            cluster=None,
         ))
-
-    # If empty, return a few fake items for UI showcase
-    if not results:
-        results = [
-            FraudClaim(id=9991, partner_name="Rahul K.", amount=400.0, trigger_type="rain", fraud_score=0.88, reason="Collusion cluster: 8 riders at same tea shop", timestamp=datetime.utcnow().isoformat()),
-            FraudClaim(id=9992, partner_name="Suresh M.", amount=500.0, trigger_type="aqi", fraud_score=0.72, reason="GPS Centroid Drift: >15km from dark store", timestamp=datetime.utcnow().isoformat())
-        ]
 
     return results
 
@@ -599,10 +605,10 @@ def get_live_api_data(
         return {"error": "No zones found. Run seed first."}
 
     # Fetch data from all sources (will try live, fallback to mock)
-    weather = MockWeatherAPI.get_current(zone.id, zone.lat, zone.lng)
-    aqi = MockAQIAPI.get_current(zone.id, zone.lat, zone.lng)
-    platform = MockPlatformAPI.get_current(zone.id)
-    shutdown = MockCivicAPI.get_current(zone.id)
+    weather = MockWeatherAPI.get_current(zone.id, zone.dark_store_lat, zone.dark_store_lng)
+    aqi = MockAQIAPI.get_current(zone.id, zone.dark_store_lat, zone.dark_store_lng)
+    platform = MockPlatformAPI.get_store_status(zone.id)
+    shutdown = MockCivicAPI.get_shutdown_status(zone.id)
 
     # Get source health
     health = get_source_health()
@@ -613,8 +619,8 @@ def get_live_api_data(
             "code": zone.code,
             "name": zone.name,
             "city": zone.city,
-            "lat": zone.lat,
-            "lng": zone.lng,
+            "lat": zone.dark_store_lat,
+            "lng": zone.dark_store_lng,
         },
         "weather": {
             "temp_celsius": weather.temp_celsius,

@@ -23,7 +23,18 @@ class TestDrillSession:
         """Verify DrillType enum has all expected values."""
         from app.models.drill_session import DrillType
 
-        expected = ['flash_flood', 'aqi_spike', 'heatwave', 'store_closure', 'curfew']
+        expected = [
+            'flash_flood',
+            'aqi_spike',
+            'heatwave',
+            'store_closure',
+            'curfew',
+            'monsoon_14day',
+            'multi_city_aqi',
+            'cyclone',
+            'bandh',
+            'collusion_fraud',
+        ]
         actual = [dt.value for dt in DrillType]
 
         assert set(expected) == set(actual), f"Missing drill types: {set(expected) - set(actual)}"
@@ -336,7 +347,7 @@ class TestVerificationService:
         expected = [
             'database', 'auth_endpoint', 'zone_list', 'trigger_engine',
             'simulation', 'claim_creation', 'payout_service', 'push_notifications',
-            'data_sources'
+            'data_sources', 'insurer_intelligence'
         ]
 
         check_names = [name for name, _ in HEALTH_CHECKS]
@@ -414,7 +425,7 @@ class TestAdminDrillsAPI:
         result = get_drill_presets()
 
         assert 'presets' in result
-        assert len(result['presets']) == 5
+        assert len(result['presets']) == 10
 
         for preset in result['presets']:
             assert 'name' in preset

@@ -191,6 +191,46 @@ def check_data_sources(db: Session) -> tuple[bool, str]:
         return False, f"Data source check error: {str(e)}"
 
 
+def check_insurer_intelligence(db: Session) -> tuple[bool, str]:
+    """Check that insurer intelligence predictions exist or can be generated."""
+    try:
+        from datetime import timedelta
+        from app.models.prediction import WeeklyPrediction, CityRiskProfile
+
+        now = datetime.utcnow()
+        week_start = now - timedelta(days=now.weekday())
+        week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Check for recent predictions
+        prediction_count = (
+            db.query(WeeklyPrediction)
+            .filter(WeeklyPrediction.week_start == week_start)
+            .count()
+        )
+
+        profile_count = (
+            db.query(CityRiskProfile)
+            .filter(CityRiskProfile.week_start == week_start)
+            .count()
+        )
+
+        if prediction_count > 0 and profile_count > 0:
+            return True, f"Intelligence active: {prediction_count} zone predictions, {profile_count} city profiles"
+
+        # Try to generate predictions
+        from app.services.prediction_service import (
+            generate_weekly_predictions,
+            generate_city_risk_profiles,
+        )
+
+        predictions = generate_weekly_predictions(db)
+        profiles = generate_city_risk_profiles(db)
+
+        return True, f"Intelligence initialized: {len(predictions)} predictions, {len(profiles)} profiles"
+    except Exception as e:
+        return False, f"Intelligence check error: {str(e)}"
+
+
 # Health check registry
 HEALTH_CHECKS = [
     ("database", check_database_connection),
@@ -202,6 +242,7 @@ HEALTH_CHECKS = [
     ("payout_service", check_payout_service),
     ("push_notifications", check_push_notifications),
     ("data_sources", check_data_sources),
+    ("insurer_intelligence", check_insurer_intelligence),
 ]
 
 

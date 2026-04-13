@@ -516,67 +516,6 @@ def check_partner_pin_code_match(partner: Partner, zone: Zone, db: Session = Non
     return False, "pin_code_mismatch"
 
 
-def check_48hr_forecast(zone_id: int, db: Session) -> list[dict]:
-    """Check forecast and return list of predicted alerts."""
-    alerts = []
-
-    mock_rain_forecast = 35.0
-    mock_temp_forecast = 41.0
-
-    if mock_rain_forecast > 30:
-        alerts.append({
-            "type": "rain",
-            "message": "Heavy rain predicted (>30mm) in the next 48 hours. Please be prepared.",
-            "severity": "high",
-        })
-
-    if mock_temp_forecast > 40:
-        alerts.append({
-            "type": "heat",
-            "message": "Extreme heat predicted (>40°C) in the next 48 hours. Stay hydrated.",
-            "severity": "high",
-        })
-
-    return alerts
-
-
-def send_forecast_alerts(zone_id: int, db: Session):
-    """Send push notifications to partners in zone."""
-    alerts = check_48hr_forecast(zone_id, db)
-    if not alerts:
-        return 0
-
-    partners = db.query(Partner).filter(
-        Partner.zone_id == zone_id,
-        Partner.is_active == True,
-    ).all()
-    if not partners:
-        return 0
-
-    from app.services.notifications import send_push_notification, get_partner_subscriptions
-
-    success_count = 0
-    for alert in alerts:
-        payload = {
-            "title": f"Weather Alert: {alert['type'].capitalize()}",
-            "body": alert["message"],
-            "url": "/",
-            "tag": f"forecast-alert-{alert['type']}",
-            "type": "weather_alert",
-            "icon": "/icon-192.png",
-        }
-
-        for partner in partners:
-            subscriptions = get_partner_subscriptions(partner.id, db)
-            for sub in subscriptions:
-                if send_push_notification(sub, payload):
-                    success_count += 1
-
-    db.commit()
-    logger.info(f"Sent {len(alerts)} forecast alerts to zone {zone_id}. Total pushes: {success_count}")
-    return success_count
-
-
 def _fetch_openweather_forecast(zone: Optional[Zone]) -> dict:
     """Fetch a compact 48-hour rain/heat forecast for alerting."""
     settings = get_settings()
