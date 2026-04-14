@@ -31,3 +31,4 @@ class Zone(Base):
     # Relationships
     partners = relationship("Partner", back_populates="zone")
     trigger_events = relationship("TriggerEvent", back_populates="zone")
+    sustained_events = relationship("SustainedEvent", back_populates="zone")
