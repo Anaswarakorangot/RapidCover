@@ -275,14 +275,25 @@ def build_validation_matrix(
     )
 
     # 9. Data freshness acceptable
-    data_source_tag = source_data.get("data_source", "mock")
-    freshness_ok = data_source_tag in ("live",) or True   # mock is always "fresh" by definition
+    from app.models.fraud import PartnerGPSPing
+    last_ping = (
+        db.query(PartnerGPSPing)
+        .filter(PartnerGPSPing.partner_id == partner.id)
+        .order_by(PartnerGPSPing.created_at.desc())
+        .first()
+    )
+    
+    # Fresh if ping within last 2 hours of trigger start
+    freshness_threshold = (trigger_event.started_at or now) - timedelta(hours=2)
+    freshness_ok = last_ping is not None and last_ping.created_at >= freshness_threshold
+    
+    ping_time_str = last_ping.created_at.isoformat() if last_ping else "None"
     _check(
         "data_freshness",
         freshness_ok,
-        f"Data source tag: {data_source_tag}",
-        data_source_tag,
-        1.0 if data_source_tag == "live" else 0.7,
+        f"Last heartbeat: {ping_time_str} (Threshold: 2h)",
+        "partner_gps_pings",
+        1.0 if freshness_ok else 0.0,
     )
 
     # 10. Cross-source agreement acceptable
@@ -571,6 +582,7 @@ def process_trigger_event(
     sustained_info = track_sustained_event(
         zone_id,
         trigger_event.trigger_type,
+        db,
         trigger_event.started_at or datetime.utcnow()
     )
 
