@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum, Text, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -57,3 +57,25 @@ class TriggerEvent(Base):
     # Relationships
     zone = relationship("Zone", back_populates="trigger_events")
     claims = relationship("Claim", back_populates="trigger_event")
+
+
+class SustainedEvent(Base):
+    """
+    Persistent tracking for consecutive days of triggers.
+    Replaces the in-memory _sustained_events dictionary in trigger_detector.
+    """
+    __tablename__ = "sustained_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    zone_id = Column(Integer, ForeignKey("zones.id"), nullable=False, index=True)
+    trigger_type = Column(Enum(TriggerType), nullable=False)
+    
+    consecutive_days = Column(Integer, default=1)
+    last_event_at = Column(DateTime(timezone=True), nullable=False)
+    is_sustained = Column(Boolean, default=False)
+    
+    # JSON list of date strings for history
+    history_json = Column(Text, default="[]") 
+
+    # Relationships
+    zone = relationship("Zone")
