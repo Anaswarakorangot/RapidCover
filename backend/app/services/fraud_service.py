@@ -238,6 +238,8 @@ def calculate_fraud_score(
     from app.models.claim import Claim
     from app.models.zone import Zone
 
+    from app.models.fraud import PartnerGPSPing, PartnerDevice
+
     zone = trigger_event.zone if trigger_event else None
     if not zone and trigger_event:
         zone = db.query(Zone).filter(Zone.id == trigger_event.zone_id).first()
@@ -271,19 +273,56 @@ def calculate_fraud_score(
             .scalar()
         ) or 0
 
-    # Device fingerprint - assume consistent for now (no device tracking in current model)
+    # 1. Device fingerprint consistency
+    # Check if partner has used other devices recently
+    known_devices = db.query(PartnerDevice).filter(PartnerDevice.partner_id == partner.id).all()
     device_consistent = True
+    if known_devices:
+        # If we have multiple devices, we check if the current one is the 'active' or 'primary' one
+        # For this model, if it's in the list of known devices for this partner, it's consistent.
+        # (In a real app, we'd pass the current device_id from the request)
+        device_consistent = len(known_devices) <= 2  # Reject if too many devices used recently
 
-    # Traffic disrupted - assume true if trigger fired (trigger = disruption confirmed)
-    traffic_disrupted = True
+    # 2. Max GPS velocity (spoof detection)
+    # Fetch recent pings for this partner
+    recent_pings = (
+        db.query(PartnerGPSPing)
+        .filter(PartnerGPSPing.partner_id == partner.id)
+        .order_by(PartnerGPSPing.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    
+    ping_data = []
+    for p in reversed(recent_pings):
+        ping_data.append({
+            "lat": p.lat,
+            "lng": p.lng,
+            "ts": p.created_at.timestamp()
+        })
+    
+    max_velocity_kmh = compute_max_velocity_kmh(ping_data)
 
-    # Centroid drift - for now use GPS distance as proxy
-    # In production: would compute from 30-day GPS ping history
-    centroid_drift_km = gps_distance
-
-    # Max GPS velocity - for now assume 0 (no GPS ping history available)
-    # In production: would compute from consecutive GPS pings
-    max_velocity_kmh = 0.0
+    # 3. Centroid drift (location anchoring)
+    # Fetch 30-day history
+    cutoff_30d = datetime.utcnow() - timedelta(days=30)
+    history_pings = (
+        db.query(PartnerGPSPing)
+        .filter(PartnerGPSPing.partner_id == partner.id, PartnerGPSPing.created_at >= cutoff_30d)
+        .all()
+    )
+    
+    centroid_drift_km = 0.0
+    if history_pings:
+        hist_data = [{"lat": p.lat, "lng": p.lng} for p in history_pings]
+        centroid = compute_centroid(hist_data)
+        centroid_drift_km = haversine_km(
+            centroid["lat"], centroid["lng"],
+            dark_store_lat, dark_store_lng
+        )
+    else:
+        # If no history, we fall back to the current distance
+        centroid_drift_km = gps_distance
 
     # Zone suspended - true if trigger event exists and is active
     zone_suspended = trigger_event is not None and trigger_event.ended_at is None
