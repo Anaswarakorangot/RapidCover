@@ -450,3 +450,21 @@ def get_transaction_log(claim: Claim) -> Optional[dict]:
         return json.loads(claim.validation_data).get("transaction_log")
     except json.JSONDecodeError:
         return None
+def process_razorpay_payout(
+    partner,
+    amount: float,
+    claim_id: int,
+) -> tuple[bool, str, dict]:
+    """Razorpay payout stub — test mode wiring."""
+    try:
+        import os
+        key_id = os.environ.get("RAZORPAY_KEY_ID", "")
+        key_secret = os.environ.get("RAZORPAY_KEY_SECRET", "")
+        if not key_id or not key_secret:
+            return False, "", {"error": "Razorpay keys not configured", "mode": "test"}
+        import uuid
+        ref = f"RZP_{uuid.uuid4().hex[:16].upper()}"
+        return True, ref, {"id": ref, "status": "processing",
+                           "amount": int(amount * 100), "currency": "INR", "mode": "test"}
+    except Exception as e:
+        return False, "", {"error": str(e)}

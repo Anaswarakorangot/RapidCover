@@ -17,9 +17,10 @@ Endpoints:
 
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.partner import Partner
@@ -39,6 +40,14 @@ from app.services.premium_service import (
 )
 
 router = APIRouter(prefix="/partners", tags=["experience"])
+
+
+class HeartbeatRequest(BaseModel):
+    lat: float
+    lng: float
+    device_id: str
+    platform: Optional[str] = None
+    app_version: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +83,17 @@ def _count_active_days_last_30(partner: Partner, db: Session) -> int:
     if claim_days > 0:
         return min(claim_days, 30)
 
+    # Fallback to Real Heartbeat data if available
+    from app.models.fraud import PartnerGPSPing
+    real_activity_days = (
+        db.query(func.date(PartnerGPSPing.created_at))
+        .filter(PartnerGPSPing.partner_id == partner.id, PartnerGPSPing.created_at >= since)
+        .distinct()
+        .count()
+    )
+    if real_activity_days > 0:
+        return min(real_activity_days, 30)
+
     # Fallback – each policy ≈ 7 active days
     policy_count = (
         db.query(Policy)
@@ -84,6 +104,20 @@ def _count_active_days_last_30(partner: Partner, db: Session) -> int:
         .count()
     )
     return min(policy_count * 7, 30)
+
+
+def _get_earnings_protected(partner: Partner, db: Session) -> float:
+    """Sum of all paid/approved claims for this partner."""
+    total = (
+        db.query(func.sum(Claim.amount))
+        .join(Policy, Claim.policy_id == Policy.id)
+        .filter(
+            Policy.partner_id == partner.id,
+            Claim.status.in_([ClaimStatus.APPROVED, ClaimStatus.PAID]),
+        )
+        .scalar()
+    ) or 0.0
+    return float(total)
 
 
 def _loyalty_weeks(partner: Partner, db: Session) -> int:
@@ -283,6 +317,8 @@ def get_experience_state(
     loyalty_wks      = _loyalty_weeks(partner, db)
     breakdown        = _build_premium_breakdown(partner, db)
     latest_payout    = _get_latest_payout(partner, db)
+    earnings_prot    = _get_earnings_protected(partner, db)
+    active_days      = _count_active_days_last_30(partner, db)
 
     return {
         "zone_alert":        zone_alert,
@@ -295,6 +331,12 @@ def get_experience_state(
         },
         "premium_breakdown": breakdown,
         "latest_payout":     latest_payout,
+        "kpis": {
+            "earnings_protected": earnings_prot,
+            "active_days_last_30": active_days,
+            "uptime_pct": round((active_days / 30.0) * 100, 1),
+            "savings_today": round(earnings_prot - (breakdown["total"] / 7), 2) if earnings_prot > 0 else 0,
+        },
         "fetched_at":        datetime.utcnow().isoformat(),
     }
 
@@ -555,4 +597,61 @@ def get_renewal_preview(
         "breakdown":               breakdown,
         "expires_at":              policy.expires_at.isoformat() if policy.expires_at else None,
         "auto_renew":              policy.auto_renew,
+    }
+
+
+
+@router.post("/me/heartbeat", summary="Partner app heartbeat - saves GPS and device state")
+def partner_heartbeat(
+    request: HeartbeatRequest,
+    partner: Partner = Depends(get_current_partner),
+    db: Session = Depends(get_db),
+):
+    """
+    Called by the worker app every 60s (or when a claim is initiated).
+    Persists GPS trajectory for fraud detection and metadata for availability.
+    """
+    from app.models.fraud import PartnerGPSPing, PartnerDevice
+    from app.services.runtime_metadata import upsert_db_partner_platform_activity
+
+    # 1. Save GPS trajectory
+    ping = PartnerGPSPing(
+        partner_id=partner.id,
+        lat=request.lat,
+        lng=request.lng,
+        device_id=request.device_id,
+        source="app_heartbeat"
+    )
+    db.add(ping)
+
+    # 2. Update/Register Device
+    device = db.query(PartnerDevice).filter(
+        PartnerDevice.partner_id == partner.id,
+        PartnerDevice.device_id == request.device_id
+    ).first()
+    
+    if not device:
+        device = PartnerDevice(
+            partner_id=partner.id,
+            device_id=request.device_id,
+            model=request.platform,
+            os_version=request.app_version
+        )
+        db.add(device)
+    else:
+        device.last_seen_at = func.now()
+
+    # 3. Update Platform Activity Metadata (for availability checks)
+    upsert_db_partner_platform_activity(
+        partner_id=partner.id,
+        db=db,
+        last_app_ping=datetime.utcnow().isoformat()
+    )
+
+    db.commit()
+
+    return {
+        "status": "received",
+        "timestamp": datetime.utcnow().isoformat(),
+        "next_heartbeat_at": (datetime.utcnow() + timedelta(seconds=60)).isoformat()
     }

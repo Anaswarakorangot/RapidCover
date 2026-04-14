@@ -323,7 +323,7 @@ class TestPerson2Tasks:
     # -------------------------------------------------------------------------
     def test_task1_shift_window_check(self):
         """Verify partner on leave or offline gets no payout"""
-        from app.services.claims_processor import is_partner_available_for_trigger
+        from app.services.runtime_metadata import is_partner_available_for_trigger
 
         # Mock partner with shift days
         mock_partner = MagicMock()
@@ -381,7 +381,7 @@ class TestPerson2Tasks:
     # -------------------------------------------------------------------------
     def test_task3_active_hours_match(self):
         """Verify trigger must fall within partner's shift window"""
-        from app.services.claims_processor import is_partner_available_for_trigger
+        from app.services.runtime_metadata import is_partner_available_for_trigger
 
         mock_partner = MagicMock()
         mock_partner.id = 1

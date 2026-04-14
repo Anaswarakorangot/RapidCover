@@ -213,7 +213,7 @@ class TestDbPartnerPlatformActivity:
         return db
 
     def test_get_returns_defaults_when_no_row(self):
-        from app.services.claims_processor import get_db_partner_platform_activity
+        from app.services.runtime_metadata import get_db_partner_platform_activity
         db = self._make_db()
         result = get_db_partner_platform_activity(1, db)
         assert result["partner_id"] == 1
@@ -223,7 +223,7 @@ class TestDbPartnerPlatformActivity:
         assert result["source"] == "default"
 
     def test_upsert_calls_db_execute(self):
-        from app.services.claims_processor import upsert_db_partner_platform_activity
+        from app.services.runtime_metadata import upsert_db_partner_platform_activity
         db = self._make_db()
         # Should not raise
         upsert_db_partner_platform_activity(1, db, active_shift=False)
@@ -231,14 +231,14 @@ class TestDbPartnerPlatformActivity:
         assert db.commit.called
 
     def test_upsert_returns_dict_with_partner_id(self):
-        from app.services.claims_processor import upsert_db_partner_platform_activity
+        from app.services.runtime_metadata import upsert_db_partner_platform_activity
         db = self._make_db()
         result = upsert_db_partner_platform_activity(1, db, platform="swiggy")
         assert isinstance(result, dict)
         assert result["partner_id"] == 1
 
     def test_get_parses_db_row_correctly(self):
-        from app.services.claims_processor import get_db_partner_platform_activity
+        from app.services.runtime_metadata import get_db_partner_platform_activity
         db = MagicMock()
         now_iso = datetime.utcnow().isoformat()
         db.execute.return_value.mappings.return_value.first.return_value = {

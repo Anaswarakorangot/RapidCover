@@ -53,6 +53,8 @@ class Partner(Base):
     zone = relationship("Zone", back_populates="partners")
     policies = relationship("Policy", back_populates="partner")
     push_subscriptions = relationship("PushSubscription", back_populates="partner")
+    gps_pings = relationship("PartnerGPSPing", back_populates="partner")
+    devices = relationship("PartnerDevice", back_populates="partner")
     kyc = Column(JSON, nullable=True, default=lambda: {
         "aadhaar_number": None,
         "pan_number":     None,

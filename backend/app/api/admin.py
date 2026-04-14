@@ -1073,7 +1073,7 @@ def check_trigger_eligibility(
     - shift_window: Trigger time is within partner's shift hours
     """
     from app.services.trigger_engine import check_partner_pin_code_match
-    from app.services.claims_processor import (
+    from app.services.runtime_metadata import (
         is_partner_available_for_trigger,
         get_partner_runtime_metadata,
         get_zone_coverage_metadata,
@@ -1232,7 +1232,7 @@ def proof_reassignments(db: Session = Depends(get_db)):
 def proof_trigger_eligibility(db: Session = Depends(get_db)):
     """Proof endpoint for trigger eligibility checks (pin-code strictness)."""
     # Count partners with/without pin codes
-    from app.services.claims_processor import (
+    from app.services.runtime_metadata import (
         get_partner_runtime_metadata,
         get_zone_coverage_metadata,
     )
@@ -1498,7 +1498,7 @@ def proof_platform_activity(db: Session = Depends(get_db)):
     Demonstrates Zomato/Swiggy/Zepto/Blinkit activity tracking and how it
     gates claim eligibility. Answers: 'how do you verify the worker is actually working?'
     """
-    from app.services.claims_processor import get_db_partner_platform_activity
+    from app.services.runtime_metadata import get_db_partner_platform_activity
     from app.services.external_apis import evaluate_partner_platform_eligibility
 
     partners = db.query(Partner).filter(Partner.is_active == True).limit(5).all()

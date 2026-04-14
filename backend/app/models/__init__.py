@@ -8,6 +8,8 @@ from app.models.drill_session import DrillSession, DrillType, DrillStatus
 from app.models.zone_reassignment import ZoneReassignment, ReassignmentStatus
 from app.models.zone_risk_profile import ZoneRiskProfile
 from app.models.prediction import WeeklyPrediction, CityRiskProfile
+from app.models.fraud import PartnerGPSPing, PartnerDevice
+from app.models.trigger_event import SustainedEvent
 
 __all__ = [
     "Partner",
@@ -24,4 +26,7 @@ __all__ = [
     "ZoneRiskProfile",
     "WeeklyPrediction",
     "CityRiskProfile",
+    "PartnerGPSPing",
+    "PartnerDevice",
+    "SustainedEvent",
 ]
