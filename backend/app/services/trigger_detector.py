@@ -27,94 +27,112 @@ from app.services.external_apis import (
 
 # Sustained Event Tracking
 # Tracks consecutive days of same trigger type in same zone
-# Key format: "{zone_id}:{trigger_type}" -> list of date strings
-_sustained_events: dict[str, list[str]] = {}
-
 # Sustained event thresholds
 SUSTAINED_EVENT_THRESHOLD_DAYS = 5  # Days before sustained mode activates
 SUSTAINED_EVENT_MAX_DAYS = 21  # Maximum days for sustained payout
 SUSTAINED_EVENT_PAYOUT_MODIFIER = 0.70  # 70% payout per day in sustained mode
 
 
-def track_sustained_event(zone_id: int, trigger_type: TriggerType, event_date: datetime = None) -> dict:
+def track_sustained_event(
+    zone_id: int,
+    trigger_type: TriggerType,
+    db: Session,
+    event_date: datetime = None
+) -> dict:
     """
-    Track consecutive trigger events for sustained event detection.
-
-    When same trigger fires 5+ consecutive days in same zone:
-    - Raises 'Sustained Event' flag
-    - Switches to 70% payout per day
-    - Bypasses weekly cap
-    - Maximum 21 days
-
-    Returns dict with:
-    - is_sustained: bool - True if 5+ consecutive days
-    - consecutive_days: int - Number of consecutive days
-    - payout_modifier: float - 1.0 normal, 0.70 for sustained
-    - max_days_reached: bool - True if 21 days reached
-    - bypass_weekly_cap: bool - True for sustained events
+    Track consecutive trigger events for sustained event detection (Persistent).
     """
+    from app.models.trigger_event import SustainedEvent
+    
     if event_date is None:
         event_date = datetime.utcnow()
 
-    key = f"{zone_id}:{trigger_type.value}"
-    dates = _sustained_events.get(key, [])
     date_str = event_date.strftime("%Y-%m-%d")
 
-    # Add date if not already tracked
-    if date_str not in dates:
-        dates.append(date_str)
-        dates = sorted(dates)[-SUSTAINED_EVENT_MAX_DAYS:]  # Keep last 21 days
-        _sustained_events[key] = dates
+    # Fetch existing sustained state
+    record = (
+        db.query(SustainedEvent)
+        .filter(SustainedEvent.zone_id == zone_id, SustainedEvent.trigger_type == trigger_type)
+        .first()
+    )
 
-    # Count consecutive days ending with today/event_date
-    consecutive = 1
-    sorted_dates = sorted(dates, reverse=True)
+    if not record:
+        record = SustainedEvent(
+            zone_id=zone_id,
+            trigger_type=trigger_type,
+            consecutive_days=1,
+            last_event_at=event_date,
+            history_json=json.dumps([date_str]),
+            is_sustained=False
+        )
+        db.add(record)
+    else:
+        # Check if this is a consecutive day or same day
+        history = json.loads(record.history_json)
+        
+        if date_str not in history:
+            last_dt = record.last_event_at.date()
+            curr_dt = event_date.date()
+            
+            if (curr_dt - last_dt).days == 1:
+                record.consecutive_days += 1
+            elif (curr_dt - last_dt).days > 1:
+                # Reset if gap exists
+                record.consecutive_days = 1
+                history = []
+            
+            history.append(date_str)
+            record.history_json = json.dumps(history[-SUSTAINED_EVENT_MAX_DAYS:])
+            record.last_event_at = event_date
+            record.is_sustained = record.consecutive_days >= SUSTAINED_EVENT_THRESHOLD_DAYS
 
-    for i in range(len(sorted_dates) - 1):
-        curr = datetime.strptime(sorted_dates[i], "%Y-%m-%d")
-        prev = datetime.strptime(sorted_dates[i + 1], "%Y-%m-%d")
-        if (curr - prev).days == 1:
-            consecutive += 1
-        else:
-            break
-
-    is_sustained = consecutive >= SUSTAINED_EVENT_THRESHOLD_DAYS
-    max_days_reached = consecutive >= SUSTAINED_EVENT_MAX_DAYS
+    db.commit()
 
     return {
-        "is_sustained": is_sustained,
-        "consecutive_days": consecutive,
-        "payout_modifier": SUSTAINED_EVENT_PAYOUT_MODIFIER if is_sustained else 1.0,
-        "max_days_reached": max_days_reached,
-        "bypass_weekly_cap": is_sustained,
+        "is_sustained": record.is_sustained,
+        "consecutive_days": record.consecutive_days,
+        "payout_modifier": SUSTAINED_EVENT_PAYOUT_MODIFIER if record.is_sustained else 1.0,
+        "max_days_reached": record.consecutive_days >= SUSTAINED_EVENT_MAX_DAYS,
+        "bypass_weekly_cap": record.is_sustained,
     }
 
 
-def inject_sustained_event_history(zone_id: int, trigger_type: TriggerType, days: int = 5) -> dict:
+def inject_sustained_event_history(zone_id: int, trigger_type: TriggerType, db: Session, days: int = 5) -> dict:
     """
-    Inject fake consecutive days history for demo purposes.
-
-    This allows testing the 70% sustained event payout without waiting 5 real days.
-    Call this BEFORE running a drill to simulate being on day N of a sustained event.
-
-    Args:
-        zone_id: Zone to inject history for
-        trigger_type: Trigger type (rain, heat, etc.)
-        days: Number of consecutive days to simulate (default 5 for 70% payout)
-
-    Returns:
-        Dict with injected dates and expected payout modifier
+    Inject consecutive days history into DB for testing.
     """
-    key = f"{zone_id}:{trigger_type.value}"
+    from app.models.trigger_event import SustainedEvent
+    
     today = datetime.utcnow()
-
-    # Generate N-1 previous consecutive days (today will be added when drill runs)
     injected_dates = []
     for i in range(days - 1, 0, -1):
         date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
         injected_dates.append(date_str)
 
-    _sustained_events[key] = injected_dates
+    # Upsert record
+    record = (
+        db.query(SustainedEvent)
+        .filter(SustainedEvent.zone_id == zone_id, SustainedEvent.trigger_type == trigger_type)
+        .first()
+    )
+    
+    if record:
+        record.consecutive_days = days - 1
+        record.last_event_at = today - timedelta(days=1)
+        record.history_json = json.dumps(injected_dates)
+        record.is_sustained = (days - 1) >= SUSTAINED_EVENT_THRESHOLD_DAYS
+    else:
+        record = SustainedEvent(
+            zone_id=zone_id,
+            trigger_type=trigger_type,
+            consecutive_days=days - 1,
+            last_event_at=today - timedelta(days=1),
+            history_json=json.dumps(injected_dates),
+            is_sustained=(days - 1) >= SUSTAINED_EVENT_THRESHOLD_DAYS
+        )
+        db.add(record)
+    
+    db.commit()
 
     return {
         "zone_id": zone_id,
@@ -122,36 +140,38 @@ def inject_sustained_event_history(zone_id: int, trigger_type: TriggerType, days
         "injected_days": days - 1,
         "dates": injected_dates,
         "next_run_will_be_day": days,
-        "payout_modifier_expected": SUSTAINED_EVENT_PAYOUT_MODIFIER if days >= SUSTAINED_EVENT_THRESHOLD_DAYS else 1.0,
     }
 
 
-def clear_sustained_event_history(zone_id: int = None, trigger_type: TriggerType = None):
+def clear_sustained_event_history(db: Session, zone_id: int = None, trigger_type: TriggerType = None):
     """
-    Clear sustained event history for testing.
-
-    If zone_id and trigger_type provided, clears just that combination.
-    If neither provided, clears all history.
+    Clear persistent sustained event history.
     """
-    global _sustained_events
-
+    from app.models.trigger_event import SustainedEvent
+    
+    query = db.query(SustainedEvent)
     if zone_id is not None and trigger_type is not None:
-        key = f"{zone_id}:{trigger_type.value}"
-        _sustained_events.pop(key, None)
-    elif zone_id is None and trigger_type is None:
-        _sustained_events = {}
+        query = query.filter(SustainedEvent.zone_id == zone_id, SustainedEvent.trigger_type == trigger_type)
+    
+    query.delete()
+    db.commit()
 
     return {"cleared": True}
 
 
-def get_sustained_event_info(zone_id: int, trigger_type: TriggerType) -> dict:
+def get_sustained_event_info(zone_id: int, trigger_type: TriggerType, db: Session) -> dict:
     """
-    Get current sustained event info for a zone/trigger combination without modifying state.
+    Get current sustained event info from DB.
     """
-    key = f"{zone_id}:{trigger_type.value}"
-    dates = _sustained_events.get(key, [])
+    from app.models.trigger_event import SustainedEvent
+    
+    record = (
+        db.query(SustainedEvent)
+        .filter(SustainedEvent.zone_id == zone_id, SustainedEvent.trigger_type == trigger_type)
+        .first()
+    )
 
-    if not dates:
+    if not record:
         return {
             "is_sustained": False,
             "consecutive_days": 0,
@@ -160,37 +180,25 @@ def get_sustained_event_info(zone_id: int, trigger_type: TriggerType) -> dict:
             "bypass_weekly_cap": False,
         }
 
-    # Count consecutive days
-    consecutive = 1
-    sorted_dates = sorted(dates, reverse=True)
-
-    for i in range(len(sorted_dates) - 1):
-        curr = datetime.strptime(sorted_dates[i], "%Y-%m-%d")
-        prev = datetime.strptime(sorted_dates[i + 1], "%Y-%m-%d")
-        if (curr - prev).days == 1:
-            consecutive += 1
-        else:
-            break
-
-    is_sustained = consecutive >= SUSTAINED_EVENT_THRESHOLD_DAYS
-
     return {
-        "is_sustained": is_sustained,
-        "consecutive_days": consecutive,
-        "payout_modifier": SUSTAINED_EVENT_PAYOUT_MODIFIER if is_sustained else 1.0,
-        "max_days_reached": consecutive >= SUSTAINED_EVENT_MAX_DAYS,
-        "bypass_weekly_cap": is_sustained,
+        "is_sustained": record.is_sustained,
+        "consecutive_days": record.consecutive_days,
+        "payout_modifier": SUSTAINED_EVENT_PAYOUT_MODIFIER if record.is_sustained else 1.0,
+        "max_days_reached": record.consecutive_days >= SUSTAINED_EVENT_MAX_DAYS,
+        "bypass_weekly_cap": record.is_sustained,
     }
 
 
-def clear_sustained_event(zone_id: int, trigger_type: TriggerType) -> None:
+def clear_sustained_event(zone_id: int, trigger_type: TriggerType, db: Session) -> None:
     """
-    Clear sustained event tracking for a zone/trigger combination.
-    Call when a trigger event ends or conditions normalize.
+    Delete sustained event tracking for a zone/trigger combination.
     """
-    key = f"{zone_id}:{trigger_type.value}"
-    if key in _sustained_events:
-        del _sustained_events[key]
+    from app.models.trigger_event import SustainedEvent
+    db.query(SustainedEvent).filter(
+        SustainedEvent.zone_id == zone_id, 
+        SustainedEvent.trigger_type == trigger_type
+    ).delete()
+    db.commit()
 
 
 def _calculate_severity(value: float, threshold: float) -> int:
