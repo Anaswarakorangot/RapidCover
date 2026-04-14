@@ -670,6 +670,7 @@ export function Dashboard() {
   const loyalty         = expState?.loyalty          ?? null;
   const premiumBreakdown = expState?.premium_breakdown ?? null;
   const latestPayout    = expState?.latest_payout    ?? null;
+  const kpis            = expState?.kpis             ?? null;
 
   // Build reassignment card data from pending reassignment (has ID for API calls)
   const zoneReassignmentCard = pendingReassignment ? {
@@ -850,21 +851,27 @@ export function Dashboard() {
         {/* ── 7. Weekly Premium Breakdown ── */}
         <WeeklyPremiumBreakdown breakdown={premiumBreakdown} policy={policy} />
 
-        {/* ── 8. Earnings Summary ── */}
         <div>
-          <p className="rc-section-title">Earnings</p>
+          <p className="rc-section-title">Earnings Protected</p>
           <div className="earn-grid">
             <div className="earn-tile">
-              <p className="earn-label">Total Received</p>
-              <p className="earn-amount" style={{ color: 'var(--green-dark)' }}>₹{summary?.total_paid || 0}</p>
-              <p className="earn-claims">{summary?.total_claims || 0} claims</p>
+              <p className="earn-label">Protected</p>
+              <p className="earn-amount" style={{ color: 'var(--green-dark)' }}>₹{kpis?.earnings_protected || 0}</p>
+              <p className="earn-claims">{summary?.total_claims || 0} claims approved</p>
             </div>
             <div className="earn-tile">
-              <p className="earn-label">Pending</p>
-              <p className="earn-amount" style={{ color: '#f97316' }}>₹{summary?.pending_amount || 0}</p>
-              <p className="earn-claims">{summary?.pending_claims || 0} claims</p>
+              <p className="earn-label">Uptime ({kpis?.uptime_pct || 0}%)</p>
+              <p className="earn-amount" style={{ color: '#f97316' }}>{kpis?.active_days_last_30 || 0} Days</p>
+              <p className="earn-claims">of last 30 days active</p>
             </div>
           </div>
+          {kpis?.savings_today > 0 && (
+            <div style={{ marginTop: 8, textAlign: 'center' }}>
+               <span style={{ fontSize: 11, color: 'var(--green-dark)', fontWeight: 700, padding: '4px 10px', background: 'var(--green-light)', borderRadius: 12 }}>
+                 ✨ Saved you ₹{kpis.savings_today} recently
+               </span>
+            </div>
+          )}
         </div>
 
         {/* ── 9. Recent Claims ── */}
