@@ -12,13 +12,14 @@ New endpoints added in Phase 2:
   GET /partners/bcr/{city}        - BCR / Loss Ratio for a city (admin)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from datetime import date
 from typing import Optional
 
 from app.database import get_db
 from app.models.partner import Partner
+from app.utils.rate_limiter import limiter, RATE_LIMITS
 from app.schemas.partner import (
     PartnerCreate,
     PartnerResponse,
@@ -56,8 +57,17 @@ router = APIRouter(prefix="/partners", tags=["partners"])
 # ------------------------------------------------------------------------------
 
 @router.post("/register", response_model=PartnerResponse, status_code=status.HTTP_201_CREATED)
-def register_partner(partner_data: PartnerCreate, db: Session = Depends(get_db)):
-    """Register a new delivery partner."""
+@limiter.limit(RATE_LIMITS["auth_register"])
+def register_partner(
+    request: Request,
+    partner_data: PartnerCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Register a new delivery partner.
+
+    Rate limit: 10 registrations per minute per IP (prevents spam/abuse).
+    """
     existing = db.query(Partner).filter(Partner.phone == partner_data.phone).first()
     if existing:
         raise HTTPException(
@@ -121,8 +131,13 @@ def register_partner(partner_data: PartnerCreate, db: Session = Depends(get_db))
 # ------------------------------------------------------------------------------
 
 @router.post("/login", status_code=status.HTTP_200_OK)
-def request_otp(login_data: PartnerLogin, db: Session = Depends(get_db)):
-    """Request OTP for login. OTP exposed in response for dev/demo mode."""
+@limiter.limit(RATE_LIMITS["auth_login"])
+def request_otp(request: Request, login_data: PartnerLogin, db: Session = Depends(get_db)):
+    """
+    Request OTP for login. OTP exposed in response for dev/demo mode.
+
+    Rate limit: 20 login requests per minute per IP.
+    """
     partner = db.query(Partner).filter(Partner.phone == login_data.phone).first()
     if not partner:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Phone number not registered")
@@ -135,8 +150,13 @@ def request_otp(login_data: PartnerLogin, db: Session = Depends(get_db)):
 
 
 @router.post("/verify", response_model=TokenResponse)
-def verify_login(verify_data: OTPVerify, db: Session = Depends(get_db)):
-    """Verify OTP and return JWT token."""
+@limiter.limit(RATE_LIMITS["auth_verify"])
+def verify_login(request: Request, verify_data: OTPVerify, db: Session = Depends(get_db)):
+    """
+    Verify OTP and return JWT token.
+
+    Rate limit: 20 verify requests per minute per IP.
+    """
     partner = db.query(Partner).filter(Partner.phone == verify_data.phone).first()
     if not partner:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Phone number not registered")

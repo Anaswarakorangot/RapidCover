@@ -24,6 +24,12 @@ httpx>=0.26.0
 # Utilities
 python-dotenv>=1.0.0
 
+# Rate Limiting (Phase 4)
+slowapi>=0.1.9
+
+# Error Tracking (Phase 4 - Optional)
+sentry-sdk[fastapi]>=1.40.0
+
 # Push notifications
 pywebpush>=2.0.0
 
