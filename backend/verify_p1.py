@@ -7,6 +7,7 @@ import json
 sys.path.append(os.getcwd())
 
 from app.database import SessionLocal
+from app.utils.time_utils import utcnow
 from app.models.partner import Partner
 from app.models.fraud import PartnerGPSPing, PartnerDevice
 from app.models.trigger_event import SustainedEvent, TriggerType
@@ -28,7 +29,7 @@ def verify():
 
         # 2. Test Heartbeat Persistence
         print("\n[1/4] Testing GPS Ping Persistence...")
-        now = datetime.utcnow()
+        now = utcnow()
         ping = PartnerGPSPing(
             partner_id=partner.id,
             lat=12.9716,
@@ -72,7 +73,7 @@ def verify():
         # Simulate 5 consecutive days
         info = None
         for i in range(5):
-            event_date = datetime.utcnow() - timedelta(days=4-i)
+            event_date = utcnow() - timedelta(days=4-i)
             info = track_sustained_event(zone_id=1, trigger_type=TriggerType.RAIN, db=db, event_date=event_date)
             print(f"  Day {i+1}: consecutive_days={info['consecutive_days']}, is_sustained={info['is_sustained']}")
         
@@ -93,8 +94,8 @@ def verify():
             policy = Policy(
                 partner_id=partner.id,
                 tier=PolicyTier.STANDARD,
-                starts_at=datetime.utcnow() - timedelta(days=1),
-                expires_at=datetime.utcnow() + timedelta(days=6),
+                starts_at=utcnow() - timedelta(days=1),
+                expires_at=utcnow() + timedelta(days=6),
                 weekly_premium=450.0,
                 max_daily_payout=500.0,
                 max_days_per_week=6,
@@ -104,7 +105,7 @@ def verify():
             db.commit()
             db.refresh(policy)
 
-        dummy_trigger = TriggerEvent(zone_id=partner.zone_id, trigger_type=TriggerType.RAIN, started_at=datetime.utcnow(), severity=3)
+        dummy_trigger = TriggerEvent(zone_id=partner.zone_id, trigger_type=TriggerType.RAIN, started_at=utcnow(), severity=3)
         # Mock fraud result for the matrix call
         fraud_mock = {"score": 0.1, "decision": "auto_approve", "factors": {"w1_gps_coherence": 1.0, "w2_run_count_clean": 1.0, "w3_zone_polygon_match": 1.0, "w4_claim_frequency": 0.0, "w5_device_consistent": 1, "w6_traffic_disrupted": 1, "w7_centroid_drift_km": 0.1}, "hard_reject_reasons": []}
         

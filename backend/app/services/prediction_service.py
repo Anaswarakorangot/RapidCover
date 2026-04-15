@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.models.zone import Zone
+from app.utils.time_utils import utcnow
 from app.models.partner import Partner
 from app.models.policy import Policy
 from app.models.claim import Claim, ClaimStatus
@@ -58,7 +59,7 @@ def compute_zone_disruption_probability(
     - Seasonal patterns
     - City-level risk factors
     """
-    now = datetime.utcnow()
+    now = utcnow()
     month = now.month
 
     # Base probability
@@ -107,7 +108,7 @@ def compute_expected_claims(
     Returns: (expected_claims, expected_payout)
     """
     # Count active policies in zone
-    now = datetime.utcnow()
+    now = utcnow()
     active_policies = (
         db.query(func.count(Policy.id))
         .join(Partner, Policy.partner_id == Partner.id)
@@ -153,7 +154,7 @@ def compute_loss_ratio_projection(
 
     Loss Ratio = Expected Payouts / Expected Premiums
     """
-    now = datetime.utcnow()
+    now = utcnow()
 
     # Total weekly premiums from active policies in zone
     weekly_premiums = (
@@ -266,7 +267,7 @@ def generate_weekly_predictions(db: Session) -> list[WeeklyPrediction]:
     # First, clean up any existing duplicates
     cleanup_duplicate_predictions(db)
 
-    now = datetime.utcnow()
+    now = utcnow()
     week_start = now - timedelta(days=now.weekday())  # Start of current week
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -381,7 +382,7 @@ def generate_city_risk_profiles(db: Session) -> list[CityRiskProfile]:
     # First, clean up any existing duplicates
     cleanup_duplicate_city_profiles(db)
 
-    now = datetime.utcnow()
+    now = utcnow()
     week_start = now - timedelta(days=now.weekday())
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
     seven_days_ago = now - timedelta(days=7)
@@ -517,7 +518,7 @@ def get_intelligence_summary(db: Session) -> dict:
 
     Returns at-risk cities, alerts, and totals for admin dashboard.
     """
-    now = datetime.utcnow()
+    now = utcnow()
     week_start = now - timedelta(days=now.weekday())
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
 

@@ -3,6 +3,10 @@
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from app.utils.time_utils import utcnow
 
 db_path = Path(__file__).parent / "rapidcover.db"
 conn = sqlite3.connect(db_path)
@@ -21,7 +25,7 @@ print("=" * 80)
 print(f"{'ID':<4} {'Partner':<8} {'Tier':<10} {'Status':<12} {'AutoRenew':<10} {'Active':<7} {'Expires At'}")
 print("-" * 80)
 
-now = datetime.utcnow()
+now = utcnow()
 renewal_window = now + timedelta(days=1)
 grace_cutoff = now - timedelta(hours=48)
 

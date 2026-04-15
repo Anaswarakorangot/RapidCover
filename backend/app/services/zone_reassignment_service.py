@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.models.partner import Partner
+from app.utils.time_utils import utcnow
 from app.models.policy import Policy
 from app.models.zone import Zone
 from app.models.zone_reassignment import ZoneReassignment, ReassignmentStatus
@@ -42,7 +43,7 @@ def _calculate_premium_adjustment(
         (premium_adjustment, remaining_days)
         - premium_adjustment: Positive = credit (new zone cheaper), Negative = debit (new zone more expensive)
     """
-    now = datetime.utcnow()
+    now = utcnow()
 
     # Get current active policy
     active_policy = (
@@ -86,7 +87,7 @@ def _enrich_reassignment_response(
     db: Session,
 ) -> ZoneReassignmentResponse:
     """Enrich a reassignment with zone and partner names."""
-    now = datetime.utcnow()
+    now = utcnow()
 
     # Calculate hours remaining if proposed
     hours_remaining = None
@@ -173,7 +174,7 @@ def propose_reassignment(
     )
 
     # Create proposal
-    now = datetime.utcnow()
+    now = utcnow()
     reassignment = ZoneReassignment(
         partner_id=partner_id,
         old_zone_id=partner.zone_id,
@@ -215,7 +216,7 @@ def accept_reassignment(
         return None, f"Reassignment is not pending (status: {reassignment.status.value})"
 
     # Check if expired
-    now = datetime.utcnow()
+    now = utcnow()
     if now > reassignment.expires_at:
         reassignment.status = ReassignmentStatus.EXPIRED
         db.commit()
@@ -275,7 +276,7 @@ def reject_reassignment(
         return None, f"Reassignment is not pending (status: {reassignment.status.value})"
 
     # Check if expired
-    now = datetime.utcnow()
+    now = utcnow()
     if now > reassignment.expires_at:
         reassignment.status = ReassignmentStatus.EXPIRED
         db.commit()
@@ -363,7 +364,7 @@ def expire_stale_proposals(db: Session) -> int:
 
     Returns number of expired proposals.
     """
-    now = datetime.utcnow()
+    now = utcnow()
 
     stale = (
         db.query(ZoneReassignment)

@@ -14,6 +14,7 @@ from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.models.partner import Partner
+from app.utils.time_utils import utcnow
 from app.models.policy import Policy, PolicyTier, PolicyStatus, TIER_CONFIG
 from app.models.zone import Zone
 from app.schemas.policy import (
@@ -42,7 +43,7 @@ def compute_policy_status(
     - can_renew: Whether renewal is currently allowed
     """
     # Use naive UTC datetime for SQLite compatibility
-    now = datetime.utcnow()
+    now = utcnow()
 
     # Get expires_at as naive datetime
     expires_at = policy.expires_at
@@ -155,7 +156,7 @@ def renew_policy(
     # - If current policy is still active, start when it expires
     # - If in grace period or lapsed, start now
     # Use naive UTC datetime for SQLite compatibility
-    now = datetime.utcnow()
+    now = utcnow()
     expires_at = policy.expires_at
     if expires_at.tzinfo is not None:
         expires_at = expires_at.replace(tzinfo=None)
@@ -215,7 +216,7 @@ def process_auto_renewals(db: Session) -> list[dict]:
 
     Returns list of renewal results with partner info.
     """
-    now = datetime.utcnow()
+    now = utcnow()
 
     # Find policies eligible for auto-renewal:
     # - auto_renew enabled
@@ -312,7 +313,7 @@ def update_lapsed_policies(db: Session) -> int:
         Number of policies marked as lapsed
     """
     # Use naive UTC datetime for SQLite compatibility
-    now = datetime.utcnow()
+    now = utcnow()
     grace_cutoff = now - timedelta(hours=GRACE_PERIOD_HOURS)
 
     # Find active policies that have expired and passed grace period

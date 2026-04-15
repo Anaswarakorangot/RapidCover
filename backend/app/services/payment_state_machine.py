@@ -18,6 +18,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.claim import Claim, ClaimStatus
+from app.utils.time_utils import utcnow
 from app.models.policy import Policy
 from app.models.partner import Partner
 
@@ -126,7 +127,7 @@ def initiate_payment(claim: Claim, db: Session) -> tuple[bool, dict]:
         "attempt_id": str(uuid.uuid4()),
         "attempt_num": attempt_num,
         "idempotency_key": idempotency_key,
-        "initiated_at": datetime.utcnow().isoformat(),
+        "initiated_at": utcnow().isoformat(),
         "status": "pending",
         "provider_ref": None,
         "error": None,
@@ -172,7 +173,7 @@ def confirm_payment(
         current_attempt = state["attempts"][-1]
         current_attempt["status"] = "success"
         current_attempt["provider_ref"] = provider_ref
-        current_attempt["completed_at"] = datetime.utcnow().isoformat()
+        current_attempt["completed_at"] = utcnow().isoformat()
         if additional_data:
             current_attempt["provider_data"] = additional_data
 
@@ -182,7 +183,7 @@ def confirm_payment(
 
     # Update claim status
     claim.status = ClaimStatus.PAID
-    claim.paid_at = datetime.utcnow()
+    claim.paid_at = utcnow()
     claim.upi_ref = provider_ref
     db.commit()
     db.refresh(claim)
@@ -219,7 +220,7 @@ def fail_payment(
         current_attempt["status"] = "failed"
         current_attempt["error"] = error
         current_attempt["error_code"] = error_code
-        current_attempt["completed_at"] = datetime.utcnow().isoformat()
+        current_attempt["completed_at"] = utcnow().isoformat()
 
     # Determine next status based on attempt count
     total_attempts = state.get("total_attempts", 1)
@@ -228,7 +229,7 @@ def fail_payment(
         # Escalate to reconciliation after multiple failures
         state["current_status"] = PaymentStatus.RECONCILE_PENDING.value
         state["reconcile_reason"] = f"Auto-escalated after {total_attempts} failed attempts"
-        state["escalated_at"] = datetime.utcnow().isoformat()
+        state["escalated_at"] = utcnow().isoformat()
     else:
         # Allow retry
         state["current_status"] = PaymentStatus.FAILED.value
@@ -291,7 +292,7 @@ def mark_for_reconciliation(
 
     state["current_status"] = PaymentStatus.RECONCILE_PENDING.value
     state["reconcile_reason"] = reason
-    state["escalated_at"] = datetime.utcnow().isoformat()
+    state["escalated_at"] = utcnow().isoformat()
 
     _save_payment_state(claim, state, db)
 
@@ -325,7 +326,7 @@ def reconcile_payment(
 
     reconciliation_record = {
         "action": action,
-        "performed_at": datetime.utcnow().isoformat(),
+        "performed_at": utcnow().isoformat(),
         "notes": notes,
         "previous_attempts": state.get("total_attempts", 0),
     }
@@ -339,7 +340,7 @@ def reconcile_payment(
 
         # Update claim
         claim.status = ClaimStatus.PAID
-        claim.paid_at = datetime.utcnow()
+        claim.paid_at = utcnow()
         claim.upi_ref = provider_ref
 
     elif action == "reject":
@@ -350,14 +351,14 @@ def reconcile_payment(
     elif action == "force_paid":
         # Mark as paid without provider confirmation (e.g., manual bank transfer)
         if not provider_ref:
-            provider_ref = f"MANUAL-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            provider_ref = f"MANUAL-{utcnow().strftime('%Y%m%d%H%M%S')}"
 
         state["current_status"] = PaymentStatus.CONFIRMED.value
         reconciliation_record["provider_ref"] = provider_ref
         reconciliation_record["force_paid"] = True
 
         claim.status = ClaimStatus.PAID
-        claim.paid_at = datetime.utcnow()
+        claim.paid_at = utcnow()
         claim.upi_ref = provider_ref
 
     else:
@@ -472,5 +473,5 @@ def get_payment_stats(db: Session) -> dict:
         "confirmed": confirmed,
         "failed": failed,
         "reconcile_pending": reconcile_pending,
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": utcnow().isoformat(),
     }

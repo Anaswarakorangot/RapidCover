@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.models.partner import Partner
+from app.utils.time_utils import utcnow
 from app.models.policy import Policy
 from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent
@@ -115,7 +116,7 @@ def check_claim_frequency(
         return 0.0
 
     # Count claims in lookback period
-    cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+    cutoff = utcnow() - timedelta(days=lookback_days)
 
     claim_count = (
         db.query(func.count(Claim.id))
@@ -178,7 +179,7 @@ def check_account_age(partner: Partner) -> float:
     if not partner.created_at:
         return 0.1
 
-    age_days = (datetime.utcnow() - partner.created_at.replace(tzinfo=None)).days
+    age_days = (utcnow() - partner.created_at.replace(tzinfo=None)).days
 
     # Less than 7 days = new, slight flag
     if age_days < 7:

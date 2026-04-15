@@ -13,6 +13,8 @@ import asyncio
 import logging
 from datetime import datetime
 
+from app.utils.time_utils import utcnow
+
 logger = logging.getLogger("scheduler")
 
 # ─── State ───────────────────────────────────────────────────────────────────
@@ -52,12 +54,12 @@ async def _poll_loop():
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, _run_trigger_check)
 
-            _last_poll_time = datetime.utcnow()
+            _last_poll_time = utcnow()
             _poll_count += 1
 
             if _should_run_reconciliation(_last_reconciliation_time):
                 await loop.run_in_executor(None, _run_reconciliation_check)
-                _last_reconciliation_time = datetime.utcnow()
+                _last_reconciliation_time = utcnow()
 
             if _poll_count % 10 == 0:
                 logger.info(f"[scheduler] Poll #{_poll_count} completed at {_last_poll_time}")
@@ -82,7 +84,7 @@ def _should_run_reconciliation(last_run: datetime | None) -> bool:
     if last_run is None:
         return True
 
-    return (datetime.utcnow() - last_run).total_seconds() >= RECONCILIATION_INTERVAL_SECONDS
+    return (utcnow() - last_run).total_seconds() >= RECONCILIATION_INTERVAL_SECONDS
 
 
 def _run_reconciliation_check():
