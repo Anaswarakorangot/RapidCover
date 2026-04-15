@@ -5,6 +5,7 @@ Tests for zone reassignment 24-hour acceptance workflow.
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch, PropertyMock
+from app.utils.time_utils import utcnow
 
 
 class TestZoneReassignmentWorkflow:
@@ -40,8 +41,8 @@ class TestZoneReassignmentWorkflow:
             status=ReassignmentStatus.PROPOSED,
             premium_adjustment=10.0,
             remaining_days=4,
-            proposed_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(hours=24),
+            proposed_at=utcnow(),
+            expires_at=utcnow() + timedelta(hours=24),
         )
 
         assert reassignment.status == ReassignmentStatus.PROPOSED
@@ -60,7 +61,7 @@ class TestZoneReassignmentWorkflow:
         mock_reassignment.old_zone_id = 1
         mock_reassignment.new_zone_id = 2
         mock_reassignment.status = ReassignmentStatus.PROPOSED
-        mock_reassignment.expires_at = datetime.utcnow() + timedelta(hours=12)
+        mock_reassignment.expires_at = utcnow() + timedelta(hours=12)
 
         mock_db.query.return_value.filter.return_value.first.side_effect = [
             mock_reassignment,  # Reassignment lookup
@@ -84,7 +85,7 @@ class TestZoneReassignmentWorkflow:
         mock_reassignment = MagicMock()
         mock_reassignment.id = 1
         mock_reassignment.status = ReassignmentStatus.PROPOSED
-        mock_reassignment.expires_at = datetime.utcnow() + timedelta(hours=12)
+        mock_reassignment.expires_at = utcnow() + timedelta(hours=12)
 
         mock_db.query.return_value.filter.return_value.first.return_value = mock_reassignment
 
@@ -105,7 +106,7 @@ class TestZoneReassignmentWorkflow:
         mock_reassignment = MagicMock()
         mock_reassignment.id = 1
         mock_reassignment.status = ReassignmentStatus.PROPOSED
-        mock_reassignment.expires_at = datetime.utcnow() - timedelta(hours=1)  # Expired
+        mock_reassignment.expires_at = utcnow() - timedelta(hours=1)  # Expired
 
         mock_db.query.return_value.filter.return_value.first.return_value = mock_reassignment
 
@@ -140,7 +141,7 @@ class TestZoneReassignmentWorkflow:
         from app.services.zone_reassignment_service import _calculate_premium_adjustment
 
         # Setup active policy expiring in ~4 days
-        mock_policy.expires_at = datetime.utcnow() + timedelta(days=4, hours=12)
+        mock_policy.expires_at = utcnow() + timedelta(days=4, hours=12)
         mock_policy.weekly_premium = 35.0
 
         mock_db.query.return_value.filter.return_value.first.return_value = mock_policy
@@ -207,8 +208,8 @@ class TestZoneReassignmentWorkflow:
         mock_reassignment.status = ReassignmentStatus.PROPOSED
         mock_reassignment.premium_adjustment = 10.0
         mock_reassignment.remaining_days = 4
-        mock_reassignment.proposed_at = datetime.utcnow()
-        mock_reassignment.expires_at = datetime.utcnow() + timedelta(hours=24)
+        mock_reassignment.proposed_at = utcnow()
+        mock_reassignment.expires_at = utcnow() + timedelta(hours=24)
         mock_reassignment.accepted_at = None
         mock_reassignment.rejected_at = None
 

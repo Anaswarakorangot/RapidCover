@@ -12,6 +12,8 @@ from unittest.mock import MagicMock
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from app.utils.time_utils import utcnow
+
 
 @pytest.fixture
 def mock_db():
@@ -74,7 +76,7 @@ def mock_partner():
     partner.zone_history = []
     partner.platform = MagicMock()
     partner.platform.value = "zepto"
-    partner.created_at = datetime.utcnow() - timedelta(days=60)
+    partner.created_at = utcnow() - timedelta(days=60)
     return partner
 
 
@@ -92,8 +94,8 @@ def mock_policy():
     policy.max_days_per_week = 3        # canonical field name used by claims_processor
     policy.max_weekly_claims = 3        # alias kept for backward compat
     policy.is_active = True
-    policy.starts_at = datetime.utcnow() - timedelta(days=3)
-    policy.expires_at = datetime.utcnow() + timedelta(days=4)
+    policy.starts_at = utcnow() - timedelta(days=3)
+    policy.expires_at = utcnow() + timedelta(days=4)
     policy.auto_renew = True
     policy.stripe_session_id = None
     return policy
@@ -112,7 +114,7 @@ def mock_claim():
     claim.status = ClaimStatus.PENDING
     claim.fraud_score = 0.15
     claim.upi_ref = None
-    claim.created_at = datetime.utcnow()
+    claim.created_at = utcnow()
     claim.paid_at = None
     # validation_data needed by multi_trigger_resolver and claims_processor tests
     claim.validation_data = json.dumps({
@@ -135,11 +137,11 @@ def mock_trigger_event():
     event.id = 1
     event.zone_id = 1
     event.trigger_type = TriggerType.RAIN
-    event.started_at = datetime.utcnow()
+    event.started_at = utcnow()
     event.ended_at = None
     event.severity = 3
     event.source_data = '{"rainfall_mm_hr": 72}'
-    event.created_at = datetime.utcnow()
+    event.created_at = utcnow()
     # zone relationship — tests that need it can set event.zone = mock_zone
     event.zone = None
     return event

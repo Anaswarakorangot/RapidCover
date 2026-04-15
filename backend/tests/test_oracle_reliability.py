@@ -14,6 +14,7 @@ Covers:
 import pytest
 from unittest.mock import patch
 from datetime import datetime, timedelta
+from app.utils.time_utils import utcnow
 
 
 # ---------------------------------------------------------------------------
@@ -24,7 +25,7 @@ class TestComputeSourceConfidence:
 
     def test_live_fresh_source_scores_1_0(self):
         from app.services.external_apis import compute_source_confidence, _source_status
-        now = datetime.utcnow()
+        now = utcnow()
         _source_status["openweathermap"]["status"] = "live"
         _source_status["openweathermap"]["last_success"] = now - timedelta(seconds=60)
         _source_status["openweathermap"]["last_check"] = now
@@ -47,7 +48,7 @@ class TestComputeSourceConfidence:
 
     def test_stale_live_source_scores_0_2(self):
         from app.services.external_apis import compute_source_confidence, _source_status
-        now = datetime.utcnow()
+        now = utcnow()
         # Last success was 20 minutes ago — exceeds freshness limit of 5 min
         _source_status["openweathermap"]["status"] = "live"
         _source_status["openweathermap"]["last_success"] = now - timedelta(minutes=20)
@@ -85,7 +86,7 @@ class TestComputeTriggerConfidence:
 
     def _set_live(self, source: str, seconds_ago: int = 30):
         from app.services.external_apis import _source_status
-        now = datetime.utcnow()
+        now = utcnow()
         _source_status[source]["status"] = "live"
         _source_status[source]["last_success"] = now - timedelta(seconds=seconds_ago)
         _source_status[source]["last_check"] = now
@@ -123,7 +124,7 @@ class TestComputeTriggerConfidence:
 
     def test_stale_primary_no_corroboration_returns_hold(self):
         from app.services.external_apis import compute_trigger_confidence, _source_status
-        now = datetime.utcnow()
+        now = utcnow()
         # Stale (last success 30 min ago, limit is 5 min)
         _source_status["openweathermap"]["status"] = "live"
         _source_status["openweathermap"]["last_success"] = now - timedelta(minutes=30)
@@ -174,7 +175,7 @@ class TestComputeTriggerConfidence:
     def test_manual_review_for_moderate_confidence(self):
         from app.services.external_apis import compute_trigger_confidence, _source_status
         # One live fresh, one mock  → moderate overall
-        now = datetime.utcnow()
+        now = utcnow()
         _source_status["openweathermap"]["status"] = "live"
         _source_status["openweathermap"]["last_success"] = now - timedelta(seconds=10)
         _source_status["openweathermap"]["last_check"] = now

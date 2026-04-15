@@ -28,6 +28,7 @@ from app.models.claim import Claim, ClaimStatus
 from app.models.zone import Zone
 from app.models.trigger_event import TriggerEvent, TriggerType
 from app.services.auth import create_access_token
+from app.utils.time_utils import utcnow
 
 # ── SQLite in-memory test DB ──────────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ def make_partner(db, zone_id=None, phone="9999900001"):
 
 
 def make_policy(db, partner_id, tier=PolicyTier.STANDARD, is_active=True, days_ago=0):
-    now = datetime.utcnow() - timedelta(days=days_ago)
+    now = utcnow() - timedelta(days=days_ago)
     policy = Policy(
         partner_id=partner_id,
         tier=tier,
@@ -121,7 +122,7 @@ def make_claim(db, policy_id, amount=400.0, status=ClaimStatus.PAID, trigger_id=
         status=status,
         fraud_score=0.1,
         upi_ref="RAPID001002001234",
-        paid_at=datetime.utcnow() if status == ClaimStatus.PAID else None,
+        paid_at=utcnow() if status == ClaimStatus.PAID else None,
     )
     db.add(claim)
     db.commit()
@@ -134,7 +135,7 @@ def make_trigger(db, zone_id, trigger_type=TriggerType.RAIN, severity=4, hours_a
         zone_id=zone_id,
         trigger_type=trigger_type,
         severity=severity,
-        started_at=datetime.utcnow() - timedelta(hours=hours_ago),
+        started_at=utcnow() - timedelta(hours=hours_ago),
     )
     db.add(trigger)
     db.commit()
@@ -254,7 +255,7 @@ class TestEligibility:
                 trigger_id=trigger.id,
             )
             # Manually set created_at to simulate distinct days (SQLite stores as string)
-            claim.created_at = datetime.utcnow() - timedelta(days=i)
+            claim.created_at = utcnow() - timedelta(days=i)
             db.commit()
 
         res  = client.get(
@@ -311,7 +312,7 @@ class TestZoneHistory:
         partner.zone_history = [{
             "old_zone_id":      zone1.id,
             "new_zone_id":      zone2.id,
-            "effective_at":     datetime.utcnow().isoformat(),
+            "effective_at":     utcnow().isoformat(),
             "premium_adjustment": -2.5,
             "new_weekly_premium": 35.5,
             "days_remaining":   4,
@@ -426,7 +427,7 @@ class TestDrillSimulation:
             status            = ClaimStatus.PAID,
             fraud_score       = 0.05,
             upi_ref           = "RAPID_DRILL_TEST_001",
-            paid_at           = datetime.utcnow(),
+            paid_at           = utcnow(),
             validation_data   = json.dumps({"auto_payout": True}),
         )
         db.add(claim)

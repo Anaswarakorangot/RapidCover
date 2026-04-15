@@ -5,6 +5,7 @@ Tests for RIQI (Road Infrastructure Quality Index) provenance system.
 import pytest
 from datetime import datetime
 from unittest.mock import MagicMock, patch
+from app.utils.time_utils import utcnow
 
 
 class TestRiqiProvenance:
@@ -24,7 +25,7 @@ class TestRiqiProvenance:
         profile.aqi_severity_freq = 0.5
         profile.zone_density = 75.0
         profile.calculated_from = "seeded"
-        profile.last_updated_at = datetime.utcnow()
+        profile.last_updated_at = utcnow()
         return profile
 
     def test_riqi_reads_from_db_first(self, mock_db, mock_zone, mock_zone_risk_profile):
