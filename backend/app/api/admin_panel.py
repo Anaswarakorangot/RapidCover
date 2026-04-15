@@ -26,6 +26,7 @@ from app.models.policy import Policy
 from app.models.zone import Zone
 from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent, TriggerType
+from app.config import get_settings
 
 router = APIRouter(prefix="/admin/panel", tags=["admin-panel"])
 
