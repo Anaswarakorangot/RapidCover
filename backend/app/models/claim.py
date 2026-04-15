@@ -29,6 +29,11 @@ class Claim(Base):
     # Contains: zone_match, platform_confirmation, traffic_check, gps_coherence
     validation_data = Column(Text, nullable=True)
 
+    # Data lineage tracking (JSON string)
+    # Contains: primary_source, corroborating, confidence, sources_used, oracle_result
+    # Used for regulatory compliance and audit trails
+    source_metadata = Column(Text, nullable=True)
+
     # UPI transaction reference
     upi_ref = Column(Text, nullable=True)
 
