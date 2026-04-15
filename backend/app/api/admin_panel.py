@@ -99,6 +99,17 @@ class SuspendCityRequest(BaseModel):
     suspended: bool
 
 
+class SystemSettingSchema(BaseModel):
+    key: str
+    value: str
+    category: str
+    description: Optional[str] = None
+
+class UpdateSettingsRequest(BaseModel):
+    settings: list[SystemSettingSchema]
+
+
+
 # --- GET /admin/panel/stats --------------------------------------------------
 
 @router.get("/stats", response_model=PanelStats)
@@ -1107,3 +1118,69 @@ def get_premium_collection(db: Session = Depends(get_db)):
         "policies": policy_list,
         "weekly_trend": weekly_trend,
     }
+# --- GET /admin/panel/settings -----------------------------------------------
+
+@router.get("/settings", response_model=list[SystemSettingSchema])
+def get_admin_settings(db: Session = Depends(get_db)):
+    """Return all system configurations grouped by category."""
+    from app.models.system_setting import SystemSetting
+    
+    settings = db.query(SystemSetting).all()
+    
+    # If empty, return defaults (or seed them)
+    if not settings:
+        seed_default_settings(db)
+        settings = db.query(SystemSetting).all()
+        
+    return [
+        SystemSettingSchema(
+            key=s.key, 
+            value=s.value, 
+            category=s.category, 
+            description=s.description
+        ) for s in settings
+    ]
+
+
+# --- POST /admin/panel/settings ----------------------------------------------
+
+@router.post("/settings")
+def update_admin_settings(req: UpdateSettingsRequest, db: Session = Depends(get_db)):
+    """Batch update system configuration keys."""
+    from app.models.system_setting import SystemSetting
+    
+    for item in req.settings:
+        db_setting = db.query(SystemSetting).filter(SystemSetting.key == item.key).first()
+        if db_setting:
+            db_setting.value = item.value
+            db_setting.category = item.category
+            db_setting.description = item.description
+        else:
+            new_setting = SystemSetting(
+                key=item.key,
+                value=item.value,
+                category=item.category,
+                description=item.description
+            )
+            db.add(new_setting)
+            
+    db.commit()
+    return {"status": "success"}
+
+
+def seed_default_settings(db: Session):
+    """Initial seed of critical insurance and system parameters."""
+    from app.models.system_setting import SystemSetting
+    
+    defaults = [
+        ("compliance_engagement_window_days", "90", "Compliance", "Number of days to check for partner engagement history (SS Code)"),
+        ("fraud_cutoff_score", "0.75", "Compliance", "Fraud score threshold for manual review queue"),
+        ("auto_payout_enabled", "false", "Operational", "Toggle for immediate UPI/Stripe disbursement on approved claims"),
+        ("disaster_buffer_km", "15", "Operational", "Safety distance from active shutdown zones to block new sales"),
+        ("system_maintenance_mode", "false", "System", "Global switch to put the platform in read-only mode"),
+        ("alert_webhook_url", "", "Integration", "Slack/Discord webhook for critical failure alerts"),
+    ]
+    
+    for key, val, cat, desc in defaults:
+        db.add(SystemSetting(key=key, value=val, category=cat, description=desc))
+    db.commit()
