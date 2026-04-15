@@ -10,8 +10,9 @@ import TriggerPanel  from '../components/admin/TriggerPanel';
 import ExclusionsCard from '../components/admin/ExclusionsCard';
 import BCRPanel      from '../components/admin/BCRPanel';
 import ZoneMapPanel  from '../components/admin/ZoneMapPanel';
-import FraudQueuePanel from '../components/admin/FraudQueuePanel';
-import DrillPanel    from '../components/admin/DrillPanel';
+import FraudQueuePanel    from '../components/admin/FraudQueuePanel';
+import { SettingsPanel }     from '../components/admin/SettingsPanel';
+import DrillPanel           from '../components/admin/DrillPanel';
 import VerificationPanel from '../components/admin/VerificationPanel';
 import StressProofPanel from '../components/admin/StressProofPanel';
 import ReassignmentQueuePanel from '../components/admin/ReassignmentQueuePanel';
@@ -36,6 +37,7 @@ export function Admin() {
   const [loading, setLoading]       = useState(true);
   const [statsError, setStatsError] = useState(false);
   const [activeTab, setActiveTab]   = useState('overview');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [systemStatus, setSystemStatus] = useState({ level: 'green', text: 'All systems operational' });
   const drillZoneSelectRef = useRef(null);
 
@@ -109,6 +111,7 @@ export function Admin() {
     { id: 'notif-preview',   label: '\u{1F514} Notifications' },
     { id: 'checklist',       label: '\u2705 Demo Checklist' },
     { id: 'oracle',          label: '\u{1F52E} Auto-Oracle' },
+    { id: 'settings',        label: '\u2699\u{FE0F} Settings' },
     { id: 'triggers',        label: '\u{2699}\u{FE0F} Legacy Sim' },
   ];
 
@@ -145,9 +148,17 @@ export function Admin() {
   }
 
   return (
-    <div className="admin-layout">
+    <div className={`admin-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-overlay" 
+          onClick={() => setIsSidebarOpen(false)} 
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar ${isSidebarOpen ? 'admin-sidebar--open' : ''}`}>
         <div className="sidebar-logo">
           <span style={{ fontSize: '1.2rem' }}>🛡️</span>
           RapidCover
@@ -179,6 +190,12 @@ export function Admin() {
         {/* Top Navigation Bar */}
         <header className="admin-topnav">
           <div className="topnav-left">
+            <button 
+              className="burger-menu" 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+              ☰
+            </button>
             <input type="text" className="topnav-search" placeholder="Search for stats, workers, or claims..." />
             <button 
               className={`demo-top-toggle ${activeTab === 'demo' ? 'demo-top-toggle--active' : ''}`}
@@ -205,7 +222,12 @@ export function Admin() {
           
           <div className="topnav-right">
             <div className="topnav-icon">🔔 <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--danger)', color: 'white', fontSize: '0.6rem', padding: '1px 4px', borderRadius: '10px' }}>3</span></div>
-            <div className="topnav-icon">⚙️</div>
+            <div 
+              className={`topnav-icon ${activeTab === 'settings' ? 'topnav-icon--active' : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
+              ⚙️
+            </div>
             
             <div className="topnav-profile">
               <div className="profile-info" style={{ textAlign: 'right' }}>
@@ -260,6 +282,7 @@ export function Admin() {
             {activeTab === 'notif-preview' && <NotificationPreviewPanel />}
             {activeTab === 'checklist' && <DemoChecklist />}
             {activeTab === 'oracle'    && <SocialOraclePanel />}
+            {activeTab === 'settings'  && <SettingsPanel />}
             {activeTab === 'triggers'  && (
               <>
                 <TriggerPanel />
