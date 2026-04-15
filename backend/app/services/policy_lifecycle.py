@@ -55,6 +55,11 @@ def check_adverse_selection(
     Returns:
         (allowed: bool, reason: str)
     """
+    # DEMO MODE: Bypass adverse selection blocking
+    from app.config import get_settings
+    if get_settings().demo_mode:
+        return (True, "[DEMO MODE] Adverse selection check bypassed")
+
     if not partner.zone_id:
         return (True, "")
 

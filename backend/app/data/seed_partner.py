@@ -2,9 +2,11 @@
 Seed data for a default test partner to simplify development after DB resets.
 """
 
+from datetime import timedelta
 from sqlalchemy.orm import Session
 from app.models.partner import Partner, Platform, Language
 from app.models.zone import Zone
+from app.utils.time_utils import utcnow
 
 
 def seed_partners(db: Session) -> list[Partner]:
