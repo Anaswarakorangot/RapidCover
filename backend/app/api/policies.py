@@ -28,6 +28,7 @@ from app.services.policy_lifecycle import (
     get_renewal_quote,
     renew_policy,
     build_extended_response,
+    check_adverse_selection,
     GRACE_PERIOD_HOURS,
 )
 
@@ -189,7 +190,33 @@ def create_policy(
     db: Session = Depends(get_db),
 ):
     """Create a new insurance policy for the current partner."""
-    # Check city enrollment status (loss ratio < 85%)
+    # ── Check 1: SS Code eligibility (90/120-day engagement rule) ────────
+    from app.services.ss_code_service import check_ss_code_eligibility, update_engagement_days
+
+    # Refresh engagement days before checking
+    update_engagement_days(partner, db)
+
+    eligible, reason = check_ss_code_eligibility(partner)
+    if not eligible:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=reason,
+        )
+
+    # ── Check 2: Adverse selection blocking ──────────────────────────────
+    allowed, reason = check_adverse_selection(partner, db)
+    
+    print(f"[DEBUG-ADVERSE] Partner {partner.id} zone {partner.zone_id}")
+    print(f"[DEBUG-ADVERSE] Allowed: {allowed}, Reason: {reason}")
+    print(f"[DEBUG-ADVERSE] Current active events in DB: ", db.query(TriggerEvent).filter(TriggerEvent.ended_at.is_(None)).all())
+
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=reason,
+        )
+
+    # ── Check 3: City enrollment status (loss ratio < 85%) ──────────────
     allowed, reason, _ = check_city_enrollment_status(partner, db)
     if not allowed:
         raise HTTPException(
@@ -392,6 +419,14 @@ def renew_policy_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Policy not found",
+        )
+
+    # ── Adverse selection blocking (also applies to renewals) ────────────
+    allowed, reason = check_adverse_selection(partner, db)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=reason,
         )
 
     # Check if renewal is allowed
