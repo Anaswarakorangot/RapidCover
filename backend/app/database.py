@@ -34,5 +34,12 @@ def get_db():
 
 
 def init_db():
-    """Create all tables. Call this on app startup."""
+    """
+    Create all tables. Call this on app startup.
+
+    NOTE: For production, use Alembic migrations instead:
+        alembic upgrade head
+
+    This function is kept for backward compatibility and quick dev setups.
+    """
     Base.metadata.create_all(bind=engine)
