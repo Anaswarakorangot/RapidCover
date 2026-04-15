@@ -20,7 +20,7 @@ export default function TriggerProofPanel() {
   // Per-partner activity control
   const [partnerId, setPartnerId] = useState('');
   const [activityForm, setActivityForm] = useState(null);
-  const [activityLoading, setActLoading] = useState(false);
+  const [actLoading, setActLoading] = useState(false);
   const [activityMsg, setActivityMsg] = useState(null);
 
   useEffect(() => { loadAll(); }, []);
@@ -133,7 +133,7 @@ export default function TriggerProofPanel() {
 function PlatformProofTab({ data }) {
   if (!data) return <AdminEmpty icon="📱" message="No platform activity data." />;
 
-  const { total_sampled, platform_eligible, platform_ineligible, partners, admin_controls, notes, pass_fail } = data;
+  const { total_sampled, platform_eligible, platform_ineligible, partners, admin_controls, notes } = data;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
