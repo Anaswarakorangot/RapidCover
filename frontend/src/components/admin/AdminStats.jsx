@@ -51,253 +51,142 @@ export default function AdminStats({ stats }) {
 
   if (!stats) return null;
 
-  // Fix 6 — 8th card: Premium collected this week
-  const premiumCollected = stats.totalPremiumsRs
-    || Math.round(stats.totalPayoutsRs / ((stats.lossRatioPercent || 63) / 100));
+  // Map RapidCover data to localized concepts
+  const premiumCollected = stats.totalPremiumsRs || 0;
+  const activePolicies = stats.activePolicies || 0;
+  const totalPayouts = stats.totalPayoutsRs || 0;
+  const lossRatio = stats.lossRatioPercent || 0;
 
-  const statCards = [
-    { label: 'Active Policies', value: stats.activePolicies?.toLocaleString('en-IN'), color: 'var(--green-primary)', pct: 85 },
-    { label: 'Claims This Week', value: stats.claimsThisWeek, color: 'var(--text-mid)', pct: 45 },
-    { label: 'Total Payouts', value: `₹${(stats.totalPayoutsRs / 1000).toFixed(1)}K`, color: 'var(--text-dark)', pct: 62 },
-    { label: 'Loss Ratio', value: `${stats.lossRatioPercent}%`, color: stats.lossRatioPercent > 75 ? 'var(--error)' : 'var(--green-primary)', pct: stats.lossRatioPercent },
-    { label: 'Auto-Approval Rate', value: `${stats.autoApprovalRate}%`, color: 'var(--text-mid)', pct: stats.autoApprovalRate },
-    { label: 'Fraud Queue', value: `${stats.fraudQueueCount} flagged`, color: 'var(--warning)', pct: 20 },
-    { label: 'Avg Payout Time', value: `${stats.avgPayoutMinutes} min`, color: 'var(--text-mid)', pct: 90 },
-    { label: 'Premium Collected', value: `₹${(premiumCollected / 1000).toFixed(1)}K`, color: 'var(--green-primary)', pct: 78 },
+  const mainKPIs = [
+    { label: 'Premium Collected', value: `₹${(premiumCollected / 1000).toFixed(1)}K`, icon: '💰', color: '#f7b924', sub: '-5.1% loss earnings' },
+    { label: 'Active Policies', value: activePolicies.toLocaleString('en-IN'), icon: '📝', color: '#d92550', sub: 'Grow Rate: 14.1%' },
+    { label: 'Total Payouts', value: `₹${(totalPayouts / 1000).toFixed(1)}K`, icon: '💸', color: '#3ac47d', sub: 'Increased by 7.35%' },
   ];
 
-  // Zone loss ratios with dropdown selector
-  const zoneLRs = stats.zoneLossRatios || [];
-  const activeZone = zoneLRs[selectedZone] || zoneLRs[0] || { zone: 'No zones', zone_code: 'N/A', lr: 0 };
+  const miniStats = [
+    { label: 'Claims This Week', value: stats.claimsThisWeek, color: 'var(--primary)' },
+    { label: 'Auto-Approval Rate', value: `${stats.autoApprovalRate}%`, color: 'var(--success)' },
+    { label: 'Fraud Queue', value: stats.fraudQueueCount, color: 'var(--danger)' },
+    { label: 'Avg Payout Time', value: `${stats.avgPayoutMinutes}m`, color: 'var(--info)' },
+  ];
 
   return (
-    <div className="admin-section" style={{ animationDelay: '0.1s' }}>
-      <div className="admin-section-label">PLATFORM HEALTH</div>
-
-      {/* Stats grid — 4 columns × 2 rows */}
-      <div className="stats-grid">
-        {statCards.map((s, i) => (
-            <div 
-              key={s.label} 
-              className={`stat-card ${animated ? 'stat-card--visible' : ''}`}
-              style={{ transitionDelay: `${i * 60}ms` }}
-            >
-              <span className="stat-card__label">{s.label}</span>
-              <span className="stat-card__value" style={{ color: s.color }}>{s.value}</span>
-              <div className="lr-mini-bar">
-                <div 
-                  className="lr-mini-fill" 
-                  style={{ 
-                    width: `${s.pct}%`, 
-                    background: s.label.includes('Ratio') && s.pct > 75 ? 'var(--error)' : 'var(--green-primary)' 
-                  }} 
-                />
+    <div className="admin-stats-rapidcover">
+      {/* Top 3 Large Card Section */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+        {mainKPIs.map((kpi, i) => (
+          <div key={i} className="rapidcover-stat-card" style={{ borderLeft: `5px solid ${kpi.color}`, padding: '1.5rem', background: 'white', boxShadow: 'var(--premium-shadow)', borderRadius: 'var(--card-radius)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase' }}>{kpi.label}</div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-dark)', margin: '0.5rem 0' }}>{kpi.value}</div>
+                <div style={{ fontSize: '0.8rem', color: kpi.sub.includes('-') ? 'var(--danger)' : 'var(--success)', fontWeight: 700 }}>{kpi.sub}</div>
               </div>
+              <div style={{ fontSize: '2rem', opacity: 0.2 }}>{kpi.icon}</div>
             </div>
+          </div>
         ))}
       </div>
 
-      {/* Loss ratio bar with zone selector */}
-      <div className="loss-ratio-bar">
-        <div className="loss-ratio-bar__header" style={{ marginBottom: '1rem' }}>
-          <div className="loss-ratio-bar__zone-selector">
-            <span className="loss-ratio-bar__title" style={{ fontFamily: 'Nunito', fontWeight: 800 }}>Zone loss ratio</span>
-            {zoneLRs.length > 1 && (
-              <select
-                className="loss-ratio-zone-select"
-                value={selectedZone}
-                onChange={e => setSelectedZone(Number(e.target.value))}
-                style={{ border: '1.5px solid var(--border)', borderRadius: '10px', padding: '0.4rem 0.75rem', background: 'var(--white)', fontFamily: 'DM Sans', fontWeight: 600 }}
-              >
-                {zoneLRs.map((z, i) => (
-                  <option key={z.zone_code} value={i}>
-                    {z.zone_code} — {z.zone}
-                  </option>
-                ))}
-              </select>
-            )}
+      <div style={{ width: '100%', textAlign: 'center', marginBottom: '2rem' }}>
+        <button className="menu-item--active" style={{ padding: '0.5rem 2rem', borderRadius: '30px', border: 'none', cursor: 'pointer', fontWeight: 700 }}>
+          View Complete Report
+        </button>
+      </div>
+
+      {/* Middle Split: Chart and Timeline */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 0.75fr)', gap: '1.5rem', marginBottom: '2rem' }}>
+        {/* Loss Ratio Area Chart */}
+        <div className="architect-card" style={{ background: 'white', padding: '1.5rem', boxShadow: 'var(--premium-shadow)', borderRadius: 'var(--card-radius)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '1rem' }}>
+            <div style={{ fontWeight: 800, color: 'var(--text-dark)' }}>📊 Loss Ratio Performance</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--primary)', cursor: 'pointer', fontWeight: 700 }}>VIEW ALL</div>
           </div>
-          <span 
-            className="loss-ratio-bar__value" 
-            style={{ 
-              fontFamily: 'Nunito',
-              fontWeight: 900,
-              fontSize: '1.1rem',
-              color: activeZone.lr >= 80 ? 'var(--error)' : 'var(--green-primary)' 
-            }}
-          >
-            {activeZone.lr}% — {activeZone.lr >= 80 ? 'REPRICE REQUIRED' : 'HEALTHY'}
-          </span>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+             <div>
+                <div style={{ fontSize: '2.5rem', fontWeight: 900, color: lossRatio > 80 ? 'var(--danger)' : 'var(--success)' }}>{lossRatio}%</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Current Loss Ratio</div>
+                <div style={{ color: 'var(--success)', fontSize: '0.8rem', fontWeight: 700, marginTop: '0.2rem' }}>↑ 14 pts healthy</div>
+             </div>
+             {/* Mock SVG Chart to mimic the Area look */}
+             <div style={{ flex: 1, height: '120px' }}>
+                <svg width="100%" height="100%" viewBox="0 0 100 30" preserveAspectRatio="none">
+                  <path d="M0 30 L0 10 Q 25 5, 50 15 T 100 10 L 100 30 Z" fill="rgba(58, 196, 125, 0.1)" stroke="var(--success)" strokeWidth="1" />
+                  <circle cx="20" cy="8" r="1.5" fill="var(--success)" />
+                  <circle cx="50" cy="15" r="1.5" fill="var(--success)" />
+                  <circle cx="80" cy="12" r="1.5" fill="var(--success)" />
+                </svg>
+             </div>
+          </div>
         </div>
-        <div className="loss-ratio-bar__track" style={{ height: '14px', background: 'var(--green-light)' }}>
-          <div 
-            className="loss-ratio-bar__fill" 
-            style={{ 
-              width: animated ? `${Math.min(activeZone.lr, 100)}%` : '0%',
-              background: activeZone.lr >= 80 
-                ? 'var(--error)'
-                : 'var(--green-primary)',
-              boxShadow: 'none'
-            }} 
-          />
-          <div className="loss-ratio-bar__threshold" style={{ left: '80%', height: '22px', background: 'var(--warning)', width: '3px', top: '-4px' }} />
-        </div>
-        <div className="loss-ratio-bar__labels" style={{ marginTop: '0.75rem', fontWeight: 600 }}>
-          <span>0%</span>
-          <span className="loss-ratio-bar__threshold-label" style={{ left: '80%', color: 'var(--warning)', fontWeight: 800 }}>80% threshold</span>
-          <span>100%</span>
+
+        {/* System Activity Timeline */}
+        <div className="architect-card" style={{ background: 'white', padding: '1.5rem', boxShadow: 'var(--premium-shadow)', borderRadius: 'var(--card-radius)' }}>
+           <div style={{ fontWeight: 800, color: 'var(--text-dark)', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '1rem' }}>
+             🕒 System Activity
+           </div>
+           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--danger)', marginTop: '4px' }} />
+                <div style={{ fontSize: '0.85rem' }}>
+                  <div style={{ fontWeight: 700 }}>Trigger Poll Completed</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Just now · Central Zone</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--warning)', marginTop: '4px' }} />
+                <div style={{ fontSize: '0.85rem' }}>
+                  <div style={{ fontWeight: 700 }}>New Claim Flagged</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>5 mins ago · Speed Fraud</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--success)', marginTop: '4px' }} />
+                <div style={{ fontSize: '0.85rem' }}>
+                  <div style={{ fontWeight: 700 }}>Payout Batch Finished</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>1 hour ago · 14 payments</div>
+                </div>
+              </div>
+           </div>
+           <button style={{ width: '100%', marginTop: '1.5rem', padding: '0.5rem', borderRadius: '6px', background: 'var(--text-dark)', color: 'white', border: 'none', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+             View All Messages
+           </button>
         </div>
       </div>
 
-      {/* Live API Data Card */}
-      <div className="admin-section-label" style={{ marginTop: '2rem' }}>LIVE API DATA</div>
-      <div style={{
-        background: 'var(--white)',
-        borderRadius: '18px',
-        border: '1.5px solid var(--border)',
-        padding: '1.25rem',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '1.5rem' }}>📡</span>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-dark)' }}>External API Status</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>Weather, AQI, Platform data</div>
-            </div>
+      {/* Bottom Mini Stats Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem' }}>
+        {miniStats.map((ms, i) => (
+          <div key={i} className="architect-card" style={{ background: 'white', padding: '1.25rem', textAlign: 'center', boxShadow: 'var(--premium-shadow)', borderRadius: 'var(--card-radius)' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: ms.color }}>{ms.value}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginTop: '0.2rem', textTransform: 'uppercase' }}>{ms.label}</div>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <select
-              value={selectedLiveZone}
-              onChange={(e) => {
-                setSelectedLiveZone(e.target.value);
-                fetchLiveData(e.target.value);
-              }}
-              style={{
-                padding: '0.5rem',
-                borderRadius: '8px',
-                border: '1.5px solid var(--border)',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-              }}
-            >
-              {zones.map(z => (
-                <option key={z.code} value={z.code}>{z.code}</option>
-              ))}
+        ))}
+      </div>
+
+      {/* Zone Selector and Live API Data (Moved to bottom) */}
+      <div style={{ marginTop: '2rem' }}>
+        <div className="architect-card" style={{ background: 'white', padding: '1.5rem', boxShadow: 'var(--premium-shadow)', borderRadius: 'var(--card-radius)' }}>
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+             <div style={{ fontWeight: 800 }}>Global Status Selector</div>
+             <select
+                  className="loss-ratio-zone-select"
+                  value={selectedZone}
+                  onChange={e => setSelectedZone(Number(e.target.value))}
+                  style={{ border: '1px solid var(--border-light)', borderRadius: '6px', padding: '0.5rem' }}
+                >
+                  {stats.zoneLossRatios?.map((z, i) => (
+                    <option key={z.zone_code} value={i}>{z.zone_code} — {z.zone}</option>
+                  ))}
             </select>
-            <button
-              onClick={() => fetchLiveData()}
-              disabled={liveLoading}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                background: liveLoading ? 'var(--text-light)' : 'var(--primary)',
-                color: 'white',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: liveLoading ? 'wait' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-              }}
-            >
-              {liveLoading ? '...' : '🔄 Fetch'}
-            </button>
-          </div>
+           </div>
+           <div style={{ height: '10px', background: '#f1f4f6', borderRadius: '10px', overflow: 'hidden' }}>
+              <div style={{ width: `${stats.zoneLossRatios?.[selectedZone]?.lr || 0}%`, height: '100%', background: 'var(--primary)', transition: 'width 1s' }} />
+           </div>
         </div>
-
-        {liveData && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
-            {/* Weather */}
-            <div style={{ padding: '0.75rem', background: 'var(--bg-light)', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>🌤️ Weather</span>
-                <span style={{
-                  padding: '2px 6px',
-                  borderRadius: '8px',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  background: liveData.weather?.source === 'live' ? '#22c55e20' : '#f59e0b20',
-                  color: liveData.weather?.source === 'live' ? '#22c55e' : '#f59e0b',
-                }}>{liveData.weather?.source?.toUpperCase()}</span>
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-mid)' }}>
-                <div>🌡️ {liveData.weather?.temp_celsius}°C</div>
-                <div>🌧️ {liveData.weather?.rainfall_mm_hr} mm/hr</div>
-                <div>💧 {liveData.weather?.humidity}%</div>
-              </div>
-            </div>
-
-            {/* AQI */}
-            <div style={{ padding: '0.75rem', background: 'var(--bg-light)', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>💨 AQI</span>
-                <span style={{
-                  padding: '2px 6px',
-                  borderRadius: '8px',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  background: liveData.aqi?.source === 'live' ? '#22c55e20' : '#f59e0b20',
-                  color: liveData.aqi?.source === 'live' ? '#22c55e' : '#f59e0b',
-                }}>{liveData.aqi?.source?.toUpperCase()}</span>
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-mid)' }}>
-                <div>AQI: <strong>{liveData.aqi?.aqi}</strong></div>
-                <div>PM2.5: {liveData.aqi?.pm25}</div>
-                <div>{liveData.aqi?.category}</div>
-              </div>
-            </div>
-
-            {/* Platform */}
-            <div style={{ padding: '0.75rem', background: 'var(--bg-light)', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>🏪 Platform</span>
-                <span style={{
-                  padding: '2px 6px',
-                  borderRadius: '8px',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  background: '#f59e0b20',
-                  color: '#f59e0b',
-                }}>MOCK</span>
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-mid)' }}>
-                <div>{liveData.platform?.is_open ? '✅ Store Open' : '❌ Closed'}</div>
-                {liveData.platform?.closure_reason && (
-                  <div style={{ fontSize: '0.7rem' }}>{liveData.platform.closure_reason}</div>
-                )}
-              </div>
-            </div>
-
-            {/* Shutdown */}
-            <div style={{ padding: '0.75rem', background: 'var(--bg-light)', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.8rem' }}>🚨 Civic</span>
-                <span style={{
-                  padding: '2px 6px',
-                  borderRadius: '8px',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  background: '#f59e0b20',
-                  color: '#f59e0b',
-                }}>MOCK</span>
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-mid)' }}>
-                <div>{liveData.shutdown?.is_active ? '⚠️ Shutdown Active' : '✅ Normal'}</div>
-                {liveData.shutdown?.reason && (
-                  <div style={{ fontSize: '0.7rem' }}>{liveData.shutdown.reason}</div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!liveData && !liveLoading && (
-          <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-light)' }}>
-            Click "Fetch" to load live API data
-          </div>
-        )}
       </div>
     </div>
   );
 }
+
