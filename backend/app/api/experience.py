@@ -395,6 +395,21 @@ def get_eligibility(
     loyalty_wks = _loyalty_weeks(partner, db)
     city = _get_partner_city(partner, db)
 
+    # DEMO MODE: Bypass activity gate
+    from app.config import get_settings
+    if get_settings().demo_mode:
+        # In demo mode, unlock all tiers regardless of activity
+        return {
+            "active_days_last_30": active_days,
+            "loyalty_weeks": loyalty_wks,
+            "allowed_tiers": ["flex", "standard", "pro"],
+            "blocked_tiers": [],
+            "reasons": {},
+            "gate_blocked": False,
+            "demo_override": True,
+            "note": "Demo mode: Activity gate bypassed"
+        }
+
     # Delhi exception: skip 7-day minimum check for demo purposes
     is_demo_exempt = city.lower() in [c.lower() for c in DEMO_EXEMPT_CITIES]
 
