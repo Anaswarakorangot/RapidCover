@@ -5,7 +5,7 @@
  * Allows retry, confirm, reject, and force_paid actions.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   getPaymentStats,
   getPaymentFailures,
@@ -285,29 +285,31 @@ export default function PaymentReconciliationPanel() {
   const [expandedClaim, setExpandedClaim] = useState(null);
   const [reconcileTarget, setReconcileTarget] = useState(null);
   const [retryingId, setRetryingId] = useState(null);
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [statsRes, failRes, reconRes] = await Promise.allSettled([
-        getPaymentStats(),
-        getPaymentFailures(50),
-        getPendingReconciliation(50),
-      ]);
-      if (statsRes.status === 'fulfilled') setStats(statsRes.value);
-      if (failRes.status === 'fulfilled') setFailures(failRes.value?.claims || []);
-      if (reconRes.status === 'fulfilled') setReconcileQueue(reconRes.value?.claims || []);
-    } catch { /* fallback handled */ }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const [statsRes, failRes, reconRes] = await Promise.allSettled([
+          getPaymentStats(),
+          getPaymentFailures(50),
+          getPendingReconciliation(50),
+        ]);
+        if (statsRes.status === 'fulfilled') setStats(statsRes.value);
+        if (failRes.status === 'fulfilled') setFailures(failRes.value?.claims || []);
+        if (reconRes.status === 'fulfilled') setReconcileQueue(reconRes.value?.claims || []);
+      } catch { /* fallback handled */ }
+      setLoading(false);
+    }
+    loadData();
+  }, [refetchTrigger]);
 
   async function handleRetry(claimId) {
     setRetryingId(claimId);
     try {
       await retryPayment(claimId);
-      await loadData();
+      setRefetchTrigger(prev => prev + 1);
     } catch (err) {
       alert(`Retry failed: ${err.message}`);
     }
@@ -316,7 +318,7 @@ export default function PaymentReconciliationPanel() {
 
   async function handleReconcile(claimId, data) {
     await reconcilePayment(claimId, data);
-    await loadData();
+    setRefetchTrigger(prev => prev + 1);
   }
 
   if (loading) {
@@ -556,7 +558,7 @@ export default function PaymentReconciliationPanel() {
         Last refreshed: {stats?.computed_at ? new Date(stats.computed_at).toLocaleString() : '—'}
         {' · '}
         <button
-          onClick={loadData}
+          onClick={() => setRefetchTrigger(prev => prev + 1)}
           style={{ background: 'none', border: 'none', color: 'var(--green-primary)', fontWeight: 700, cursor: 'pointer' }}
         >
           🔄 Refresh
