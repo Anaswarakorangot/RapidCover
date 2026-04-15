@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
+from app.utils.time_utils import utcnow
 from app.models.partner import Partner
 from app.models.policy import Policy
 from app.models.zone import Zone
@@ -103,7 +104,7 @@ class SuspendCityRequest(BaseModel):
 def get_panel_stats(db: Session = Depends(get_db)):
     """Return the seven key financial health numbers for the admin panel."""
 
-    now = datetime.utcnow()
+    now = utcnow()
     week_ago = now - timedelta(days=7)
 
     # Active policies
@@ -216,7 +217,7 @@ def get_panel_stats(db: Session = Depends(get_db)):
 def get_zones(db: Session = Depends(get_db)):
     """Return live status of all zones for the map and overview."""
     zones = db.query(Zone).all()
-    now = datetime.utcnow()
+    now = utcnow()
     results = []
 
     for z in zones:
@@ -540,12 +541,17 @@ async def simulate_trigger(req: SimulateTriggerRequest):
             elif trigger_type == "closure":
                 MockPlatformAPI.set_store_closed(zone.id, reason="Admin simulation")
         db.close()
-        
+
+        # Use drill_mode() to temporarily enable demo mode for simulation
+        from app.utils.demo_context import drill_mode
+
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: check_all_triggers(force=True, zone_code=zone_code, prefer_mock=True)
-        )
+
+        def run_drill():
+            with drill_mode():
+                check_all_triggers(force=True, zone_code=zone_code)
+
+        await loop.run_in_executor(None, run_drill)
     except Exception as e:
         print(f"[admin_panel] Trigger engine force-fire error: {e}")
 
@@ -656,7 +662,8 @@ def get_live_api_data(
             }
             for name, info in health.items()
         },
-        "fetched_at": datetime.utcnow().isoformat(),
+        "demo_mode": get_settings().demo_mode,
+        "fetched_at": utcnow().isoformat(),
     }
 
 
@@ -764,5 +771,52 @@ def get_live_data(db: Session = Depends(get_db)):
             "inactive_on_platform": len(activity_summary) - active_on_platform,
             "partners": activity_summary,
         },
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": utcnow().isoformat(),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  DEMO MODE CONTROL (Phase 3)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/demo-mode")
+async def get_demo_mode_status():
+    """
+    Get current demo mode status.
+
+    Returns:
+        {
+            "demo_mode": bool,
+            "demo_exempt_cities": list[str],
+            "description": str
+        }
+    """
+    settings = get_settings()
+    return {
+        "demo_mode": settings.demo_mode,
+        "demo_exempt_cities": settings.demo_exempt_cities,
+        "description": "Demo mode uses mock data instead of live APIs" if settings.demo_mode else "Production mode uses live APIs",
+    }
+
+
+@router.post("/demo-mode")
+async def toggle_demo_mode(enable: bool):
+    """
+    Toggle demo mode on or off.
+
+    Args:
+        enable: True to enable demo mode, False to disable
+
+    Returns:
+        {
+            "demo_mode": bool,
+            "message": str
+        }
+    """
+    settings = get_settings()
+    settings.demo_mode = enable
+
+    return {
+        "demo_mode": settings.demo_mode,
+        "message": f"Demo mode {'enabled' if enable else 'disabled'}. {'Using mock data for simulations.' if enable else 'Using live API data.'}",
     }

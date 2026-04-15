@@ -21,6 +21,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.utils.time_utils import utcnow
 from app.models.trigger_event import TriggerEvent, TriggerType, TRIGGER_THRESHOLDS
 from app.models.zone import Zone
 from app.models.partner import Partner
@@ -73,7 +74,7 @@ FORECAST_ALERT_COOLDOWN_HOURS = 24
 def _add_log(zone_id: int, zone_code: str, event_type: str, message: str, level: str = "info"):
     """Append to the trigger log ring buffer."""
     entry = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": utcnow().isoformat(),
         "zone_id": zone_id,
         "zone_code": zone_code,
         "event_type": event_type,
@@ -108,14 +109,19 @@ def get_engine_status() -> dict:
 #  Main entry point — called by scheduler every 45 seconds
 # ═════════════════════════════════════════════════════════════════════════════
 
-def check_all_triggers(force: bool = False, zone_code: str = None, prefer_mock: bool = False):
+def check_all_triggers(force: bool = False, zone_code: str = None):
     """
     Poll all zones (or a specific zone) and check trigger conditions.
 
     Args:
         force: If True, skip duration requirement (for demo simulation)
         zone_code: If set, only check this specific zone code
+
+    Note: Data source (live vs mock) is controlled by settings.demo_mode
     """
+    from app.config import get_settings
+    settings = get_settings()
+
     db = SessionLocal()
     try:
         # Get all zones with active policies
@@ -128,9 +134,10 @@ def check_all_triggers(force: bool = False, zone_code: str = None, prefer_mock: 
             return
 
         for zone in zones:
-            if not prefer_mock:
+            # Only run forecast alerts in production mode (not demo)
+            if not settings.demo_mode:
                 _run_forecast_alerts(zone, db)
-            _check_zone_triggers(zone, db, force=force, prefer_mock=prefer_mock)
+            _check_zone_triggers(zone, db, force=force)
 
     except Exception as e:
         logger.error(f"[trigger_engine] Error in check_all_triggers: {e}")
@@ -140,7 +147,7 @@ def check_all_triggers(force: bool = False, zone_code: str = None, prefer_mock: 
 
 def _get_active_zones(db: Session) -> list[Zone]:
     """Get all zones that have at least one active policy."""
-    now = datetime.utcnow()
+    now = utcnow()
 
     # Get zone IDs with active policies
     zone_ids_with_policies = (
@@ -165,15 +172,20 @@ def _get_active_zones(db: Session) -> list[Zone]:
     return db.query(Zone).filter(Zone.id.in_(zone_ids)).all()
 
 
-def _check_zone_triggers(zone: Zone, db: Session, force: bool = False, prefer_mock: bool = False):
-    """Check all trigger types for a single zone."""
+def _check_zone_triggers(zone: Zone, db: Session, force: bool = False):
+    """
+    Check all trigger types for a single zone.
+
+    Data source (live vs mock) is controlled by settings.demo_mode.
+    """
 
     lat = zone.dark_store_lat
     lon = zone.dark_store_lng
 
     # Fetch current conditions from all data sources
-    weather = MockWeatherAPI.get_current(zone.id, lat, lon, prefer_mock=prefer_mock)
-    aqi_data = MockAQIAPI.get_current(zone.id, lat, lon, prefer_mock=prefer_mock)
+    # (demo mode is checked internally by get_current methods)
+    weather = MockWeatherAPI.get_current(zone.id, lat, lon)
+    aqi_data = MockAQIAPI.get_current(zone.id, lat, lon)
     platform = MockPlatformAPI.get_store_status(zone.id)
     shutdown = MockCivicAPI.get_shutdown_status(zone.id)
 
@@ -223,7 +235,7 @@ def _check_zone_triggers(zone: Zone, db: Session, force: bool = False, prefer_mo
 
 def _run_forecast_alerts(zone: Zone, db: Session) -> int:
     """Dispatch forecast alerts for a zone with a 24-hour cooldown."""
-    now = datetime.utcnow()
+    now = utcnow()
     last_sent_iso = forecast_alert_state.get(zone.id)
     if last_sent_iso:
         last_sent = datetime.fromisoformat(last_sent_iso)
@@ -381,7 +393,7 @@ def _fire_trigger(
     trigger = TriggerEvent(
         zone_id=zone.id,
         trigger_type=trigger_type,
-        started_at=datetime.utcnow() - timedelta(minutes=duration_min),
+        started_at=utcnow() - timedelta(minutes=duration_min),
         severity=severity,
         source_data=json.dumps(source_data),
     )
@@ -537,7 +549,7 @@ def _fetch_openweather_forecast(zone: Optional[Zone]) -> dict:
         )
         response.raise_for_status()
         data = response.json()
-        horizon = datetime.utcnow() + timedelta(hours=48)
+        horizon = utcnow() + timedelta(hours=48)
         entries = []
         for item in data.get("list", []):
             timestamp = datetime.utcfromtimestamp(item.get("dt", 0))

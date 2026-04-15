@@ -13,6 +13,7 @@ from typing import AsyncGenerator, Optional
 from sqlalchemy.orm import Session
 
 from app.models.drill_session import DrillSession, DrillType, DrillStatus
+from app.utils.time_utils import utcnow
 from app.models.zone import Zone
 from app.models.partner import Partner
 from app.models.policy import Policy
@@ -240,7 +241,7 @@ def add_pipeline_event(
     event = DrillPipelineEvent(
         step=step,
         message=message,
-        ts=datetime.utcnow(),
+        ts=utcnow(),
         metadata=metadata,
     )
 
@@ -264,14 +265,14 @@ def complete_drill_session(
 ):
     """Mark drill session as completed or failed."""
     drill_session.status = status
-    drill_session.completed_at = datetime.utcnow()
+    drill_session.completed_at = utcnow()
 
     if trigger_event_id:
         drill_session.trigger_event_id = trigger_event_id
 
     if error:
         errors = json.loads(drill_session.errors or "[]")
-        errors.append({"message": error, "ts": datetime.utcnow().isoformat()})
+        errors.append({"message": error, "ts": utcnow().isoformat()})
         drill_session.errors = json.dumps(errors)
 
     # Calculate total latency
@@ -359,8 +360,12 @@ def execute_drill(
         # Step 3: Fire trigger (this creates TriggerEvent and claims)
         trigger_start = time.time()
 
-        # Use check_all_triggers which handles the full flow
-        check_all_triggers(force=drill_session.force_mode, zone_code=zone.code, prefer_mock=True)
+        # Use drill_mode() to temporarily enable demo mode for mock data
+        from app.utils.demo_context import drill_mode
+
+        with drill_mode():
+            # Use check_all_triggers which handles the full flow
+            check_all_triggers(force=drill_session.force_mode, zone_code=zone.code)
 
         trigger_latency = int((time.time() - trigger_start) * 1000)
         drill_session.trigger_latency_ms = trigger_latency

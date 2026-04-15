@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     # App Settings
     debug: bool = True
     environment: str = "development"
+    log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    json_logging: bool = False  # Enable JSON logging for production
+
+    # Demo Mode Configuration (Phase 3)
+    demo_mode: bool = False  # Global demo mode toggle - uses mock data instead of live APIs
+    demo_exempt_cities: list[str] = []  # Cities that always use live data even in demo mode
 
     # Zero-Touch Automation
     auto_payout_enabled: bool = False  # Enable for demo mode to auto-pay approved claims
@@ -47,6 +53,9 @@ class Settings(BaseSettings):
     vapid_private_key: str = ""
     vapid_public_key: str = ""
     vapid_claim_email: str = "mailto:admin@rapidcover.in"
+
+    # Error Tracking (Phase 4 - Optional)
+    sentry_dsn: str = ""  # Leave empty to disable Sentry
 
     model_config = {
         "env_file": ".env",

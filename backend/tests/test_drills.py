@@ -11,6 +11,7 @@ import os
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
+from app.utils.time_utils import utcnow
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -223,7 +224,7 @@ class TestDrillForcedPayoutRegression:
         from app.models.policy import Policy, PolicyTier, PolicyStatus
         from app.services.claims_processor import calculate_payout_amount
 
-        now = datetime.utcnow()
+        now = utcnow()
         trigger = TriggerEvent(
             zone_id=1,
             trigger_type=TriggerType.RAIN,
@@ -266,13 +267,24 @@ class TestDrillForcedPayoutRegression:
 
         monkeypatch.setattr(MockWeatherAPI, "_fetch_live", staticmethod(fake_live))
 
-        live_first = MockWeatherAPI.get_current(321)
-        mock_first = MockWeatherAPI.get_current(321, prefer_mock=True)
+        # Test with demo_mode disabled (should use live data)
+        from app.config import get_settings
+        settings = get_settings()
+        original_demo_mode = settings.demo_mode
 
+        settings.demo_mode = False
+        live_first = MockWeatherAPI.get_current(321)
         assert live_first.source == "live"
         assert live_first.rainfall_mm_hr == 3.0
+
+        # Test with demo_mode enabled (should use mock data)
+        settings.demo_mode = True
+        mock_first = MockWeatherAPI.get_current(321)
         assert mock_first.source == "mock"
         assert mock_first.rainfall_mm_hr == 72
+
+        # Restore original demo mode
+        settings.demo_mode = original_demo_mode
 
 
 class TestZonePoolShareRegression:
