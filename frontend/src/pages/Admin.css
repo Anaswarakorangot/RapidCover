@@ -40,7 +40,7 @@
   position: sticky;
   top: 0;
   height: 100vh;
-  z-index: 10;
+  z-index: 100;
   box-shadow: 7px 0 60px rgba(0,0,0,0.1);
 }
 
@@ -111,6 +111,32 @@
   font-size: 1.1rem;
   width: 20px;
   text-align: center;
+}
+
+/* ── Mobile Burger Menu ─────────────────────────────────────────────────── */
+
+.burger-menu {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-dark);
+  padding: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 90;
+  transition: opacity 0.3s ease;
 }
 
 /* ── Main Content Area ──────────────────────────────────────────────────── */
@@ -1159,4 +1185,27 @@
   .checklist-row__right { width: 100%; justify-content: flex-start; }
   .notif-controls { flex-direction: column; }
   .admin-tabs { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
+}
+
+/* -- Responsive Queries -------------------------------------------------- */
+
+@media (max-width: 992px) {
+  .burger-menu { display: block; }
+  .admin-sidebar {
+    position: fixed;
+    left: -280px;
+    transition: transform 0.3s ease;
+  }
+  .admin-sidebar--open { transform: translateX(280px); }
+  .sidebar-overlay { display: block; }
+  .admin-content-scroll { padding: 1.25rem; }
+  .topnav-search { width: 180px; }
+  .profile-info { display: none; }
+}
+
+@media (max-width: 768px) {
+  .admin-stats-rapidcover > div {
+    grid-template-columns: 1fr !important;
+  }
+  .topnav-search { display: none; }
 }

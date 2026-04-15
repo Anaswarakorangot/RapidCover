@@ -36,6 +36,7 @@ export function Admin() {
   const [loading, setLoading]       = useState(true);
   const [statsError, setStatsError] = useState(false);
   const [activeTab, setActiveTab]   = useState('overview');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [systemStatus, setSystemStatus] = useState({ level: 'green', text: 'All systems operational' });
   const drillZoneSelectRef = useRef(null);
 
@@ -145,9 +146,17 @@ export function Admin() {
   }
 
   return (
-    <div className="admin-layout">
+    <div className={`admin-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-overlay" 
+          onClick={() => setIsSidebarOpen(false)} 
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar ${isSidebarOpen ? 'admin-sidebar--open' : ''}`}>
         <div className="sidebar-logo">
           <span style={{ fontSize: '1.2rem' }}>🛡️</span>
           RapidCover
@@ -179,6 +188,12 @@ export function Admin() {
         {/* Top Navigation Bar */}
         <header className="admin-topnav">
           <div className="topnav-left">
+            <button 
+              className="burger-menu" 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+              ☰
+            </button>
             <input type="text" className="topnav-search" placeholder="Search for stats, workers, or claims..." />
             <button 
               className={`demo-top-toggle ${activeTab === 'demo' ? 'demo-top-toggle--active' : ''}`}
