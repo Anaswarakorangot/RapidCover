@@ -14,6 +14,7 @@ Covers:
 import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
+from app.utils.time_utils import utcnow
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +93,7 @@ class TestEvaluatePartnerPlatformEligibility:
             active_shift=True,
             orders_completed_recent=5,
             suspicious_inactivity=False,
-            last_app_ping=datetime.utcnow().isoformat(),
+            last_app_ping=utcnow().isoformat(),
         )
 
     def _set_inactive(self, partner_id=1):
@@ -103,7 +104,7 @@ class TestEvaluatePartnerPlatformEligibility:
             active_shift=False,
             orders_completed_recent=0,
             suspicious_inactivity=True,
-            last_app_ping=(datetime.utcnow() - timedelta(hours=2)).isoformat(),
+            last_app_ping=(utcnow() - timedelta(hours=2)).isoformat(),
         )
 
     def test_fully_active_partner_is_eligible(self):
@@ -176,7 +177,7 @@ class TestEvaluatePartnerPlatformEligibility:
     def test_old_ping_fails_check(self):
         from app.services.external_apis import evaluate_partner_platform_eligibility, set_partner_platform_activity
         self._set_active(1)
-        old_ping = (datetime.utcnow() - timedelta(hours=1)).isoformat()
+        old_ping = (utcnow() - timedelta(hours=1)).isoformat()
         set_partner_platform_activity(1, last_app_ping=old_ping)
         result = evaluate_partner_platform_eligibility(1)
         ping_check = next(r for r in result["reasons"] if r["check"] == "last_app_ping")
@@ -240,7 +241,7 @@ class TestDbPartnerPlatformActivity:
     def test_get_parses_db_row_correctly(self):
         from app.services.runtime_metadata import get_db_partner_platform_activity
         db = MagicMock()
-        now_iso = datetime.utcnow().isoformat()
+        now_iso = utcnow().isoformat()
         db.execute.return_value.mappings.return_value.first.return_value = {
             "partner_id": 5,
             "platform_logged_in": 0,
@@ -283,14 +284,14 @@ class TestPlatformActivityInValidationMatrix:
         policy = MagicMock()
         policy.id = 10
         policy.is_active = True
-        policy.starts_at = datetime.utcnow() - timedelta(days=1)
-        policy.expires_at = datetime.utcnow() + timedelta(days=7)
+        policy.starts_at = utcnow() - timedelta(days=1)
+        policy.expires_at = utcnow() + timedelta(days=7)
 
         trigger = MagicMock()
         trigger.id = 100
         trigger.zone_id = 1
         trigger.trigger_type.value = "rain"
-        trigger.started_at = datetime.utcnow()
+        trigger.started_at = utcnow()
 
         zone = MagicMock()
         zone.id = 1
@@ -298,6 +299,13 @@ class TestPlatformActivityInValidationMatrix:
 
         fraud = {"score": 0.2, "recommendation": "approve"}
         db = MagicMock()
+        # Configure mock for GPS ping queries (data freshness check)
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.first.return_value = None  # No GPS pings found
+        db.query.return_value = mock_query
+        # Configure execute().mappings().first() for other queries
         db.execute.return_value.mappings.return_value.first.return_value = None
 
         with (
@@ -332,14 +340,14 @@ class TestPlatformActivityInValidationMatrix:
         policy = MagicMock()
         policy.id = 10
         policy.is_active = True
-        policy.starts_at = datetime.utcnow() - timedelta(days=1)
-        policy.expires_at = datetime.utcnow() + timedelta(days=7)
+        policy.starts_at = utcnow() - timedelta(days=1)
+        policy.expires_at = utcnow() + timedelta(days=7)
 
         trigger = MagicMock()
         trigger.id = 100
         trigger.zone_id = 1
         trigger.trigger_type.value = "rain"
-        trigger.started_at = datetime.utcnow()
+        trigger.started_at = utcnow()
 
         zone = MagicMock()
         zone.id = 1
@@ -347,6 +355,13 @@ class TestPlatformActivityInValidationMatrix:
 
         fraud = {"score": 0.2, "recommendation": "approve"}
         db = MagicMock()
+        # Configure mock for GPS ping queries (data freshness check)
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.first.return_value = None  # No GPS pings found
+        db.query.return_value = mock_query
+        # Configure execute().mappings().first() for other queries
         db.execute.return_value.mappings.return_value.first.return_value = None
 
         with (
