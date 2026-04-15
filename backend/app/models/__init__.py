@@ -11,6 +11,7 @@ from app.models.prediction import WeeklyPrediction, CityRiskProfile
 from app.models.fraud import PartnerGPSPing, PartnerDevice
 from app.models.trigger_event import SustainedEvent
 from app.models.weather_observation import WeatherObservation
+from app.models.active_event_tracker import ActiveEventTracker
 
 __all__ = [
     "Partner",
@@ -31,4 +32,5 @@ __all__ = [
     "PartnerDevice",
     "SustainedEvent",
     "WeatherObservation",
+    "ActiveEventTracker",
 ]
