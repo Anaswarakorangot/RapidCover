@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
+from app.utils.time_utils import utcnow
 from app.models.partner import Partner
 from app.models.policy import Policy, PolicyStatus, TIER_CONFIG
 from app.models.claim import Claim, ClaimStatus
@@ -52,7 +53,7 @@ def reinsurance_review(db: Session = Depends(get_db)):
     Admin API endpoint to flag policies for reinsurance review on day 7.
     Flags policies where total claims > 3x weekly premium.
     """
-    now = datetime.utcnow()
+    now = utcnow()
     # Find active policies created at least 7 days ago (or around 7 days for demo)
     day_7_cutoff = now - timedelta(days=7)
     
@@ -111,7 +112,7 @@ def check_city_enrollment_status(partner: Partner, db: Session, days: int = 7) -
         return (True, "", 0.0)
 
     city = zone.city
-    now = datetime.utcnow()
+    now = utcnow()
     period_start = now - timedelta(days=days)
 
     # Get all zones in the city
@@ -202,7 +203,7 @@ def create_policy(
         .filter(
             Policy.partner_id == partner.id,
             Policy.is_active == True,
-            Policy.expires_at > datetime.utcnow(),
+            Policy.expires_at > utcnow(),
         )
         .first()
     )
@@ -222,7 +223,7 @@ def create_policy(
     quote = calculate_premium(policy_data.tier, zone)
 
     # Create policy (starts now, expires in 7 days)
-    now = datetime.utcnow()
+    now = utcnow()
     policy = Policy(
         partner_id=partner.id,
         tier=policy_data.tier,
@@ -248,7 +249,7 @@ def get_active_policy(
 ):
     """Get the current partner's active policy with lifecycle status."""
     # Use naive UTC datetime for SQLite compatibility
-    now = datetime.utcnow()
+    now = utcnow()
     grace_cutoff = now - timedelta(hours=GRACE_PERIOD_HOURS)
 
     # Find policy that is either:
@@ -402,7 +403,7 @@ def renew_policy_endpoint(
         )
 
     # Check for existing future policy (already renewed)
-    now = datetime.utcnow()
+    now = utcnow()
     existing_future = (
         db.query(Policy)
         .filter(

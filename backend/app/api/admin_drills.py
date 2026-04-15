@@ -19,6 +19,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.utils.time_utils import utcnow
 from app.models.zone import Zone
 from app.models.drill_session import DrillSession, DrillType, DrillStatus
 from app.schemas.drill import (
@@ -263,5 +264,5 @@ def run_verification(db: Session = Depends(get_db)):
     return VerificationResponse(
         overall_status=overall,
         checks=checks,
-        run_at=datetime.utcnow(),
+        run_at=utcnow(),
     )

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
+from app.utils.time_utils import utcnow
 from app.models.zone import Zone
 from app.models.policy import Policy
 from app.models.claim import Claim, ClaimStatus
@@ -404,7 +405,7 @@ def calculate_city_bcr(city: str, db: Session, days: int = 7) -> BCRResponse:
 
     Returns BCRResponse with all financial metrics.
     """
-    now = datetime.utcnow()
+    now = utcnow()
     period_start = now - timedelta(days=days)
 
     # Get all zones in the city
@@ -629,7 +630,7 @@ def reassign_partner_zone(
     old_zone_id = partner.zone_id
 
     # Get current active policy
-    now = datetime.utcnow()
+    now = utcnow()
     active_policy = (
         db.query(Policy)
         .filter(

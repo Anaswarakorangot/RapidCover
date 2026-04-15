@@ -23,6 +23,7 @@ from sqlalchemy import func
 from pydantic import BaseModel
 
 from app.database import get_db
+from app.utils.time_utils import utcnow
 from app.models.partner import Partner
 from app.models.policy import Policy
 from app.models.claim import Claim, ClaimStatus
@@ -67,7 +68,7 @@ def _count_active_days_last_30(partner: Partner, db: Session) -> int:
     Count distinct calendar days partner had at least one paid/approved claim
     in the last 30 days.  Falls back to policy-days if no claims yet.
     """
-    since = datetime.utcnow() - timedelta(days=30)
+    since = utcnow() - timedelta(days=30)
 
     claim_days = (
         db.query(func.date(Claim.created_at))
@@ -172,7 +173,7 @@ def _get_active_zone_alert(partner: Partner, db: Session) -> Optional[dict]:
     """Return most recent trigger fired in partner's zone within the last 6 hours."""
     if not partner.zone_id:
         return None
-    since = datetime.utcnow() - timedelta(hours=6)
+    since = utcnow() - timedelta(hours=6)
     trigger = (
         db.query(TriggerEvent)
         .filter(
@@ -225,7 +226,7 @@ def _get_zone_reassignment_card(partner: Partner, db: Session) -> Optional[dict]
         effective_at = datetime.fromisoformat(effective_at_str)
     except ValueError:
         return None
-    if datetime.utcnow() - effective_at > timedelta(hours=24):
+    if utcnow() - effective_at > timedelta(hours=24):
         return None
 
     old_zone_id  = latest.get("old_zone_id")
@@ -269,7 +270,7 @@ def _build_premium_breakdown(partner: Partner, db: Session) -> dict:
     base = SVC_TIER_CONFIG.get(tier, SVC_TIER_CONFIG["standard"])["weekly_premium"]
 
     # Seasonal index: monsoon Jun–Sep = 1.20, else 1.00
-    month          = datetime.utcnow().month
+    month          = utcnow().month
     seasonal_index = 1.20 if month in (6, 7, 8, 9) else 1.00
 
     # Zone risk factor from Zone.risk_score (0–100, centre at 50)
@@ -337,7 +338,7 @@ def get_experience_state(
             "uptime_pct": round((active_days / 30.0) * 100, 1),
             "savings_today": round(earnings_prot - (breakdown["total"] / 7), 2) if earnings_prot > 0 else 0,
         },
-        "fetched_at":        datetime.utcnow().isoformat(),
+        "fetched_at":        utcnow().isoformat(),
     }
 
 
@@ -645,13 +646,13 @@ def partner_heartbeat(
     upsert_db_partner_platform_activity(
         partner_id=partner.id,
         db=db,
-        last_app_ping=datetime.utcnow().isoformat()
+        last_app_ping=utcnow().isoformat()
     )
 
     db.commit()
 
     return {
         "status": "received",
-        "timestamp": datetime.utcnow().isoformat(),
-        "next_heartbeat_at": (datetime.utcnow() + timedelta(seconds=60)).isoformat()
+        "timestamp": utcnow().isoformat(),
+        "next_heartbeat_at": (utcnow() + timedelta(seconds=60)).isoformat()
     }
