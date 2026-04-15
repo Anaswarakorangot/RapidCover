@@ -3,6 +3,7 @@
  */
 import { useState } from 'react';
 import { Card, CardBody } from './Card';
+import { TRIGGER_ICONS, TRIGGER_LABELS } from './ClaimConstants';
 
 const STATUS_STYLES = {
     pending: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
@@ -11,9 +12,6 @@ const STATUS_STYLES = {
     rejected: 'bg-red-100 text-red-800 border border-red-200',
 };
 const STATUS_ICONS = { pending: '⏳', approved: '✅', paid: '💸', rejected: '❌' };
-
-export const TRIGGER_ICONS = { rain: '🌧️', heat: '🌡️', aqi: '💨', shutdown: '🚫', closure: '🏪' };
-export const TRIGGER_LABELS = { rain: 'Heavy Rain', heat: 'Extreme Heat', aqi: 'Dangerous AQI', shutdown: 'Civic Shutdown', closure: 'Store Closure' };
 
 function ClaimDetail({ claim, onClose }) {
     return (
