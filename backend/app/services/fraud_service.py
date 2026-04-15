@@ -135,6 +135,200 @@ def compute_centroid(pings: list) -> dict:
     return {"lat": round(avg_lat, 6), "lng": round(avg_lng, 6)}
 
 
+# ------------------------------------------------------------------------------
+# WEATHER CONSISTENCY CHECKING (Phase 2 - Historical Data)
+# ------------------------------------------------------------------------------
+
+def check_weather_consistency(
+    db,
+    zone_id: int,
+    trigger_time: "datetime",
+    claimed_temp: float = None,
+    claimed_rainfall: float = None,
+    claimed_aqi: int = None,
+    tolerance_hours: float = 1.0
+) -> dict:
+    """
+    Check if claimed weather matches stored observations within ±tolerance_hours.
+
+    Args:
+        db: Database session
+        zone_id: Zone ID
+        trigger_time: When the trigger event occurred
+        claimed_temp: Temperature claimed by trigger (°C)
+        claimed_rainfall: Rainfall claimed by trigger (mm/hr)
+        claimed_aqi: AQI claimed by trigger
+        tolerance_hours: Time window for matching observations (default ±1 hour)
+
+    Returns:
+        {
+            "consistent": bool,
+            "confidence": float (0.0-1.0),
+            "reason": str,
+            "observations_found": int,
+            "discrepancy": str or None
+        }
+    """
+    from datetime import timedelta
+    from app.models.weather_observation import WeatherObservation
+    from app.utils.time_utils import utcnow
+
+    # Query observations within tolerance window
+    start_time = trigger_time - timedelta(hours=tolerance_hours)
+    end_time = trigger_time + timedelta(hours=tolerance_hours)
+
+    observations = (
+        db.query(WeatherObservation)
+        .filter(
+            WeatherObservation.zone_id == zone_id,
+            WeatherObservation.observed_at >= start_time,
+            WeatherObservation.observed_at <= end_time
+        )
+        .order_by(WeatherObservation.observed_at.desc())
+        .all()
+    )
+
+    if not observations:
+        return {
+            "consistent": True,  # Can't disprove without data
+            "confidence": 0.5,   # Low confidence due to no data
+            "reason": "No historical observations found for comparison",
+            "observations_found": 0,
+            "discrepancy": None
+        }
+
+    # Check temperature consistency
+    if claimed_temp is not None:
+        obs_temps = [o.temp_celsius for o in observations if o.temp_celsius is not None]
+        if obs_temps:
+            avg_temp = sum(obs_temps) / len(obs_temps)
+            temp_diff = abs(claimed_temp - avg_temp)
+
+            # Flag if difference > 5°C (unrealistic variation in 1 hour)
+            if temp_diff > 5.0:
+                return {
+                    "consistent": False,
+                    "confidence": 0.9,
+                    "reason": f"Temperature mismatch: claimed {claimed_temp}°C vs observed avg {avg_temp:.1f}°C",
+                    "observations_found": len(observations),
+                    "discrepancy": f"temp_diff_{temp_diff:.1f}C"
+                }
+
+    # Check rainfall consistency
+    if claimed_rainfall is not None:
+        obs_rain = [o.rainfall_mm_hr for o in observations if o.rainfall_mm_hr is not None]
+        if obs_rain:
+            avg_rain = sum(obs_rain) / len(obs_rain)
+            rain_diff = abs(claimed_rainfall - avg_rain)
+
+            # Flag if difference > 20mm/hr (significant discrepancy)
+            if rain_diff > 20.0:
+                return {
+                    "consistent": False,
+                    "confidence": 0.85,
+                    "reason": f"Rainfall mismatch: claimed {claimed_rainfall}mm/hr vs observed avg {avg_rain:.1f}mm/hr",
+                    "observations_found": len(observations),
+                    "discrepancy": f"rain_diff_{rain_diff:.1f}mm"
+                }
+
+    # Check AQI consistency
+    if claimed_aqi is not None:
+        obs_aqi = [o.aqi for o in observations if o.aqi is not None]
+        if obs_aqi:
+            avg_aqi = sum(obs_aqi) / len(obs_aqi)
+            aqi_diff = abs(claimed_aqi - avg_aqi)
+
+            # Flag if difference > 100 (different AQI category)
+            if aqi_diff > 100:
+                return {
+                    "consistent": False,
+                    "confidence": 0.8,
+                    "reason": f"AQI mismatch: claimed {claimed_aqi} vs observed avg {avg_aqi:.0f}",
+                    "observations_found": len(observations),
+                    "discrepancy": f"aqi_diff_{aqi_diff:.0f}"
+                }
+
+    # All checks passed
+    confidence = 0.9 if len(observations) >= 3 else 0.7
+    return {
+        "consistent": True,
+        "confidence": confidence,
+        "reason": "Weather data consistent with historical observations",
+        "observations_found": len(observations),
+        "discrepancy": None
+    }
+
+
+def check_device_fingerprint_enhanced(db, partner_id: int, lookback_days: int = 30) -> dict:
+    """
+    Enhanced device fingerprint analysis using PartnerDevice table.
+
+    Flags suspicious patterns:
+    - Too many different devices (>3 in 30 days = suspicious)
+    - Rapid device switching (>2 devices in 24 hours)
+    - New device with no history
+
+    Args:
+        db: Database session
+        partner_id: Partner ID
+        lookback_days: Days to look back for device history
+
+    Returns:
+        {
+            "consistent": bool,
+            "reason": str,
+            "device_count": int,
+            "rapid_switching": bool
+        }
+    """
+    from datetime import timedelta
+    from app.models.fraud import PartnerDevice
+    from app.utils.time_utils import utcnow
+
+    cutoff = utcnow() - timedelta(days=lookback_days)
+
+    devices = (
+        db.query(PartnerDevice)
+        .filter(
+            PartnerDevice.partner_id == partner_id,
+            PartnerDevice.last_seen_at >= cutoff
+        )
+        .order_by(PartnerDevice.last_seen_at.desc())
+        .all()
+    )
+
+    device_count = len(devices)
+
+    # Flag if too many devices
+    if device_count > 3:
+        return {
+            "consistent": False,
+            "reason": f"Too many devices ({device_count}) used in {lookback_days} days",
+            "device_count": device_count,
+            "rapid_switching": False
+        }
+
+    # Check for rapid switching (>2 devices in 24 hours)
+    if device_count >= 2:
+        recent_24h = utcnow() - timedelta(hours=24)
+        recent_devices = [d for d in devices if d.last_seen_at >= recent_24h]
+
+        if len(recent_devices) > 2:
+            return {
+                "consistent": False,
+                "reason": f"Rapid device switching: {len(recent_devices)} devices in 24 hours",
+                "device_count": device_count,
+                "rapid_switching": True
+            }
+
+    return {
+        "consistent": True,
+        "reason": "Device usage pattern normal",
+        "device_count": device_count,
+        "rapid_switching": False
+    }
+
+
 def build_claim_features(
     partner_id:               int,
     zone_id:                  int,
@@ -239,6 +433,7 @@ def calculate_fraud_score(
     from app.models.zone import Zone
 
     from app.models.fraud import PartnerGPSPing, PartnerDevice
+    from app.utils.time_utils import utcnow
 
     zone = trigger_event.zone if trigger_event else None
     if not zone and trigger_event:
@@ -266,24 +461,36 @@ def calculate_fraud_score(
     policy_ids = [p.id for p in db.query(Policy).filter(Policy.partner_id == partner.id).all()]
     claims_last_30 = 0
     if policy_ids:
-        cutoff = datetime.utcnow() - timedelta(days=30)
+        cutoff = utcnow() - timedelta(days=30)
         claims_last_30 = (
             db.query(func.count(Claim.id))
             .filter(Claim.policy_id.in_(policy_ids), Claim.created_at >= cutoff)
             .scalar()
         ) or 0
 
-    # 1. Device fingerprint consistency
-    # Check if partner has used other devices recently
-    known_devices = db.query(PartnerDevice).filter(PartnerDevice.partner_id == partner.id).all()
-    device_consistent = True
-    if known_devices:
-        # If we have multiple devices, we check if the current one is the 'active' or 'primary' one
-        # For this model, if it's in the list of known devices for this partner, it's consistent.
-        # (In a real app, we'd pass the current device_id from the request)
-        device_consistent = len(known_devices) <= 2  # Reject if too many devices used recently
+    # 1. Device fingerprint consistency (enhanced with historical analysis)
+    device_check = check_device_fingerprint_enhanced(db, partner.id, lookback_days=30)
+    device_consistent = device_check["consistent"]
 
-    # 2. Max GPS velocity (spoof detection)
+    # 2. Weather consistency check (Phase 2 - Historical data)
+    weather_check = {"consistent": True, "confidence": 0.5, "reason": "No weather data to check"}
+    if trigger_event and hasattr(trigger_event, 'started_at') and trigger_event.started_at:
+        # Extract weather values from trigger event metadata if available
+        trigger_temp = getattr(trigger_event, 'temp_celsius', None)
+        trigger_rainfall = getattr(trigger_event, 'rainfall_mm_hr', None)
+        trigger_aqi = getattr(trigger_event, 'aqi', None)
+
+        weather_check = check_weather_consistency(
+            db=db,
+            zone_id=zone.id if zone else 0,
+            trigger_time=trigger_event.started_at,
+            claimed_temp=trigger_temp,
+            claimed_rainfall=trigger_rainfall,
+            claimed_aqi=trigger_aqi,
+            tolerance_hours=1.0
+        )
+
+    # 3. Max GPS velocity (spoof detection)
     # Fetch recent pings for this partner
     recent_pings = (
         db.query(PartnerGPSPing)
@@ -305,7 +512,7 @@ def calculate_fraud_score(
 
     # 3. Centroid drift (location anchoring)
     # Fetch 30-day history
-    cutoff_30d = datetime.utcnow() - timedelta(days=30)
+    cutoff_30d = utcnow() - timedelta(days=30)
     history_pings = (
         db.query(PartnerGPSPing)
         .filter(PartnerGPSPing.partner_id == partner.id, PartnerGPSPing.created_at >= cutoff_30d)
@@ -363,6 +570,26 @@ def calculate_fraud_score(
     else:
         reason = f"Moderate risk ({result['decision']}) - review required"
 
+    # Add weather inconsistency to hard reject reasons if flagged
+    if not weather_check["consistent"] and weather_check["confidence"] > 0.7:
+        result["hard_reject_reasons"].append(
+            f"Weather data inconsistency: {weather_check['reason']}"
+        )
+        # Escalate recommendation if weather is highly inconsistent
+        if recommendation == "approve":
+            recommendation = "review"
+            reason = f"Weather inconsistency detected: {weather_check['reason']}"
+
+    # Add device fingerprint issues to hard reject reasons if flagged
+    if not device_check["consistent"]:
+        result["hard_reject_reasons"].append(
+            f"Device fingerprint issue: {device_check['reason']}"
+        )
+        # Escalate recommendation if device switching is suspicious
+        if recommendation == "approve":
+            recommendation = "review"
+            reason = f"Device fingerprint issue: {device_check['reason']}"
+
     # Return in old format for compatibility
     return {
         "score": result["fraud_score"],
@@ -377,9 +604,19 @@ def calculate_fraud_score(
             "centroid_drift_km": result["factors"]["w7_centroid_drift_km"],
             "device_consistent": result["factors"]["w5_device_consistent"],
             "traffic_disrupted": result["factors"]["w6_traffic_disrupted"],
+            # Phase 2 enhancements - historical data checks
+            "weather_consistent": weather_check["consistent"],
+            "weather_confidence": weather_check["confidence"],
+            "device_count": device_check["device_count"],
+            "rapid_device_switching": device_check.get("rapid_switching", False),
         },
         "recommendation": recommendation,
         "reason": reason,
-        "model_version": "7-factor",
+        "model_version": "7-factor-enhanced",  # Updated version
         "raw_result": result,  # Include full result for debugging
+        # Phase 2 additions - detailed checks for audit trail
+        "historical_checks": {
+            "weather_check": weather_check,
+            "device_check": device_check,
+        },
     }

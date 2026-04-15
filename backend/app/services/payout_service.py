@@ -16,6 +16,7 @@ import uuid
 import time
 
 from app.models.claim import Claim, ClaimStatus
+from app.utils.time_utils import utcnow
 from app.models.policy import Policy
 from app.models.partner import Partner
 from app.models.zone import Zone
@@ -70,7 +71,7 @@ def check_city_hard_cap(partner: Partner, db: Session, days: int = 7) -> tuple[b
         return (False, 0.0, float('inf'))
 
     city = zone.city
-    now = datetime.utcnow()
+    now = utcnow()
     period_start = now - timedelta(days=days)
 
     # Get all zones in the city
@@ -134,7 +135,7 @@ def check_city_hard_cap(partner: Partner, db: Session, days: int = 7) -> tuple[b
 
 def generate_upi_ref(policy_id: int, claim_id: int) -> str:
     """Generate a unique UPI transaction reference."""
-    epoch = int(datetime.utcnow().timestamp())
+    epoch = int(utcnow().timestamp())
     return f"RAPID{policy_id:06d}{claim_id:06d}{epoch % 100000:05d}"
 
 
@@ -168,8 +169,8 @@ def build_transaction_log(
             "amount": claim.amount,
             "currency": "INR",
             "status": "SUCCESS",
-            "initiated_at": datetime.utcnow().isoformat(),
-            "completed_at": datetime.utcnow().isoformat(),
+            "initiated_at": utcnow().isoformat(),
+            "completed_at": utcnow().isoformat(),
         },
         "claim": {
             "id": claim.id,
@@ -232,7 +233,7 @@ def process_razorpay_payout_mock(partner: Partner, amount: float, claim_id: int)
         "currency": "INR",
         "mode": "UPI" if partner.upi_id else "IMPS",
         "status": "processed",
-        "utr": f"UTR{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{claim_id:06d}",
+        "utr": f"UTR{utcnow().strftime('%Y%m%d%H%M%S')}{claim_id:06d}",
     }
     return True, payout_id, {"razorpay_response": razorpay_data}
 
@@ -398,7 +399,7 @@ def process_payout(
             "current_ratio": current_ratio,
             "cap_ratio": CITY_HARD_CAP_RATIO,
             "remaining_capacity_after": remaining_capacity - claim.amount,
-            "checked_at": datetime.utcnow().isoformat(),
+            "checked_at": utcnow().isoformat(),
         }
 
     # Update validation_data with transaction log (claim already updated by confirm_payment)
@@ -409,7 +410,7 @@ def process_payout(
 
     existing["transaction_log"] = transaction_log
     existing["payout_status"] = "SUCCESS"
-    existing["paid_at"] = datetime.utcnow().isoformat()
+    existing["paid_at"] = utcnow().isoformat()
     claim.validation_data = json.dumps(existing)
 
     db.commit()

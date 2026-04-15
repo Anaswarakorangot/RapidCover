@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import text, func
 
 from app.models.partner import Partner
+from app.utils.time_utils import utcnow
 
 logger = logging.getLogger("runtime_metadata")
 
@@ -145,7 +146,7 @@ def upsert_partner_runtime_metadata(
             leave_until.isoformat() if leave_until is not None else None
         ),
         "leave_note": existing["leave_note"] if leave_note is UNSET else leave_note,
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": utcnow().isoformat(),
     }
 
     if is_manual_offline is False and manual_offline_until is UNSET:
@@ -227,7 +228,7 @@ def upsert_zone_coverage_metadata(
         "pin_codes_json": json.dumps(normalized_pin_codes),
         "density_weight": density_weight if density_weight is not None else existing["density_weight"],
         "ward_name": ward_name if ward_name is not None else existing["ward_name"],
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": utcnow().isoformat(),
     }
 
     db.execute(
@@ -265,7 +266,7 @@ def get_db_partner_platform_activity(partner_id: int, db: Session) -> dict:
     ).mappings().first()
 
     if not row:
-        now = datetime.utcnow().isoformat()
+        now = utcnow().isoformat()
         p = db.query(Partner).filter(Partner.id == partner_id).first()
         actual_platform = p.platform.value if p and p.platform else "zepto"
         return {
@@ -320,7 +321,7 @@ def upsert_db_partner_platform_activity(partner_id: int, db: Session, **kwargs) 
         "zone_dwell_minutes": existing["zone_dwell_minutes"],
         "suspicious_inactivity": int(existing["suspicious_inactivity"]),
         "platform": existing["platform"],
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": utcnow().isoformat(),
         "source": "admin_override",
     }
 
@@ -362,7 +363,7 @@ def is_partner_available_for_trigger(
     """
     Check whether the partner should be eligible when the trigger fires.
     """
-    trigger_time = trigger_time or datetime.utcnow()
+    trigger_time = trigger_time or utcnow()
 
     if not partner.is_active:
         return False, "partner_inactive"

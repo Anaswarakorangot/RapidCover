@@ -14,6 +14,7 @@ import json
 import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
+from app.utils.time_utils import utcnow
 
 
 # ---------------------------------------------------------------------------
@@ -43,8 +44,8 @@ def _make_policy(is_active=True):
     p = MagicMock()
     p.id = 10
     p.is_active = is_active
-    p.starts_at = datetime.utcnow() - timedelta(days=7)
-    p.expires_at = datetime.utcnow() + timedelta(days=7)
+    p.starts_at = utcnow() - timedelta(days=7)
+    p.expires_at = utcnow() + timedelta(days=7)
     p.max_daily_payout = 500.0
     p.tier = MagicMock()
     p.tier.value = "basic"
@@ -58,7 +59,7 @@ def _make_trigger(zone_id=1, trigger_type=None, severity=3):
     t.trigger_type = trigger_type or MagicMock()
     t.trigger_type.value = "rain"
     t.severity = severity
-    t.started_at = datetime.utcnow()
+    t.started_at = utcnow()
     return t
 
 
@@ -84,6 +85,14 @@ def _make_fraud_result(score=0.2, recommendation="approve"):
 
 def _make_db():
     db = MagicMock()
+    # Configure mock to return None for GPS ping queries (data freshness check)
+    mock_query = MagicMock()
+    mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
+    mock_query.first.return_value = None  # No GPS pings found
+    db.query.return_value = mock_query
+
+    # Configure execute().mappings().first() to return None (for other queries)
     db.execute.return_value.mappings.return_value.first.return_value = None
     return db
 
@@ -224,7 +233,7 @@ class TestValidationMatrixCheckLogic:
 
     def test_active_policy_fails_for_expired_policy(self):
         policy = _make_policy()
-        policy.expires_at = datetime.utcnow() - timedelta(days=3)
+        policy.expires_at = utcnow() - timedelta(days=3)
         checks = self._run(policy=policy)
         assert checks["active_policy"]["passed"] is False
 
@@ -248,7 +257,7 @@ class TestValidationMatrixCheckLogic:
     def test_partner_activity_fails_when_on_leave(self):
         checks = self._run(runtime_meta={
             "is_manual_offline": False,
-            "leave_until": datetime.utcnow() + timedelta(hours=3),
+            "leave_until": utcnow() + timedelta(hours=3),
             "manual_offline_until": None,
             "pin_code": "560001",
         })

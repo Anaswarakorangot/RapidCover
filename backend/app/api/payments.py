@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.utils.time_utils import utcnow
 from app.config import get_settings
 from app.models.partner import Partner
 from app.models.policy import Policy
@@ -49,7 +50,7 @@ def create_checkout_session(
         .filter(
             Policy.partner_id == partner.id,
             Policy.is_active == True,
-            Policy.expires_at > datetime.utcnow(),
+            Policy.expires_at > utcnow(),
         )
         .first()
     )
@@ -178,7 +179,7 @@ def confirm_payment_and_create_policy(
             .filter(
                 Policy.partner_id == partner.id,
                 Policy.is_active == True,
-                Policy.expires_at > datetime.utcnow(),
+                Policy.expires_at > utcnow(),
             )
             .first()
         )
@@ -213,7 +214,7 @@ def confirm_payment_and_create_policy(
         quote = calculate_premium(tier, zone)
 
         # Create policy
-        now = datetime.utcnow()
+        now = utcnow()
         policy = Policy(
             partner_id=partner.id,
             tier=tier,

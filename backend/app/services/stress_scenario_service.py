@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.models.partner import Partner
+from app.utils.time_utils import utcnow
 from app.models.policy import Policy
 from app.models.zone import Zone
 from app.models.claim import Claim, ClaimStatus
@@ -97,7 +98,7 @@ def get_city_metrics(city: str, db: Session, days: int = 7) -> StressCityMetrics
     Returns:
         StressCityMetrics with active policies, premiums, and zones
     """
-    now = datetime.utcnow()
+    now = utcnow()
     period_start = now - timedelta(days=days)
 
     # Get all zones in the city
@@ -278,7 +279,7 @@ def get_all_stress_scenarios(db: Session) -> StressScenarioListResponse:
 
     return StressScenarioListResponse(
         scenarios=scenarios,
-        computed_at=datetime.utcnow(),
+        computed_at=utcnow(),
         total_reserve_needed=round(total_reserve_needed, 2),
     )
 

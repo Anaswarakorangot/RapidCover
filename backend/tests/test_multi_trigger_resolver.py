@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 
 from app.models.trigger_event import TriggerType
 from app.models.claim import ClaimStatus
+from app.utils.time_utils import utcnow
 from app.services.multi_trigger_resolver import (
     generate_aggregation_group_id,
     find_triggers_in_window,
@@ -102,9 +103,9 @@ class TestCalculateAggregatedPayout:
     def triggers_with_payouts(self):
         """Create triggers with known payouts."""
         triggers = [
-            MagicMock(id=1, trigger_type=TriggerType.RAIN, severity=4, started_at=datetime.utcnow()),
-            MagicMock(id=2, trigger_type=TriggerType.AQI, severity=3, started_at=datetime.utcnow()),
-            MagicMock(id=3, trigger_type=TriggerType.HEAT, severity=2, started_at=datetime.utcnow()),
+            MagicMock(id=1, trigger_type=TriggerType.RAIN, severity=4, started_at=utcnow()),
+            MagicMock(id=2, trigger_type=TriggerType.AQI, severity=3, started_at=utcnow()),
+            MagicMock(id=3, trigger_type=TriggerType.HEAT, severity=2, started_at=utcnow()),
         ]
         payouts = {1: 300.0, 2: 250.0, 3: 150.0}
         return triggers, payouts
@@ -138,8 +139,8 @@ class TestCalculateAggregatedPayout:
     def test_no_uplift_for_2_triggers(self, mock_policy):
         """No uplift with only 2 trigger types."""
         triggers = [
-            MagicMock(id=1, trigger_type=TriggerType.RAIN, severity=4, started_at=datetime.utcnow()),
-            MagicMock(id=2, trigger_type=TriggerType.AQI, severity=3, started_at=datetime.utcnow()),
+            MagicMock(id=1, trigger_type=TriggerType.RAIN, severity=4, started_at=utcnow()),
+            MagicMock(id=2, trigger_type=TriggerType.AQI, severity=3, started_at=utcnow()),
         ]
         payouts = {1: 300.0, 2: 250.0}
         mock_policy.max_daily_payout = 1000.0
@@ -164,7 +165,7 @@ class TestCalculateAggregatedPayout:
     def test_daily_limit_applied(self, mock_policy):
         """Daily limit should cap the final payout."""
         triggers = [
-            MagicMock(id=1, trigger_type=TriggerType.RAIN, severity=5, started_at=datetime.utcnow()),
+            MagicMock(id=1, trigger_type=TriggerType.RAIN, severity=5, started_at=utcnow()),
         ]
         payouts = {1: 500.0}
         mock_policy.max_daily_payout = 400.0  # Limit below payout
@@ -199,7 +200,7 @@ class TestCheckAndResolveAggregation:
         trigger.zone_id = 1
         trigger.trigger_type = TriggerType.RAIN
         trigger.severity = 4
-        trigger.started_at = datetime.utcnow()
+        trigger.started_at = utcnow()
         return trigger
 
     def test_first_trigger_creates_new_claim(self, mock_trigger, mock_policy, mock_db):
@@ -230,7 +231,7 @@ class TestCheckAndResolveAggregation:
 
         # Mock finding triggers in window
         mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
-            MagicMock(id=0, trigger_type=TriggerType.AQI, severity=3, started_at=datetime.utcnow()),
+            MagicMock(id=0, trigger_type=TriggerType.AQI, severity=3, started_at=utcnow()),
             mock_trigger,
         ]
 
@@ -250,7 +251,7 @@ class TestAggregationStats:
     def test_metadata_structure(self):
         """Aggregation metadata should have all required fields."""
         triggers = [
-            MagicMock(id=1, trigger_type=TriggerType.RAIN, severity=4, started_at=datetime.utcnow()),
+            MagicMock(id=1, trigger_type=TriggerType.RAIN, severity=4, started_at=utcnow()),
         ]
         payouts = {1: 300.0}
         policy = MagicMock(max_daily_payout=1000.0)

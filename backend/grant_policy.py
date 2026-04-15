@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.database import SessionLocal
+from app.utils.time_utils import utcnow
 from app.models.partner import Partner
 from app.models.policy import Policy, PolicyTier, PolicyStatus
 
@@ -25,8 +26,8 @@ print(f"Modifying partner: {partner.name} (Phone: {partner.phone}, ID: {partner.
 old_policy = Policy(
     partner_id=partner.id,
     tier=PolicyTier.FLEX,
-    starts_at=datetime.utcnow() - timedelta(days=20),
-    expires_at=datetime.utcnow() - timedelta(days=13),
+    starts_at=utcnow() - timedelta(days=20),
+    expires_at=utcnow() - timedelta(days=13),
     weekly_premium=22.0,
     max_days_per_week=2,
     max_daily_payout=250.0,
@@ -38,8 +39,8 @@ db.add(old_policy)
 active_policy = Policy(
     partner_id=partner.id,
     tier=PolicyTier.STANDARD,
-    starts_at=datetime.utcnow() - timedelta(days=2),
-    expires_at=datetime.utcnow() + timedelta(days=5),
+    starts_at=utcnow() - timedelta(days=2),
+    expires_at=utcnow() + timedelta(days=5),
     weekly_premium=33.0,
     max_days_per_week=3,
     max_daily_payout=400.0,

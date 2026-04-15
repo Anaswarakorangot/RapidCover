@@ -10,6 +10,7 @@ from app.models.trigger_event import TriggerEvent
 from app.services.payment_state_machine import PaymentStatus
 from app.services.payout_service import process_payout
 from app.services.reconciliation_job import run_reconciliation_cycle
+from app.utils.time_utils import utcnow
 
 
 def _query_for(value):
@@ -105,7 +106,7 @@ def test_reconciliation_cycle_retries_failed_and_escalates_stuck(mock_db, mock_c
             "attempts": [{
                 "attempt_id": "a2",
                 "status": "pending",
-                "initiated_at": (datetime.utcnow() - timedelta(minutes=20)).isoformat(),
+                "initiated_at": (utcnow() - timedelta(minutes=20)).isoformat(),
             }],
         }
     })

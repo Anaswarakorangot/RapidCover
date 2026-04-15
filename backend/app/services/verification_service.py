@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.schemas.drill import VerificationCheck
+from app.utils.time_utils import utcnow
 from app.config import get_settings
 
 
@@ -197,7 +198,7 @@ def check_insurer_intelligence(db: Session) -> tuple[bool, str]:
         from datetime import timedelta
         from app.models.prediction import WeeklyPrediction, CityRiskProfile
 
-        now = datetime.utcnow()
+        now = utcnow()
         week_start = now - timedelta(days=now.weekday())
         week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
 

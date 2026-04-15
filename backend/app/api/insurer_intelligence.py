@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.utils.time_utils import utcnow
 from app.models.prediction import WeeklyPrediction, CityRiskProfile
 from app.services.prediction_service import (
     generate_weekly_predictions,
@@ -98,7 +99,7 @@ def get_predictions(
     """
     from app.models.zone import Zone
 
-    now = datetime.utcnow()
+    now = utcnow()
     week_start = now - timedelta(days=now.weekday())
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -159,7 +160,7 @@ def get_risk_profiles(
 
     Returns current and predicted loss ratios, risk flags, and premium adjustment suggestions.
     """
-    now = datetime.utcnow()
+    now = utcnow()
     week_start = now - timedelta(days=now.weekday())
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -213,7 +214,7 @@ def get_summary(db: Session = Depends(get_db)):
 
     Returns at-risk cities, alerts, and aggregate predictions for the current week.
     """
-    now = datetime.utcnow()
+    now = utcnow()
     week_start = now - timedelta(days=now.weekday())
     week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -255,5 +256,5 @@ def refresh_predictions(db: Session = Depends(get_db)):
         status="success",
         predictions_generated=len(predictions),
         profiles_generated=len(profiles),
-        computed_at=datetime.utcnow().isoformat(),
+        computed_at=utcnow().isoformat(),
     )

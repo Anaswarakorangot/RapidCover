@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timedelta
 
 from app.database import SessionLocal
+from app.utils.time_utils import utcnow
 from app.models.claim import Claim, ClaimStatus
 from app.services.payment_state_machine import (
     MAX_PAYMENT_RETRIES,
@@ -44,7 +45,7 @@ def run_reconciliation_cycle(db) -> dict:
         "retry_failed": 0,
         "escalated_failed": 0,
         "escalated_stuck": 0,
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": utcnow().isoformat(),
     }
 
     failed_claims = (
@@ -98,7 +99,7 @@ def run_reconciliation_cycle(db) -> dict:
         .all()
     )
 
-    threshold = datetime.utcnow() - timedelta(minutes=STUCK_INITIATED_THRESHOLD_MINUTES)
+    threshold = utcnow() - timedelta(minutes=STUCK_INITIATED_THRESHOLD_MINUTES)
 
     for claim in initiated_claims:
         state = get_payment_status(claim)

@@ -6,6 +6,10 @@ Run: python test_lifecycle.py
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from app.utils.time_utils import utcnow
 
 db_path = Path(__file__).parent / "rapidcover.db"
 conn = sqlite3.connect(db_path)
@@ -50,7 +54,7 @@ print("0. Exit")
 choice = input("\nEnter choice (1-4, 0 to exit): ").strip()
 
 if choice == "1":
-    new_expires = datetime.utcnow() + timedelta(days=1)
+    new_expires = utcnow() + timedelta(days=1)
     cursor.execute("UPDATE policies SET expires_at = ?, status = 'ACTIVE' WHERE id = ?",
                    (new_expires.isoformat(), policy_id))
     conn.commit()
@@ -58,7 +62,7 @@ if choice == "1":
     print("→ Refresh Policy page - you should see 'Renew' button")
 
 elif choice == "2":
-    new_expires = datetime.utcnow() - timedelta(hours=12)
+    new_expires = utcnow() - timedelta(hours=12)
     cursor.execute("UPDATE policies SET expires_at = ?, status = 'ACTIVE' WHERE id = ?",
                    (new_expires.isoformat(), policy_id))
     conn.commit()
@@ -68,7 +72,7 @@ elif choice == "2":
     print("→ Renew button should be available")
 
 elif choice == "3":
-    new_expires = datetime.utcnow() - timedelta(days=3)
+    new_expires = utcnow() - timedelta(days=3)
     cursor.execute("UPDATE policies SET expires_at = ?, status = 'ACTIVE' WHERE id = ?",
                    (new_expires.isoformat(), policy_id))
     conn.commit()
@@ -77,7 +81,7 @@ elif choice == "3":
     print("→ No Renew button (need to buy new policy)")
 
 elif choice == "4":
-    new_expires = datetime.utcnow() + timedelta(days=7)
+    new_expires = utcnow() + timedelta(days=7)
     cursor.execute("UPDATE policies SET expires_at = ?, status = 'ACTIVE' WHERE id = ?",
                    (new_expires.isoformat(), policy_id))
     conn.commit()

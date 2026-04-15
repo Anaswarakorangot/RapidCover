@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.models.zone import Zone
+from app.utils.time_utils import utcnow
 from app.models.zone_risk_profile import ZoneRiskProfile
 from app.schemas.riqi import (
     RiqiInputMetrics,
@@ -302,7 +303,7 @@ def recompute_riqi_for_zone(zone_code: str, db: Session) -> Optional[RiqiRecompu
         profile.riqi_score = new_score
         profile.riqi_band = new_band
         profile.calculated_from = "computed"
-        profile.last_updated_at = datetime.utcnow()
+        profile.last_updated_at = utcnow()
     else:
         profile = ZoneRiskProfile(
             zone_id=zone.id,
@@ -325,7 +326,7 @@ def recompute_riqi_for_zone(zone_code: str, db: Session) -> Optional[RiqiRecompu
         new_riqi_score=new_score,
         old_band=old_band,
         new_band=new_band,
-        recomputed_at=datetime.utcnow(),
+        recomputed_at=utcnow(),
         metrics_used=RiqiInputMetrics(
             historical_suspensions=suspensions,
             closure_frequency=closures,

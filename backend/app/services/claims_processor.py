@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, text
 
 from app.models.partner import Partner
+from app.utils.time_utils import utcnow
 from app.models.policy import Policy, TIER_CONFIG
 from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent, TriggerType
@@ -174,7 +175,7 @@ def build_validation_matrix(
     All 10 checks from the spec are run.
     """
 
-    now = datetime.utcnow()
+    now = utcnow()
     source_data = source_data or {}
     matrix = []
 
@@ -403,7 +404,7 @@ def check_daily_limit(
 
     Returns (is_within_limit, remaining_amount)
     """
-    today = datetime.utcnow().date()
+    today = utcnow().date()
     start_of_day = datetime.combine(today, datetime.min.time())
 
     # Get today's paid/pending claims for this policy
@@ -433,7 +434,7 @@ def check_weekly_limit(
     Returns (has_days_remaining, days_remaining)
     """
     # Get start of current week (Monday)
-    today = datetime.utcnow()
+    today = utcnow()
     start_of_week = today - timedelta(days=today.weekday())
     start_of_week = datetime.combine(start_of_week.date(), datetime.min.time())
 
@@ -478,7 +479,7 @@ def calculate_city_weekly_reserve(zone_id: int, db: Session, days: int = 7) -> f
     if not zone:
         return 0.0
 
-    now = datetime.utcnow()
+    now = utcnow()
     period_start = now - timedelta(days=days)
     city_zones = db.query(Zone).filter(Zone.city.ilike(f"%{zone.city}%")).all()
     zone_ids = [z.id for z in city_zones]
@@ -516,7 +517,7 @@ def get_eligible_policies(
 
     Returns list of (Policy, Partner) tuples.
     """
-    now = datetime.utcnow()
+    now = utcnow()
 
     # Grace period is 48 hours after expiry
     GRACE_PERIOD_HOURS = 48
@@ -583,11 +584,11 @@ def process_trigger_event(
         zone_id,
         trigger_event.trigger_type,
         db,
-        trigger_event.started_at or datetime.utcnow()
+        trigger_event.started_at or utcnow()
     )
 
     # Get eligible policies in the affected zone
-    eligible = get_eligible_policies(zone_id, db, trigger_event.started_at or datetime.utcnow())
+    eligible = get_eligible_policies(zone_id, db, trigger_event.started_at or utcnow())
     total_partners_in_event = len(eligible)
     city_weekly_reserve = calculate_city_weekly_reserve(zone_id, db)
     zone = db.query(Zone).filter(Zone.id == zone_id).first()
@@ -724,7 +725,22 @@ def process_trigger_event(
                 "zone_pool_share": zone_pool_result,
                 "severity": trigger_event.severity,
             },
-            "processed_at": datetime.utcnow().isoformat(),
+            "processed_at": utcnow().isoformat(),
+        }
+
+        # Build data lineage metadata for regulatory compliance
+        source_metadata = {
+            "trigger_source": trigger_event.source if hasattr(trigger_event, 'source') else "unknown",
+            "fraud_model_version": fraud_result.get("model_version", "7-factor"),
+            "historical_checks": fraud_result.get("historical_checks", {}),
+            "weather_observations_count": fraud_result.get("historical_checks", {}).get("weather_check", {}).get("observations_found", 0),
+            "weather_confidence": fraud_result.get("historical_checks", {}).get("weather_check", {}).get("confidence", 0.5),
+            "device_fingerprint": {
+                "device_count": fraud_result.get("factors", {}).get("device_count", 0),
+                "rapid_switching": fraud_result.get("factors", {}).get("rapid_device_switching", False),
+            },
+            "source_data": src_data,
+            "validation_timestamp": utcnow().isoformat(),
         }
 
         # Create claim
@@ -735,6 +751,7 @@ def process_trigger_event(
             status=status,
             fraud_score=fraud_result["score"],
             validation_data=json.dumps(validation_data),
+            source_metadata=json.dumps(source_metadata),
         )
 
         # Auto-payout for demo mode: use payout_service for structured UPI ref + transaction log
@@ -753,16 +770,16 @@ def process_trigger_event(
                 "amount": claim.amount,
                 "currency": "INR",
                 "status": "SUCCESS",
-                "initiated_at": datetime.utcnow().isoformat(),
-                "completed_at": datetime.utcnow().isoformat(),
+                "initiated_at": utcnow().isoformat(),
+                "completed_at": utcnow().isoformat(),
                 "auto_payout": True,
             }
             vd["stripe"] = stripe_data
             vd["payout_status"] = "SUCCESS"
-            vd["paid_at"] = datetime.utcnow().isoformat()
+            vd["paid_at"] = utcnow().isoformat()
             claim.status = ClaimStatus.PAID
             claim.upi_ref = upi_ref
-            claim.paid_at = datetime.utcnow()
+            claim.paid_at = utcnow()
             claim.validation_data = json.dumps(vd)
 
         db.add(claim)
@@ -825,7 +842,7 @@ def reject_claim(claim_id: int, db: Session, reason: str = None) -> Optional[Cla
         if reason:
             validation = json.loads(claim.validation_data or "{}")
             validation["rejection_reason"] = reason
-            validation["rejected_at"] = datetime.utcnow().isoformat()
+            validation["rejected_at"] = utcnow().isoformat()
             claim.validation_data = json.dumps(validation)
 
         db.commit()
@@ -847,7 +864,7 @@ def mark_as_paid(
 
     if claim and claim.status == ClaimStatus.APPROVED:
         claim.status = ClaimStatus.PAID
-        claim.paid_at = datetime.utcnow()
+        claim.paid_at = utcnow()
         claim.upi_ref = upi_ref
 
         db.commit()

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
+from app.utils.time_utils import utcnow
 from app.models.partner import Partner
 from app.models.policy import Policy
 from app.models.zone import Zone
@@ -193,7 +194,7 @@ class ReconcileRequest(BaseModel):
 @router.get("/dashboard", response_model=DashboardStats)
 def get_dashboard_stats(db: Session = Depends(get_db)):
     """Get overall platform statistics."""
-    now = datetime.utcnow()
+    now = utcnow()
 
     total_partners = db.query(func.count(Partner.id)).scalar()
     active_policies = (
@@ -426,7 +427,7 @@ def payout_claim_endpoint(
     db: Session = Depends(get_db),
 ):
     """Process an approved claim payout through the payout service."""
-    upi_ref = request.upi_ref if request else f"UPI{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{claim_id}"
+    upi_ref = request.upi_ref if request else f"UPI{utcnow().strftime('%Y%m%d%H%M%S')}{claim_id}"
     claim = db.query(Claim).filter(Claim.id == claim_id).first()
 
     if not claim or claim.status != ClaimStatus.APPROVED:
@@ -681,7 +682,7 @@ def simulate_weather(
         db.query(TriggerEvent).filter(
             TriggerEvent.zone_id == simulation.zone_id,
             TriggerEvent.ended_at.is_(None)
-        ).update({'ended_at': datetime.utcnow()})
+        ).update({'ended_at': utcnow()})
         db.commit()
         triggers = detect_and_save_triggers(simulation.zone_id, db)
         # Auto-process payouts for instant demo effect
@@ -740,7 +741,7 @@ def simulate_aqi(
         db.query(TriggerEvent).filter(
             TriggerEvent.zone_id == simulation.zone_id,
             TriggerEvent.ended_at.is_(None)
-        ).update({'ended_at': datetime.utcnow()})
+        ).update({'ended_at': utcnow()})
         db.commit()
         triggers = detect_and_save_triggers(simulation.zone_id, db)
         # Auto-process payouts for instant demo effect
@@ -786,7 +787,7 @@ def simulate_shutdown(
         db.query(TriggerEvent).filter(
             TriggerEvent.zone_id == simulation.zone_id,
             TriggerEvent.ended_at.is_(None)
-        ).update({'ended_at': datetime.utcnow()})
+        ).update({'ended_at': utcnow()})
         db.commit()
         triggers = detect_and_save_triggers(simulation.zone_id, db)
         # Auto-process payouts for instant demo effect
@@ -830,7 +831,7 @@ def simulate_closure(
         db.query(TriggerEvent).filter(
             TriggerEvent.zone_id == simulation.zone_id,
             TriggerEvent.ended_at.is_(None)
-        ).update({'ended_at': datetime.utcnow()})
+        ).update({'ended_at': utcnow()})
         db.commit()
         triggers = detect_and_save_triggers(simulation.zone_id, db)
         # Auto-process payouts for instant demo effect
@@ -1113,7 +1114,7 @@ def check_trigger_eligibility(
         all_passed = False
 
     # Check 2: Policy active
-    now = datetime.utcnow()
+    now = utcnow()
     active_policy = (
         db.query(Policy)
         .filter(
@@ -1190,7 +1191,7 @@ def proof_stress_scenarios(db: Session = Depends(get_db)):
         },
         "timestamps": {
             "computed_at": result.computed_at.isoformat(),
-            "data_as_of": datetime.utcnow().isoformat(),
+            "data_as_of": utcnow().isoformat(),
         },
         "source": "live" if any(s.data_source == "live" for s in result.scenarios) else "mock",
         "pass_fail": "pass" if result.total_reserve_needed >= 0 else "fail",
@@ -1219,8 +1220,8 @@ def proof_reassignments(db: Session = Depends(get_db)):
             "expired_this_check": expired_count,
         },
         "timestamps": {
-            "computed_at": datetime.utcnow().isoformat(),
-            "data_as_of": datetime.utcnow().isoformat(),
+            "computed_at": utcnow().isoformat(),
+            "data_as_of": utcnow().isoformat(),
         },
         "source": "live",
         "pass_fail": "pass",
@@ -1266,8 +1267,8 @@ def proof_trigger_eligibility(db: Session = Depends(get_db)):
             "zones_without_coverage_data": len(zones) - zones_with_coverage,
         },
         "timestamps": {
-            "computed_at": datetime.utcnow().isoformat(),
-            "data_as_of": datetime.utcnow().isoformat(),
+            "computed_at": utcnow().isoformat(),
+            "data_as_of": utcnow().isoformat(),
         },
         "source": "live",
         "pass_fail": "pass" if partners_with_pin > 0 or zones_with_coverage > 0 else "partial",
@@ -1299,8 +1300,8 @@ def proof_riqi(db: Session = Depends(get_db)):
             "data_source": result.data_source,
         },
         "timestamps": {
-            "computed_at": datetime.utcnow().isoformat(),
-            "data_as_of": datetime.utcnow().isoformat(),
+            "computed_at": utcnow().isoformat(),
+            "data_as_of": utcnow().isoformat(),
         },
         "source": result.data_source,
         "pass_fail": "pass" if from_db > 0 else "partial",
@@ -1384,7 +1385,7 @@ def proof_data_sources(db: Session = Depends(get_db)):
     return {
         "feature": "data_sources",
         "sources": sources,
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": utcnow().isoformat(),
     }
 
 
@@ -1448,7 +1449,7 @@ def proof_validation_matrix(db: Session = Depends(get_db)):
             "Every paid/rejected claim now carries a full 10-check validation matrix",
             "Check validation_data.validation_matrix on any claim record",
         ],
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": utcnow().isoformat(),
     }
 
 
@@ -1546,7 +1547,7 @@ def proof_platform_activity(db: Session = Depends(get_db)):
             "Claim approval reads platform_activity check via validation matrix",
             "Platform activity score gates payout — inactive workers are blocked",
         ],
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": utcnow().isoformat(),
     }
 
 

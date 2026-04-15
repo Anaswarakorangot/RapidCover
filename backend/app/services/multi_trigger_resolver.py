@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.models.claim import Claim, ClaimStatus
+from app.utils.time_utils import utcnow
 from app.models.policy import Policy
 from app.models.partner import Partner
 from app.models.trigger_event import TriggerEvent, TriggerType
@@ -184,7 +185,7 @@ def calculate_aggregated_payout(
             for t in triggers
         ],
         "window_hours": AGGREGATION_WINDOW_HOURS,
-        "aggregated_at": datetime.utcnow().isoformat(),
+        "aggregated_at": utcnow().isoformat(),
     }
 
     return (final_payout, aggregation_metadata)
@@ -213,7 +214,7 @@ def check_and_resolve_aggregation(
         If should_create_new_claim is True, create a new claim with aggregation_metadata.
         If existing_claim is returned, update it instead of creating new.
     """
-    trigger_time = trigger_event.started_at or datetime.utcnow()
+    trigger_time = trigger_event.started_at or utcnow()
     window_start, window_end = calculate_aggregation_window(trigger_time)
 
     # Check for existing claim in window
@@ -249,7 +250,7 @@ def check_and_resolve_aggregation(
                 }
             ],
             "window_hours": AGGREGATION_WINDOW_HOURS,
-            "aggregated_at": datetime.utcnow().isoformat(),
+            "aggregated_at": utcnow().isoformat(),
         }
         return (True, None, aggregation_metadata)
 
@@ -365,7 +366,7 @@ def get_aggregation_stats(db: Session) -> dict:
         "total_aggregated_claims": total_aggregated,
         "total_triggers_suppressed": total_suppressed,
         "total_savings": round(total_savings, 2),
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": utcnow().isoformat(),
     }
 
 

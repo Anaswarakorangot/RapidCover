@@ -10,6 +10,7 @@ import sys
 import os
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
+from app.utils.time_utils import utcnow
 
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -422,11 +423,33 @@ class TestPerson2Tasks:
         assert SUSTAINED_EVENT_PAYOUT_MODIFIER == 0.70
         assert SUSTAINED_EVENT_MAX_DAYS == 21
 
+        # Use a patch to test sustained events without needing a real database
+        from unittest.mock import patch
+
+        # Track state across calls
+        mock_record = None
+
+        def mock_query_first(*args, **kwargs):
+            return mock_record
+
+        def mock_add(record):
+            nonlocal mock_record
+            mock_record = record
+
+        mock_db = MagicMock()
+        mock_db.add.side_effect = mock_add
+        mock_db.commit.return_value = None
+
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.first.side_effect = mock_query_first
+        mock_db.query.return_value = mock_query
+
         # Simulate 5 consecutive days
         zone_id = 999  # Test zone
         for day in range(5):
-            event_date = datetime.utcnow() - timedelta(days=4-day)
-            result = track_sustained_event(zone_id, TriggerType.RAIN, event_date)
+            event_date = utcnow() - timedelta(days=4-day)
+            result = track_sustained_event(zone_id, TriggerType.RAIN, mock_db, event_date)
 
         assert result["is_sustained"] == True
         assert result["payout_modifier"] == 0.70

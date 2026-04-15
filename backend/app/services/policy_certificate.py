@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Optional
 
 from reportlab.lib import colors
+from app.utils.time_utils import utcnow
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, cm
@@ -231,7 +232,7 @@ def generate_certificate_pdf(
     elements.append(Spacer(1, 30))
 
     # Footer
-    generated_at = datetime.utcnow().strftime("%d %B %Y at %I:%M %p UTC")
+    generated_at = utcnow().strftime("%d %B %Y at %I:%M %p UTC")
     elements.append(Paragraph(f"Certificate generated on {generated_at}", footer_style))
     elements.append(Paragraph("RapidCover - Parametric Income Insurance for Q-Commerce Partners", footer_style))
     elements.append(Paragraph("www.rapidcover.in | support@rapidcover.in", footer_style))
