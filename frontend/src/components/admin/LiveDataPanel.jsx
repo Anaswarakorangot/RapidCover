@@ -33,17 +33,7 @@ export default function LiveDataPanel() {
   const [lastFetch, setLastFetch] = useState(null);
   const [activeTab, setActiveTab] = useState('oracle');
 
-  useEffect(() => {
-    fetchZones();
-    fetchLiveData();
-    fetchOracle();
-  }, []);
-
-  useEffect(() => {
-    if (selectedZone) fetchZoneData();
-  }, [selectedZone]);
-
-  async function fetchZones() {
+  const fetchZones = async () => {
     try {
       const res = await fetch(`${API}/zones`);
       if (res.ok) {
@@ -51,32 +41,46 @@ export default function LiveDataPanel() {
         setZones(list);
         if (list.length > 0) setSelectedZone(list[0].code);
       }
-    } catch (err) { console.error('zones:', err); }
-  }
+    } catch (_err) { console.error('zones:', _err); }
+  };
 
-  async function fetchLiveData() {
+  const fetchLiveData = async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API}/admin/panel/live-data`);
       if (res.ok) { setLiveData(await res.json()); setLastFetch(new Date()); }
-    } catch (err) { console.error('live-data:', err); }
+    } catch (_err) { console.error('live-data:', _err); }
     setLoading(false);
-  }
+  };
 
-  async function fetchOracle() {
+  const fetchOracle = async () => {
     try {
       const res = await fetch(`${API}/admin/panel/oracle-reliability`);
       if (res.ok) setOracle(await res.json());
-    } catch (err) { console.error('oracle:', err); }
-  }
+    } catch (_err) { console.error('oracle:', _err); }
+  };
 
-  async function fetchZoneData() {
-    if (!selectedZone) return;
-    try {
-      const res = await fetch(`${API}/admin/panel/live-data?zone_code=${selectedZone}`);
-      if (res.ok) setZoneData(await res.json());
-    } catch (err) { console.error('zone data:', err); }
-  }
+  useEffect(() => {
+    const initialize = async () => {
+      await fetchZones();
+      await fetchLiveData();
+      await fetchOracle();
+    };
+    initialize();
+  }, []);
+
+  useEffect(() => {
+    const loadZoneData = async () => {
+      if (!selectedZone) return;
+      try {
+        const res = await fetch(`${API}/admin/panel/live-data?zone_code=${selectedZone}`);
+        if (res.ok) setZoneData(await res.json());
+      } catch (_err) { console.error('zone data:', _err); }
+    };
+    if (selectedZone) {
+      loadZoneData();
+    }
+  }, [selectedZone]);
 
   const TABS = [
     { id: 'oracle', label: '🔮 Oracle Engine' },
@@ -157,7 +161,7 @@ function HealthBanner({ oracle }) {
 
 // ── Oracle tab ────────────────────────────────────────────────────────────────
 
-function OracleTab({ oracle, liveData }) {
+function OracleTab({ oracle }) {
   if (!oracle) return <p style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>Loading oracle data…</p>;
 
   const examples = oracle.example_trigger_decisions || {};

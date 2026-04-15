@@ -54,11 +54,7 @@ export default function InsurerIntelligencePanel() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('summary');
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  async function fetchData() {
+  const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -71,26 +67,30 @@ export default function InsurerIntelligencePanel() {
       if (summaryRes.ok) setSummary(await summaryRes.json());
       if (profilesRes.ok) setProfiles(await profilesRes.json());
       if (predictionsRes.ok) setPredictions(await predictionsRes.json());
-    } catch (err) {
+    } catch {
       setError('Failed to fetch intelligence data. Is the backend running?');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  async function handleRefresh() {
+  const handleRefresh = async () => {
     setRefreshing(true);
     try {
       const res = await fetch(`${API_BASE}/admin/intelligence/refresh`, { method: 'POST' });
       if (res.ok) {
         await fetchData();
       }
-    } catch (err) {
+    } catch {
       setError('Failed to refresh predictions');
     } finally {
       setRefreshing(false);
     }
-  }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   if (loading) {
     return (

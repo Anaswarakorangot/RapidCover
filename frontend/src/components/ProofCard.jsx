@@ -99,12 +99,11 @@ export default function ProofCard({
     try {
       const parsed = typeof validationData === 'string' ? JSON.parse(validationData) : validationData;
       trLog = parsed.transaction_log || parsed;
-    } catch (e) {
-      console.warn("Failed to parse claim validation data", e);
+    } catch (_e) {
+      console.warn("Failed to parse claim validation data", _e);
     }
   }
 
-  const calculation = trLog?.payout_metadata?.payout_calculation;
   const cityCap = trLog?.city_cap_check;
   const triggerDetail = trLog?.trigger || {};
 

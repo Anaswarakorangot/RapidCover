@@ -494,7 +494,6 @@ const STEPS = [
   { id: 'review', label: 'Review' },
 ];
 
-function validateUPI(upi) { return /^[\w.\-]{3,}@[\w]{3,}$/.test(upi.trim()); }
 function validateAadhaar(val) { return /^\d{12}$/.test(val.replace(/\s/g, '')); }
 function validatePAN(val) { return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val.trim().toUpperCase()); }
 function validatePhone(val) { return /^[6-9]\d{9}$/.test(val.replace(/\s/g, '')); }
@@ -673,10 +672,6 @@ export function Register() {
     if (formData.panNumber.trim() && !validatePAN(formData.panNumber)) return false;
     return true;
   }
-  function canProceedFromUpi() {
-    if (!formData.upiId || !formData.upiId.trim()) return true;
-    return /^[\w.\-]{3,}@[\w]{3,}$/.test(formData.upiId);
-  }
 
   async function handleBasicContinue() {
     if (!canProceedFromBasic()) return;
@@ -708,7 +703,7 @@ export function Register() {
       } else {
         setError('Invalid verification code');
       }
-    } catch (err) {
+    } catch {
       setError('Verification failed');
     } finally {
       setOtpLoading(false);
@@ -780,7 +775,6 @@ export function Register() {
   // Derived
   const pidInputClass = `reg-input${partnerIdStatus === 'valid' || partnerIdStatus === 'verified_b2b' ? ' valid' : partnerIdStatus === 'invalid' ? ' invalid' : ''}`;
   const pidIcon = partnerIdStatus === 'checking' ? '⏳' : partnerIdStatus === 'valid' || partnerIdStatus === 'verified_b2b' ? '✓' : partnerIdStatus === 'invalid' ? '✗' : null;
-  const upiValid = formData.upiId.trim() ? validateUPI(formData.upiId) : null;
   const aadhaarValid = formData.aadhaarNumber.trim() ? validateAadhaar(formData.aadhaarNumber) : null;
   const panValid = formData.panNumber.trim() ? validatePAN(formData.panNumber) : null;
   const selectedZone = zones.find(z => String(z.id) === String(formData.zone_id));
@@ -1075,7 +1069,7 @@ export function Register() {
           <button
             className="reg-btn-next"
             onClick={goNext}
-            disabled={formData.upiId && !/^[\w.\-]{3,}@[\w]{3,}$/.test(formData.upiId)}
+            disabled={formData.upiId && !/^[\w.-]{3,}@[\w]{3,}$/.test(formData.upiId)}
           >
             Review →
           </button>

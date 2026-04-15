@@ -1,0 +1,74 @@
+{
+  "training_date": "2026-04-15T11:44:00.111439",
+  "version": "1.0.0",
+  "models": {
+    "zone_risk": {
+      "model_type": "XGBRegressor",
+      "n_features": 10,
+      "train_samples": 800,
+      "test_samples": 200,
+      "mse": 36.60397313145924,
+      "mae": 4.986280639648438,
+      "r2_score": 0.6730857595003396,
+      "cv_r2_mean": 0.6548451959257763,
+      "cv_r2_std": 0.03392512384717749,
+      "feature_names": [
+        "city_encoded",
+        "avg_rainfall_mm_per_hr",
+        "flood_events_2yr",
+        "aqi_avg_annual",
+        "aqi_severe_days_2yr",
+        "heat_advisory_days_2yr",
+        "bandh_events_2yr",
+        "dark_store_suspensions_2yr",
+        "road_flood_prone",
+        "month"
+      ]
+    },
+    "premium": {
+      "model_type": "XGBRegressor",
+      "n_features": 8,
+      "train_samples": 800,
+      "test_samples": 200,
+      "mse": 4.496955437964058,
+      "mae": 1.677856749343872,
+      "r2_score": 0.9588497431869283,
+      "cv_r2_mean": 0.9569925594426616,
+      "cv_r2_std": 0.0048086156894687464,
+      "feature_names": [
+        "city_encoded",
+        "zone_risk_score",
+        "active_days_last_30",
+        "avg_hours_per_day",
+        "tier_encoded",
+        "loyalty_weeks",
+        "month",
+        "riqi_score"
+      ]
+    },
+    "fraud": {
+      "model_type": "XGBClassifier",
+      "n_features": 9,
+      "train_samples": 1600,
+      "test_samples": 400,
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0,
+      "cv_auc_mean": 1.0,
+      "cv_auc_std": 0.0,
+      "feature_names": [
+        "gps_in_zone",
+        "run_count_during_event",
+        "zone_polygon_match",
+        "claims_last_30_days",
+        "device_consistent",
+        "traffic_disrupted",
+        "centroid_drift_km",
+        "max_gps_velocity_kmh",
+        "zone_suspended"
+      ]
+    }
+  }
+}

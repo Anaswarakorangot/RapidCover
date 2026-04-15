@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
     try {
       const profile = await api.getProfile();
       setUser(profile);
-    } catch (error) {
+    } catch {
       localStorage.removeItem('access_token');
     } finally {
       setLoading(false);
@@ -59,6 +59,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+/* eslint-disable react-refresh/only-export-components */
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

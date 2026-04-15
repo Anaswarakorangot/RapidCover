@@ -439,29 +439,6 @@ class FraudModel:
 # SINGLETONS - import these everywhere
 # ------------------------------------------------------------------------------
 
-# Try to load trained models, fall back to manual if not available
-try:
-    from pathlib import Path
-    import joblib
-
-    ML_MODELS_DIR = Path(__file__).parent.parent.parent / "ml_models"
-    metadata_path = ML_MODELS_DIR / "model_metadata.json"
-
-    if metadata_path.exists():
-        print("[ML] Trained models detected - loading ML service with trained models")
-        from app.services.ml_service_trained import (
-            zone_risk_model,
-            premium_model,
-            fraud_model
-        )
-    else:
-        print("[ML] No trained models found - using manual calibrated models")
-        zone_risk_model = ZoneRiskModel()
-        premium_model   = PremiumModel()
-        fraud_model     = FraudModel()
-except ImportError as e:
-    print(f"[ML] Could not load trained models: {e}")
-    print("[ML] Using manual calibrated models")
-    zone_risk_model = ZoneRiskModel()
-    premium_model   = PremiumModel()
-    fraud_model     = FraudModel()
+zone_risk_model = ZoneRiskModel()
+premium_model   = PremiumModel()
+fraud_model     = FraudModel()

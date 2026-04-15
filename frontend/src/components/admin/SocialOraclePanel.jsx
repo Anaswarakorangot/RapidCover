@@ -144,7 +144,7 @@ export default function SocialOraclePanel() {
             } else {
               setLogs(prev => [...prev, { msg: parsed.msg, type: parsed.type }]);
             }
-          } catch (e) {
+          } catch {
             // Skip unparseable lines
           }
         }
@@ -159,7 +159,9 @@ export default function SocialOraclePanel() {
           } else {
             setLogs(prev => [...prev, { msg: parsed.msg, type: parsed.type }]);
           }
-        } catch (e) {}
+        } catch {
+          // Failed to parse buffer
+        }
       }
 
       // If verified, fire the actual trigger
