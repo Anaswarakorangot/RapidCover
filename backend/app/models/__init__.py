@@ -10,6 +10,7 @@ from app.models.zone_risk_profile import ZoneRiskProfile
 from app.models.prediction import WeeklyPrediction, CityRiskProfile
 from app.models.fraud import PartnerGPSPing, PartnerDevice
 from app.models.trigger_event import SustainedEvent
+from app.models.weather_observation import WeatherObservation
 
 __all__ = [
     "Partner",
@@ -29,4 +30,5 @@ __all__ = [
     "PartnerGPSPing",
     "PartnerDevice",
     "SustainedEvent",
+    "WeatherObservation",
 ]

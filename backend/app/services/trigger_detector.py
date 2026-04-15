@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.trigger_event import TriggerEvent, TriggerType, TRIGGER_THRESHOLDS
 from app.models.zone import Zone
 from app.services.claims_processor import process_trigger_event
+from app.utils.time_utils import utcnow
 from app.services.external_apis import (
     MockWeatherAPI,
     MockAQIAPI,
@@ -45,7 +46,7 @@ def track_sustained_event(
     from app.models.trigger_event import SustainedEvent
     
     if event_date is None:
-        event_date = datetime.utcnow()
+        event_date = utcnow()
 
     date_str = event_date.strftime("%Y-%m-%d")
 
@@ -103,7 +104,7 @@ def inject_sustained_event_history(zone_id: int, trigger_type: TriggerType, db: 
     """
     from app.models.trigger_event import SustainedEvent
     
-    today = datetime.utcnow()
+    today = utcnow()
     injected_dates = []
     for i in range(days - 1, 0, -1):
         date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
@@ -259,7 +260,7 @@ def check_rain_trigger(
         trigger = TriggerEvent(
             zone_id=zone_id,
             trigger_type=TriggerType.RAIN,
-            started_at=datetime.utcnow(),
+            started_at=utcnow(),
             severity=severity,
             source_data=json.dumps(source_data),
         )
@@ -302,7 +303,7 @@ def check_heat_trigger(
         trigger = TriggerEvent(
             zone_id=zone_id,
             trigger_type=TriggerType.HEAT,
-            started_at=datetime.utcnow(),
+            started_at=utcnow(),
             severity=severity,
             source_data=json.dumps(source_data),
         )
@@ -347,7 +348,7 @@ def check_aqi_trigger(
         trigger = TriggerEvent(
             zone_id=zone_id,
             trigger_type=TriggerType.AQI,
-            started_at=datetime.utcnow(),
+            started_at=utcnow(),
             severity=severity,
             source_data=json.dumps(source_data),
         )
@@ -384,7 +385,7 @@ def check_shutdown_trigger(
         trigger = TriggerEvent(
             zone_id=zone_id,
             trigger_type=TriggerType.SHUTDOWN,
-            started_at=shutdown_data.started_at or datetime.utcnow(),
+            started_at=shutdown_data.started_at or utcnow(),
             severity=3,  # Default severity for civic shutdowns
             source_data=json.dumps(source_data),
         )
@@ -420,7 +421,7 @@ def check_closure_trigger(
         trigger = TriggerEvent(
             zone_id=zone_id,
             trigger_type=TriggerType.CLOSURE,
-            started_at=platform_data.closed_since or datetime.utcnow(),
+            started_at=platform_data.closed_since or utcnow(),
             severity=2,  # Default severity for closures
             source_data=json.dumps(source_data),
         )
@@ -436,6 +437,8 @@ def check_all_triggers(zone_id: int, db: Session) -> list[TriggerEvent]:
 
     Returns list of triggered events (not yet persisted).
     """
+    from app.services.external_apis import log_weather_observation, log_aqi_observation
+
     triggers = []
 
     # Get all current conditions
@@ -443,6 +446,10 @@ def check_all_triggers(zone_id: int, db: Session) -> list[TriggerEvent]:
     aqi = MockAQIAPI.get_current(zone_id)
     platform = MockPlatformAPI.get_store_status(zone_id)
     shutdown = MockCivicAPI.get_shutdown_status(zone_id)
+
+    # Log weather and AQI observations for historical tracking
+    log_weather_observation(db, weather, api_provider="openweathermap" if weather.source == "live" else "mock")
+    log_aqi_observation(db, aqi, api_provider="waqi" if aqi.source == "live" else "mock")
 
     # Check each trigger type
     rain_trigger = check_rain_trigger(zone_id, weather)
@@ -517,7 +524,7 @@ def end_trigger(trigger_id: int, db: Session) -> Optional[TriggerEvent]:
     trigger = db.query(TriggerEvent).filter(TriggerEvent.id == trigger_id).first()
 
     if trigger and not trigger.ended_at:
-        trigger.ended_at = datetime.utcnow()
+        trigger.ended_at = utcnow()
         db.commit()
         db.refresh(trigger)
 

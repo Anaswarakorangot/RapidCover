@@ -18,6 +18,8 @@ from typing import Optional
 from pydantic import BaseModel
 
 from app.config import get_settings
+from app.utils.time_utils import utcnow
+from sqlalchemy.orm import Session
 
 
 # ─── In-memory storage for simulated conditions ─────────────────────────────
@@ -96,13 +98,82 @@ def get_source_health() -> dict:
 
 def _update_source(name: str, success: bool):
     """Update data source health tracking."""
-    now = datetime.utcnow()
+    now = utcnow()
     _source_status[name]["last_check"] = now
     if success:
         _source_status[name]["status"] = "live"
         _source_status[name]["last_success"] = now
     else:
         _source_status[name]["status"] = "mock"
+
+
+# ─── Weather Observation Persistence ────────────────────────────────────────
+
+def log_weather_observation(
+    db: Session,
+    weather_data: WeatherData,
+    api_provider: str = None,
+    confidence: float = None
+) -> None:
+    """
+    Persist weather observation to database for historical tracking.
+
+    Args:
+        db: Database session
+        weather_data: WeatherData object from API
+        api_provider: e.g. "openweathermap", "mock"
+        confidence: 0.0-1.0 confidence score
+    """
+    from app.models.weather_observation import WeatherObservation
+
+    try:
+        observation = WeatherObservation(
+            zone_id=weather_data.zone_id,
+            temp_celsius=weather_data.temp_celsius,
+            rainfall_mm_hr=weather_data.rainfall_mm_hr,
+            source=weather_data.source,
+            api_provider=api_provider or "unknown",
+            confidence=confidence or (1.0 if weather_data.source == "live" else 0.7),
+            observed_at=weather_data.timestamp,
+        )
+        db.add(observation)
+        db.commit()
+    except Exception as e:
+        print(f"[external_apis] Failed to log weather observation: {e}")
+        db.rollback()
+
+
+def log_aqi_observation(
+    db: Session,
+    aqi_data: AQIData,
+    api_provider: str = None,
+    confidence: float = None
+) -> None:
+    """
+    Persist AQI observation to database for historical tracking.
+
+    Args:
+        db: Database session
+        aqi_data: AQIData object from API
+        api_provider: e.g. "waqi", "mock"
+        confidence: 0.0-1.0 confidence score
+    """
+    from app.models.weather_observation import WeatherObservation
+
+    try:
+        observation = WeatherObservation(
+            zone_id=aqi_data.zone_id,
+            aqi=aqi_data.aqi,
+            source=aqi_data.source,
+            api_provider=api_provider or "unknown",
+            confidence=confidence or (1.0 if aqi_data.source == "live" else 0.7),
+            observed_at=aqi_data.timestamp,
+        )
+        db.add(observation)
+        db.commit()
+    except Exception as e:
+        print(f"[external_apis] Failed to log AQI observation: {e}")
+        db.rollback()
 
 
 # ─── Helper: zone condition defaults ────────────────────────────────────────
@@ -192,7 +263,7 @@ class MockWeatherAPI:
                 temp_celsius=round(d["main"]["temp"] - 273.15, 1),
                 rainfall_mm_hr=d.get("rain", {}).get("1h", 0.0),
                 humidity=d["main"].get("humidity", 60.0),
-                timestamp=datetime.utcnow(),
+                timestamp=utcnow(),
                 source="live",
             )
         except Exception as e:
@@ -201,9 +272,20 @@ class MockWeatherAPI:
             return None
 
     @staticmethod
-    def get_current(zone_id: int, lat: float = None, lon: float = None, prefer_mock: bool = False) -> WeatherData:
-        """Get current weather — live first unless a drill explicitly prefers mock data."""
-        live = None if prefer_mock else MockWeatherAPI._fetch_live(zone_id, lat, lon)
+    def get_current(zone_id: int, lat: float = None, lon: float = None) -> WeatherData:
+        """
+        Get current weather — live first unless demo mode is enabled.
+
+        Demo mode can be controlled via:
+        - settings.demo_mode (global toggle)
+        - settings.demo_exempt_cities (cities that always use live data)
+        """
+        settings = get_settings()
+
+        # Skip live fetch if demo mode is enabled
+        use_mock = settings.demo_mode
+
+        live = None if use_mock else MockWeatherAPI._fetch_live(zone_id, lat, lon)
         if live:
             return live
 
@@ -215,7 +297,7 @@ class MockWeatherAPI:
             temp_celsius=weather["temp"],
             rainfall_mm_hr=weather["rainfall"],
             humidity=weather["humidity"],
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             source="mock",
         )
 
@@ -226,7 +308,7 @@ class MockWeatherAPI:
         rainfall_mm_hr: Optional[float] = None,
         humidity: Optional[float] = None,
     ) -> WeatherData:
-        """Set weather conditions for simulation."""
+        """Set weather conditions for simulation (always returns mock data)."""
         conditions = _get_zone_conditions(zone_id)
         if temp_celsius is not None:
             conditions["weather"]["temp"] = temp_celsius
@@ -234,7 +316,17 @@ class MockWeatherAPI:
             conditions["weather"]["rainfall"] = rainfall_mm_hr
         if humidity is not None:
             conditions["weather"]["humidity"] = humidity
-        return MockWeatherAPI.get_current(zone_id, prefer_mock=True)
+
+        # Return mock data directly (simulations always use mock)
+        weather = conditions["weather"]
+        return WeatherData(
+            zone_id=zone_id,
+            temp_celsius=weather["temp"],
+            rainfall_mm_hr=weather["rainfall"],
+            humidity=weather["humidity"],
+            timestamp=utcnow(),
+            source="mock",
+        )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -290,7 +382,7 @@ class MockAQIAPI:
                 pm25=data["data"].get("iaqi", {}).get("pm25", {}).get("v", 55.0),
                 pm10=data["data"].get("iaqi", {}).get("pm10", {}).get("v", 85.0),
                 category=MockAQIAPI._get_category(aqi_val),
-                timestamp=datetime.utcnow(),
+                timestamp=utcnow(),
                 source="live",
             )
         except Exception as e:
@@ -299,9 +391,18 @@ class MockAQIAPI:
             return None
 
     @staticmethod
-    def get_current(zone_id: int, lat: float = None, lon: float = None, prefer_mock: bool = False) -> AQIData:
-        """Get current AQI — live first unless a drill explicitly prefers mock data."""
-        live = None if prefer_mock else MockAQIAPI._fetch_live(zone_id, lat, lon)
+    def get_current(zone_id: int, lat: float = None, lon: float = None) -> AQIData:
+        """
+        Get current AQI — live first unless demo mode is enabled.
+
+        Demo mode can be controlled via settings.demo_mode.
+        """
+        settings = get_settings()
+
+        # Skip live fetch if demo mode is enabled
+        use_mock = settings.demo_mode
+
+        live = None if use_mock else MockAQIAPI._fetch_live(zone_id, lat, lon)
         if live:
             return live
 
@@ -313,7 +414,7 @@ class MockAQIAPI:
             pm25=aqi_data["pm25"],
             pm10=aqi_data["pm10"],
             category=MockAQIAPI._get_category(aqi_data["value"]),
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             source="mock",
         )
 
@@ -324,7 +425,7 @@ class MockAQIAPI:
         pm25: Optional[float] = None,
         pm10: Optional[float] = None,
     ) -> AQIData:
-        """Set AQI conditions for simulation."""
+        """Set AQI conditions for simulation (always returns mock data)."""
         conditions = _get_zone_conditions(zone_id)
         if aqi is not None:
             conditions["aqi"]["value"] = aqi
@@ -332,7 +433,18 @@ class MockAQIAPI:
             conditions["aqi"]["pm25"] = pm25
         if pm10 is not None:
             conditions["aqi"]["pm10"] = pm10
-        return MockAQIAPI.get_current(zone_id, prefer_mock=True)
+
+        # Return mock data directly (simulations always use mock)
+        aqi_data = conditions["aqi"]
+        return AQIData(
+            zone_id=zone_id,
+            aqi=aqi_data["value"],
+            pm25=aqi_data["pm25"],
+            pm10=aqi_data["pm10"],
+            category=MockAQIAPI._get_category(aqi_data["value"]),
+            timestamp=utcnow(),
+            source="mock",
+        )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -351,7 +463,7 @@ class MockTrafficAPI:
             blocked_roads=traffic["blocked"],
             congestion_level=traffic["congestion"],
             avg_delay_mins=traffic["delay"],
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             source="mock",
         )
 
@@ -388,7 +500,7 @@ class MockPlatformAPI:
             is_open=platform["is_open"],
             closure_reason=platform["reason"],
             closed_since=platform["since"],
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             source="mock",
         )
 
@@ -397,7 +509,7 @@ class MockPlatformAPI:
         conditions = _get_zone_conditions(zone_id)
         conditions["platform"]["is_open"] = False
         conditions["platform"]["reason"] = reason
-        conditions["platform"]["since"] = datetime.utcnow()
+        conditions["platform"]["since"] = utcnow()
         return MockPlatformAPI.get_store_status(zone_id)
 
     @staticmethod
@@ -431,7 +543,7 @@ class MockCivicAPI:
             reason=shutdown["reason"],
             started_at=shutdown["since"],
             expected_end=expected_end,
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             source="mock",
         )
 
@@ -440,7 +552,7 @@ class MockCivicAPI:
         conditions = _get_zone_conditions(zone_id)
         conditions["shutdown"]["is_active"] = True
         conditions["shutdown"]["reason"] = reason
-        conditions["shutdown"]["since"] = datetime.utcnow()
+        conditions["shutdown"]["since"] = utcnow()
         return MockCivicAPI.get_shutdown_status(zone_id)
 
     @staticmethod
@@ -520,7 +632,7 @@ def compute_source_confidence(source_name: str) -> dict:
       - badge: "live" | "mock" | "stale"
       - last_success_iso: str | None
     """
-    now = datetime.utcnow()
+    now = utcnow()
     info = _source_status.get(source_name, {})
 
     is_live = info.get("status") == "live"
@@ -650,7 +762,7 @@ def compute_trigger_confidence(
         "agreement_score": round(agreement_score, 3),
         "primary_source": primary_source,
         "corroborating_sources": corroborating_sources,
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": utcnow().isoformat(),
     }
 
 
@@ -684,7 +796,7 @@ def get_oracle_reliability_report(zone_id: int = None) -> dict:
         "stale_sources": stale_count,
         "mock_sources": mock_count,
         "sources": source_reports,
-        "computed_at": datetime.utcnow().isoformat(),
+        "computed_at": utcnow().isoformat(),
     }
 
 
@@ -699,7 +811,7 @@ _partner_platform_activity: dict[int, dict] = {}
 
 def _default_partner_activity(partner_id: int) -> dict:
     """Return default (active, working) platform activity for a partner."""
-    now = datetime.utcnow()
+    now = utcnow()
     return {
         "partner_id": partner_id,
         "platform_logged_in": True,
@@ -739,7 +851,7 @@ def set_partner_platform_activity(partner_id: int, **kwargs) -> dict:
     for key, val in kwargs.items():
         if key in allowed_fields:
             existing[key] = val
-    existing["updated_at"] = datetime.utcnow().isoformat()
+    existing["updated_at"] = utcnow().isoformat()
     existing["source"] = "admin_override"
     _partner_platform_activity[partner_id] = existing
     return dict(existing)
@@ -802,7 +914,7 @@ def evaluate_partner_platform_eligibility(partner_id: int) -> dict:
     # Check: last app ping within 30 min
     try:
         last_ping = datetime.fromisoformat(activity["last_app_ping"])
-        minutes_since_ping = (datetime.utcnow() - last_ping).total_seconds() / 60.0
+        minutes_since_ping = (utcnow() - last_ping).total_seconds() / 60.0
         if minutes_since_ping <= 30:
             reasons.append({"check": "last_app_ping", "pass": True, "note": f"Last ping {minutes_since_ping:.0f}m ago"})
             score_parts.append(1.0)
