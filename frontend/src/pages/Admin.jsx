@@ -127,7 +127,7 @@ export function Admin() {
     },
     {
       label: 'Operations',
-      items: ['fraud', 'payments', 'premium', 'demo', 'aggregation', 'disruption', 'reassign']
+      items: ['fraud', 'payments', 'premium', 'aggregation', 'disruption', 'reassign']
     },
     {
       label: 'Tools & Testing',
@@ -180,9 +180,27 @@ export function Admin() {
         <header className="admin-topnav">
           <div className="topnav-left">
             <input type="text" className="topnav-search" placeholder="Search for stats, workers, or claims..." />
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)' }}>
-              MEGA MENU <span style={{ fontSize: '0.6rem' }}>▼</span>
-            </div>
+            <button 
+              className={`demo-top-toggle ${activeTab === 'demo' ? 'demo-top-toggle--active' : ''}`}
+              onClick={() => setActiveTab('demo')}
+              style={{ 
+                width: 'auto', 
+                padding: '0.4rem 1.25rem', 
+                borderRadius: '30px', 
+                fontSize: '0.75rem', 
+                fontWeight: 800,
+                letterSpacing: '0.05em',
+                marginLeft: '1rem', 
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                border: activeTab === 'demo' ? 'none' : '1px solid var(--border-light)',
+                background: activeTab === 'demo' ? 'var(--primary)' : 'var(--white)',
+                color: activeTab === 'demo' ? 'var(--white)' : 'var(--text-dark)',
+                textTransform: 'uppercase'
+              }}
+            >
+              Demo Mode
+            </button>
           </div>
           
           <div className="topnav-right">
