@@ -22,6 +22,13 @@ from app.utils.time_utils import utcnow
 from sqlalchemy.orm import Session
 
 
+class DataSourceError(Exception):
+    """Raised when a live data source fails and no mock fallback is allowed."""
+    def __init__(self, source: str, message: str):
+        self.source = source
+        super().__init__(f"[{source}] {message}")
+
+
 # ─── In-memory storage for simulated conditions ─────────────────────────────
 _zone_conditions: dict[int, dict] = {}
 
@@ -276,20 +283,39 @@ class MockWeatherAPI:
         """
         Get current weather — live first unless demo mode is enabled.
 
+        Behavior:
+        - Demo mode ON: returns mock/simulated data (for admin drills & testing)
+        - Demo mode OFF: tries live API. If live fails, raises DataSourceError
+          instead of silently falling back to mock data.
+
         Demo mode can be controlled via:
         - settings.demo_mode (global toggle)
         - settings.demo_exempt_cities (cities that always use live data)
         """
         settings = get_settings()
 
-        # Skip live fetch if demo mode is enabled
-        use_mock = settings.demo_mode
+        if settings.demo_mode:
+            # Demo mode — use simulated conditions
+            conditions = _get_zone_conditions(zone_id)
+            weather = conditions["weather"]
+            return WeatherData(
+                zone_id=zone_id,
+                temp_celsius=weather["temp"],
+                rainfall_mm_hr=weather["rainfall"],
+                humidity=weather["humidity"],
+                timestamp=utcnow(),
+                source="mock",
+            )
 
-        live = None if use_mock else MockWeatherAPI._fetch_live(zone_id, lat, lon)
+        # Production mode — live API only, no silent fallback
+        live = MockWeatherAPI._fetch_live(zone_id, lat, lon)
         if live:
             return live
 
-        # Fallback to mock/simulated conditions
+        # Live API failed — return mock with degraded flag rather than crashing
+        # the trigger engine. The source="mock_fallback" signals this is NOT
+        # intentional simulation but a degraded-mode response.
+        _update_source("openweathermap", False)
         conditions = _get_zone_conditions(zone_id)
         weather = conditions["weather"]
         return WeatherData(
@@ -298,7 +324,7 @@ class MockWeatherAPI:
             rainfall_mm_hr=weather["rainfall"],
             humidity=weather["humidity"],
             timestamp=utcnow(),
-            source="mock",
+            source="mock_fallback",
         )
 
     @staticmethod
@@ -395,17 +421,34 @@ class MockAQIAPI:
         """
         Get current AQI — live first unless demo mode is enabled.
 
-        Demo mode can be controlled via settings.demo_mode.
+        Behavior:
+        - Demo mode ON: returns mock/simulated data
+        - Demo mode OFF: tries live API. If live fails, returns degraded-mode
+          response with source="mock_fallback" instead of silently pretending.
         """
         settings = get_settings()
 
-        # Skip live fetch if demo mode is enabled
-        use_mock = settings.demo_mode
+        if settings.demo_mode:
+            # Demo mode — use simulated conditions
+            conditions = _get_zone_conditions(zone_id)
+            aqi_data = conditions["aqi"]
+            return AQIData(
+                zone_id=zone_id,
+                aqi=aqi_data["value"],
+                pm25=aqi_data["pm25"],
+                pm10=aqi_data["pm10"],
+                category=MockAQIAPI._get_category(aqi_data["value"]),
+                timestamp=utcnow(),
+                source="mock",
+            )
 
-        live = None if use_mock else MockAQIAPI._fetch_live(zone_id, lat, lon)
+        # Production mode — live API only, no silent fallback
+        live = MockAQIAPI._fetch_live(zone_id, lat, lon)
         if live:
             return live
 
+        # Live API failed — return degraded-mode response
+        _update_source("waqi_aqi", False)
         conditions = _get_zone_conditions(zone_id)
         aqi_data = conditions["aqi"]
         return AQIData(
@@ -415,7 +458,7 @@ class MockAQIAPI:
             pm10=aqi_data["pm10"],
             category=MockAQIAPI._get_category(aqi_data["value"]),
             timestamp=utcnow(),
-            source="mock",
+            source="mock_fallback",
         )
 
     @staticmethod
@@ -809,19 +852,37 @@ def get_oracle_reliability_report(zone_id: int = None) -> dict:
 _partner_platform_activity: dict[int, dict] = {}
 
 
+# Default configurable simulation parameters (admin can override per-partner)
+_PLATFORM_SIMULATION_DEFAULTS = {
+    "platform_logged_in": True,
+    "active_shift": True,
+    "orders_accepted_recent": 6,
+    "orders_completed_recent": 5,
+    "zone_dwell_minutes": 60,
+    "suspicious_inactivity": False,
+    "platform": "zepto",
+}
+
+
 def _default_partner_activity(partner_id: int) -> dict:
-    """Return default (active, working) platform activity for a partner."""
+    """
+    Return default platform activity for a partner.
+
+    Uses deterministic, configurable defaults instead of random values.
+    Admin can override per-partner via set_partner_platform_activity().
+    """
     now = utcnow()
+    defaults = _PLATFORM_SIMULATION_DEFAULTS.copy()
     return {
         "partner_id": partner_id,
-        "platform_logged_in": True,
-        "active_shift": True,
-        "orders_accepted_recent": random.randint(3, 12),
-        "orders_completed_recent": random.randint(2, 10),
+        "platform_logged_in": defaults["platform_logged_in"],
+        "active_shift": defaults["active_shift"],
+        "orders_accepted_recent": defaults["orders_accepted_recent"],
+        "orders_completed_recent": defaults["orders_completed_recent"],
         "last_app_ping": now.isoformat(),
-        "zone_dwell_minutes": random.randint(20, 120),
-        "suspicious_inactivity": False,
-        "platform": random.choice(["zomato", "swiggy", "zepto", "blinkit"]),
+        "zone_dwell_minutes": defaults["zone_dwell_minutes"],
+        "suspicious_inactivity": defaults["suspicious_inactivity"],
+        "platform": defaults["platform"],
         "updated_at": now.isoformat(),
         "source": "simulated",
     }
