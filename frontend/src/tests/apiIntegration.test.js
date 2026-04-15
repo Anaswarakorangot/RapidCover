@@ -1,3 +1,4 @@
+/* global global */
 /**
  * apiIntegration.test.js  –  API client fetch-layer integration tests
  *
@@ -12,7 +13,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Modules under test ─────────────────────────────────────────────────────
-import proofApi, {
+import {
   getMyReassignments,
   acceptReassignment,
   rejectReassignment,

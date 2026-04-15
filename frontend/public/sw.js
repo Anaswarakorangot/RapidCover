@@ -1,3 +1,4 @@
+/* global clients */
 // RapidCover Service Worker
 
 const CACHE_NAME = 'rapidcover-v2';
@@ -69,7 +70,7 @@ self.addEventListener('push', (event) => {
   if (!event.data) return;
   let data;
   try { data = event.data.json(); }
-  catch (e) { data = { title: 'RapidCover', body: event.data.text(), icon: '/icon-192.png' }; }
+  catch { data = { title: 'RapidCover', body: event.data.text(), icon: '/icon-192.png' }; }
 
   event.waitUntil(
     self.registration.showNotification(data.title || 'RapidCover', {
