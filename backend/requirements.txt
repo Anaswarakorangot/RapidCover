@@ -37,3 +37,9 @@ pywebpush>=2.0.0
 reportlab>=4.0.0
 razorpay>=1.4.0
 stripe
+
+# Persistent scheduler (Phase 5 - Hardening)
+apscheduler>=3.10.0
+
+# Rate limiting
+slowapi
