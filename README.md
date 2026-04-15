@@ -731,14 +731,25 @@ Phase 2 added **25+ production-grade features** on top of the Phase 1 core:
 
 ---
 
-## 🚀 Quick Start (One-Command Setup)
+## 🚀 Quick Start & Development Setup
 
-Get your local dev environment running in a single step:
+> **Production Recommendation:** The application is transitioning to a persistent, data-driven architecture. Local file-based SQLite is deprecated for development. Please use PostgreSQL.
+
+### 1. Database Setup (PostgreSQL)
+Start a local PostgreSQL instance using Docker:
+```powershell
+docker run --name rapidcover-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=rapidcover -p 5432:5432 -d postgres:15-alpine
+```
+Ensure your `backend/.env` is updated to point to this: `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rapidcover`
+
+### 2. Application Setup
+Get your local dev environment running:
 
 ```powershell
 # Backend (Python 3.10+)
 cd backend && python -m venv venv && venv\Scripts\activate
-pip install -r requirements.txt && python -m uvicorn app.main:app --port 8000
+pip install -r requirements.txt
+python -m uvicorn app.main:app --reload
 
 # Frontend (Node.js)
 cd frontend && npm install && npm run dev

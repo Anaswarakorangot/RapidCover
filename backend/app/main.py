@@ -14,7 +14,8 @@ from app.data.seed_partner import seed_partners
 from app.models import (
     Partner, Zone, Policy, TriggerEvent, Claim,
     ZoneReassignment, ReassignmentStatus, ZoneRiskProfile,
-    PushSubscription, DrillSession, PartnerGPSPing, PartnerDevice, SustainedEvent
+    PushSubscription, DrillSession, PartnerGPSPing, PartnerDevice, SustainedEvent,
+    ActiveEventTracker,
 )
 from app.services.scheduler import start_scheduler, stop_scheduler
 

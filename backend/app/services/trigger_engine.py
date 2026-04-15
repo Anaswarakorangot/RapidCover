@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.utils.time_utils import utcnow
 from app.models.trigger_event import TriggerEvent, TriggerType, TRIGGER_THRESHOLDS
+from app.models.active_event_tracker import ActiveEventTracker
 from app.models.zone import Zone
 from app.models.partner import Partner
 from app.models.policy import Policy
@@ -60,9 +61,9 @@ TRIGGER_MIN_DURATION = {
     "closure":  90,    # 90 minutes
 }
 
-# ─── In-memory tracking of ongoing events ──────────────────────────────────
-# Format: { "zone_id:trigger_type": { "start": timestamp, "details": dict } }
-active_events: dict[str, dict] = {}
+# ─── Persistent tracking of ongoing events (DB-backed) ────────────────────
+# The in-memory active_events dict has been replaced by the ActiveEventTracker
+# DB model. This ensures event tracking survives server restarts.
 forecast_alert_state: dict[int, str] = {}
 
 # ─── Trigger log (in-memory ring buffer for admin UI) ──────────────────────
@@ -96,9 +97,21 @@ def get_trigger_log(limit: int = 50) -> list[dict]:
 def get_engine_status() -> dict:
     """Return engine status for admin UI."""
     oracle = get_oracle_reliability_report()
+
+    # Query active event trackers from DB
+    db = SessionLocal()
+    try:
+        active_count = db.query(ActiveEventTracker).count()
+        active_keys = [
+            f"{t.zone_id}:{t.event_type}"
+            for t in db.query(ActiveEventTracker).all()
+        ]
+    finally:
+        db.close()
+
     return {
-        "active_events": len(active_events),
-        "active_event_keys": list(active_events.keys()),
+        "active_events": active_count,
+        "active_event_keys": active_keys,
         "log_entries": len(_trigger_log),
         "data_sources": get_source_health(),
         "oracle_reliability": oracle,
@@ -272,28 +285,45 @@ def _handle_event(
     """
     Track event duration and fire trigger when minimum duration is met.
 
+    Uses the ActiveEventTracker DB model for persistence (survives restarts).
     The de minimis rule: events under MIN_DURATION_MINUTES (45 min) produce
     no payout. Each trigger type also has its own minimum from the README.
     """
-    key = f"{zone.id}:{event_type}"
     now = time.time()
 
+    # Check if we already have an active tracker for this zone+event_type
+    tracker = (
+        db.query(ActiveEventTracker)
+        .filter(
+            ActiveEventTracker.zone_id == zone.id,
+            ActiveEventTracker.event_type == event_type,
+        )
+        .first()
+    )
+
     if triggered:
-        if key not in active_events:
+        if tracker is None:
             # Force mode (admin drills / demos): one poll must fire — do not wait for a
             # second scheduler tick to satisfy duration (normal path below).
             if force:
                 _fire_trigger(zone, event_type, 0.0, details, db, force)
             else:
-                # Event just started — begin the duration clock
-                active_events[key] = {"start": now, "details": details}
+                # Event just started — begin the duration clock (persisted to DB)
+                tracker = ActiveEventTracker(
+                    zone_id=zone.id,
+                    event_type=event_type,
+                    started_at_epoch=now,
+                    details_json=json.dumps(details),
+                )
+                db.add(tracker)
+                db.commit()
                 _add_log(zone.id, zone.code, event_type,
-                         f"Threshold breached — duration clock started. Details: {_summarize(details)}",
+                         f"Threshold breached — duration clock started (persisted). Details: {_summarize(details)}",
                          "warning")
 
         else:
             # Event ongoing — check if duration requirement met
-            duration_min = (now - active_events[key]["start"]) / 60.0
+            duration_min = (now - tracker.started_at_epoch) / 60.0
             min_required = max(
                 MIN_DURATION_MINUTES,
                 TRIGGER_MIN_DURATION.get(event_type, MIN_DURATION_MINUTES),
@@ -302,8 +332,9 @@ def _handle_event(
             if force or duration_min >= min_required:
                 # Duration met (or force-fired for demo) — create trigger event
                 _fire_trigger(zone, event_type, duration_min, details, db, force)
-                # Remove from tracking so we don't re-fire every poll
-                active_events.pop(key, None)
+                # Remove tracker so we don't re-fire every poll
+                db.delete(tracker)
+                db.commit()
             else:
                 remaining = min_required - duration_min
                 _add_log(zone.id, zone.code, event_type,
@@ -311,12 +342,42 @@ def _handle_event(
                          "info")
     else:
         # Event ended — clear tracking
-        if key in active_events:
-            duration_min = (now - active_events[key]["start"]) / 60.0
+        if tracker is not None:
+            duration_min = (now - tracker.started_at_epoch) / 60.0
             _add_log(zone.id, zone.code, event_type,
                      f"Condition cleared after {duration_min:.0f}m — below threshold, no trigger fired",
                      "info")
-            active_events.pop(key, None)
+            db.delete(tracker)
+            db.commit()
+
+        # ── Fix ended_at bug: mark any active TriggerEvents as ended ─────
+        # When conditions clear, update the corresponding TriggerEvent's
+        # ended_at timestamp so we know when the event actually ended.
+        type_map = {
+            "rain": TriggerType.RAIN,
+            "heat": TriggerType.HEAT,
+            "aqi": TriggerType.AQI,
+            "shutdown": TriggerType.SHUTDOWN,
+            "closure": TriggerType.CLOSURE,
+        }
+        trigger_type = type_map.get(event_type)
+        if trigger_type:
+            open_events = (
+                db.query(TriggerEvent)
+                .filter(
+                    TriggerEvent.zone_id == zone.id,
+                    TriggerEvent.trigger_type == trigger_type,
+                    TriggerEvent.ended_at.is_(None),
+                )
+                .all()
+            )
+            if open_events:
+                for evt in open_events:
+                    evt.ended_at = utcnow()
+                db.commit()
+                _add_log(zone.id, zone.code, event_type,
+                         f"Marked {len(open_events)} TriggerEvent(s) as ended",
+                         "info")
 
 
 def _fire_trigger(

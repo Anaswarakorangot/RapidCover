@@ -46,6 +46,11 @@ class Partner(Base):
     account_number = Column(String(30), nullable=True)
     ifsc_code = Column(String(20), nullable=True)
 
+    # Social Security Code compliance (90/120-day rule)
+    platform_engagement_days = Column(Integer, default=0)  # Total days worked on platform
+    engagement_start_date = Column(DateTime(timezone=True), nullable=True)  # When they started
+    ss_code_eligible = Column(Boolean, default=False)  # Cached eligibility flag
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

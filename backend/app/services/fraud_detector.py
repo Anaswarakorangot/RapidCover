@@ -179,7 +179,12 @@ def check_account_age(partner: Partner) -> float:
     if not partner.created_at:
         return 0.1
 
-    age_days = (utcnow() - partner.created_at.replace(tzinfo=None)).days
+    # Ensure created_at is timezone-aware for comparison with utcnow()
+    created_at = partner.created_at
+    if created_at.tzinfo is None:
+        from datetime import timezone
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    age_days = (utcnow() - created_at).days
 
     # Less than 7 days = new, slight flag
     if age_days < 7:

@@ -17,6 +17,7 @@ from app.models.partner import Partner
 from app.utils.time_utils import utcnow
 from app.models.policy import Policy, PolicyTier, PolicyStatus, TIER_CONFIG
 from app.models.zone import Zone
+from app.models.trigger_event import TriggerEvent, TriggerType
 from app.schemas.policy import (
     PolicyStatus as PolicyStatusSchema,
     PolicyResponseExtended,
@@ -30,6 +31,56 @@ GRACE_PERIOD_HOURS = 48
 LOYALTY_DISCOUNT_PERCENT = 5
 RENEWAL_WINDOW_DAYS = 2  # Can renew starting 2 days before expiry
 
+# Adverse selection: minimum severity to block enrollment
+ADVERSE_SELECTION_MIN_SEVERITY = 3
+
+
+def check_adverse_selection(
+    partner: Partner,
+    db: Session,
+) -> tuple[bool, str]:
+    """
+    Block policy purchase/renewal during active high-severity events.
+
+    When a high-severity trigger event (severity >= 3) is currently active
+    in the partner's zone, new enrollments and renewals are blocked to
+    prevent adverse selection (buying insurance AFTER a known event starts).
+
+    This implements the IRDAI-recommended lock-out period.
+
+    Args:
+        partner: The partner trying to purchase/renew
+        db: Database session
+
+    Returns:
+        (allowed: bool, reason: str)
+    """
+    if not partner.zone_id:
+        return (True, "")
+
+    # Check for active high-severity events in partner's zone
+    active_events = (
+        db.query(TriggerEvent)
+        .filter(
+            TriggerEvent.zone_id == partner.zone_id,
+            TriggerEvent.ended_at.is_(None),  # Still active
+            TriggerEvent.severity >= ADVERSE_SELECTION_MIN_SEVERITY,
+        )
+        .all()
+    )
+
+    if active_events:
+        event_types = [e.trigger_type.value for e in active_events]
+        return (
+            False,
+            f"Policy purchase blocked: active weather/disruption alert(s) in your zone "
+            f"({', '.join(event_types)}). To prevent adverse selection, new enrollments "
+            f"are suspended during active high-severity events. Please try again after "
+            f"the event subsides.",
+        )
+
+    return (True, "")
+
 
 def compute_policy_status(
     policy: Policy,
@@ -42,14 +93,13 @@ def compute_policy_status(
     - hours_until_grace_ends: Hours left in grace period (None if not in grace)
     - can_renew: Whether renewal is currently allowed
     """
-    # Use naive UTC datetime for SQLite compatibility
     now = utcnow()
 
-    # Get expires_at as naive datetime
+    # Ensure expires_at is timezone-aware for consistent comparison
     expires_at = policy.expires_at
-    if expires_at.tzinfo is not None:
-        # Convert to naive UTC if timezone-aware
-        expires_at = expires_at.replace(tzinfo=None)
+    if expires_at.tzinfo is None:
+        from datetime import timezone
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     # Make now naive too for comparison
     if now.tzinfo is not None:
@@ -159,11 +209,12 @@ def renew_policy(
     # Determine start time:
     # - If current policy is still active, start when it expires
     # - If in grace period or lapsed, start now
-    # Use naive UTC datetime for SQLite compatibility
     now = utcnow()
     expires_at = policy.expires_at
-    if expires_at.tzinfo is not None:
-        expires_at = expires_at.replace(tzinfo=None)
+    # Ensure timezone-aware for consistent comparison
+    if expires_at.tzinfo is None:
+        from datetime import timezone
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     if now < expires_at:
         # Policy still active, start new one when old expires
