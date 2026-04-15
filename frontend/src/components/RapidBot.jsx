@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import api from '../services/api';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * RapidBot.jsx - Premium AI Assistant powered by Groq.
@@ -227,11 +226,9 @@ export function RapidBot() {
   const [isThinking, setIsThinking] = useState(false);
   const msgsEndRef = useRef(null);
 
-  const scrollToBottom = () => {
+  useEffect(() => {
     msgsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(scrollToBottom, [messages]);
+  }, [messages]);
 
   const handleSend = async (textInput) => {
     const query = (textInput || input).trim();
@@ -257,10 +254,10 @@ export function RapidBot() {
       
       const data = await res.json();
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
-    } catch (e) {
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: "Power grid disruption. My connection to the RapidCover network is unstable. Please retry." 
+    } catch {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "Power grid disruption. My connection to the RapidCover network is unstable. Please retry."
       }]);
     } finally {
       setIsThinking(false);
