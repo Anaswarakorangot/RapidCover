@@ -832,46 +832,161 @@ def get_live_data(db: Session = Depends(get_db)):
 #  DEMO MODE CONTROL (Phase 3)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/demo-mode")
+@router.get("/demo-mode/status")
 async def get_demo_mode_status():
     """
     Get current demo mode status.
 
-    Returns:
-        {
-            "demo_mode": bool,
-            "demo_exempt_cities": list[str],
-            "description": str
-        }
+    Returns detailed information about demo mode state and what bypasses are active.
     """
     settings = get_settings()
     return {
-        "demo_mode": settings.demo_mode,
+        "enabled": settings.demo_mode,
+        "mode": "demo_override" if settings.demo_mode else "production",
+        "bypasses_active": {
+            "adverse_selection": settings.demo_mode,
+            "activity_gate": settings.demo_mode,
+            "fraud_rejection": False,  # Not implemented yet
+        } if settings.demo_mode else {},
+        "description": (
+            "Demo mode: Bypasses restrictions for feature demonstration. Works on REAL database with REAL users."
+            if settings.demo_mode
+            else "Production mode: All safety checks active."
+        ),
         "demo_exempt_cities": settings.demo_exempt_cities,
-        "description": "Demo mode uses mock data instead of live APIs" if settings.demo_mode else "Production mode uses live APIs",
     }
 
 
-@router.post("/demo-mode")
-async def toggle_demo_mode(enable: bool):
+@router.post("/demo-mode/toggle")
+async def toggle_demo_mode(enabled: bool = Query(..., description="True to enable demo mode, False to disable")):
     """
     Toggle demo mode on or off.
 
+    Demo mode bypasses safety restrictions to demonstrate features on REAL database:
+    - Adverse selection blocking (can buy policy during active events)
+    - 7-day activity gate (can buy policy immediately after registration)
+    - Uses mock data for external API calls
+
     Args:
-        enable: True to enable demo mode, False to disable
+        enabled: True to enable demo mode, False to disable
 
     Returns:
-        {
-            "demo_mode": bool,
-            "message": str
-        }
+        Status and confirmation message
     """
     settings = get_settings()
-    settings.demo_mode = enable
+    settings.demo_mode = enabled
 
     return {
-        "demo_mode": settings.demo_mode,
-        "message": f"Demo mode {'enabled' if enable else 'disabled'}. {'Using mock data for simulations.' if enable else 'Using live API data.'}",
+        "enabled": settings.demo_mode,
+        "mode": "demo_override" if settings.demo_mode else "production",
+        "message": (
+            "Demo mode ENABLED: Restrictions bypassed, mock data active. Working on REAL database."
+            if settings.demo_mode
+            else "Demo mode DISABLED: Production mode restored, all safety checks active."
+        ),
+        "bypasses_active": {
+            "adverse_selection": settings.demo_mode,
+            "activity_gate": settings.demo_mode,
+        } if settings.demo_mode else {},
+    }
+
+
+@router.post("/demo-mode/create-trigger")
+async def create_manual_trigger(
+    zone_id: int = Query(..., description="Zone ID where trigger should occur"),
+    trigger_type: str = Query(..., description="rain | heat | aqi | shutdown | closure"),
+    severity: int = Query(4, ge=1, le=5, description="Severity level 1-5"),
+    db: Session = Depends(get_db),
+):
+    """
+    Manually create a REAL trigger event in the database.
+
+    This is used in demo mode to showcase how the system responds to trigger events.
+    Creates a REAL trigger in the database, which will generate REAL claims for partners
+    with active policies in that zone.
+
+    Args:
+        zone_id: The zone where the trigger occurs
+        trigger_type: Type of trigger (rain, heat, aqi, shutdown, closure)
+        severity: Severity level (1-5, where 3+ blocks new enrollments)
+
+    Returns:
+        Created trigger event details
+    """
+    from app.models.trigger_event import TriggerEvent, TriggerType
+
+    # Verify zone exists
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    if not zone:
+        return {"error": f"Zone {zone_id} not found"}
+
+    # Map string to enum
+    trigger_type_map = {
+        "rain": TriggerType.RAIN,
+        "heat": TriggerType.HEAT,
+        "aqi": TriggerType.AQI,
+        "shutdown": TriggerType.SHUTDOWN,
+        "closure": TriggerType.CLOSURE,
+    }
+
+    trigger_enum = trigger_type_map.get(trigger_type.lower())
+    if not trigger_enum:
+        return {"error": f"Invalid trigger type: {trigger_type}"}
+
+    # Check if there's already an active trigger for this zone
+    existing = (
+        db.query(TriggerEvent)
+        .filter(
+            TriggerEvent.zone_id == zone_id,
+            TriggerEvent.trigger_type == trigger_enum,
+            TriggerEvent.ended_at.is_(None),
+        )
+        .first()
+    )
+
+    if existing:
+        return {
+            "error": f"Active {trigger_type} trigger already exists for {zone.name}",
+            "existing_trigger_id": existing.id,
+            "started_at": existing.started_at.isoformat(),
+        }
+
+    # Create new trigger event
+    now = utcnow()
+    trigger = TriggerEvent(
+        zone_id=zone_id,
+        trigger_type=trigger_enum,
+        severity=severity,
+        started_at=now,
+        ended_at=None,  # Active event
+        source_data=json.dumps({
+            "source": "manual_admin",
+            "created_via": "demo_mode_panel",
+            "note": "Manually created for demonstration",
+        }),
+    )
+
+    db.add(trigger)
+    db.commit()
+    db.refresh(trigger)
+
+    # Process claims for this trigger (auto-create claims for affected partners)
+    from app.services.claims_processor import process_trigger_event
+    claims_created = len(process_trigger_event(trigger, db))
+
+    return {
+        "status": "success",
+        "trigger": {
+            "id": trigger.id,
+            "zone": zone.name,
+            "zone_code": zone.code,
+            "type": trigger.trigger_type.value,
+            "severity": trigger.severity,
+            "started_at": trigger.started_at.isoformat(),
+            "active": True,
+        },
+        "claims_created": claims_created,
+        "message": f"Created {trigger_type} trigger (severity {severity}) in {zone.name}. {claims_created} claims auto-generated.",
     }
 
 
