@@ -286,7 +286,7 @@ const LANGUAGES = [
   { code: 'bn', label: 'বাংলা (Bengali)' },
 ];
 
-function validateUPI(v) { return /^[\w.\-]{3,}@[\w]{3,}$/.test(v.trim()); }
+function validateUPI(v) { return /^[\w.-]{3,}@[\w]{3,}$/.test(v.trim()); }
 function validateAadhaar(v) { return /^\d{12}$/.test(v.replace(/\s/g, '')); }
 function validatePAN(v) { return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v.trim().toUpperCase()); }
 

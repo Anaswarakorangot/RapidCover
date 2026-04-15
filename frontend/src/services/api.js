@@ -27,7 +27,9 @@ async function handleResponse(res) {
     try {
       const body = await res.json();
       detail = body.detail || JSON.stringify(body);
-    } catch (_) { }
+    } catch {
+      // Failed to parse error response, use status only
+    }
     throw new Error(detail);
   }
   if (res.status === 204) return null;
@@ -63,7 +65,7 @@ async function register(partnerData) {
   return handleResponse(res);
 }
 
-async function requestRegisterOtp(phone) {
+async function requestRegisterOtp() {
   // For registration, we generate a demo OTP client-side since the phone isn't registered yet.
   // In production, this would call a dedicated /partners/register-otp endpoint.
   await new Promise(r => setTimeout(r, 500)); // Simulate network delay
@@ -425,7 +427,9 @@ function zonesAuthHeaders() {
 async function zonesHandleResponse(res) {
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
-    try { const b = await res.json(); detail = b.detail || JSON.stringify(b); } catch (_) { }
+    try { const b = await res.json(); detail = b.detail || JSON.stringify(b); } catch {
+      // Failed to parse error response, use status only
+    }
     throw new Error(detail);
   }
   return res.json();

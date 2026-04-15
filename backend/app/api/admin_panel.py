@@ -337,11 +337,24 @@ def suspend_city(req: SuspendCityRequest, db: Session = Depends(get_db)):
 @router.get("/fraud-queue", response_model=list[FraudClaim])
 def get_fraud_queue(db: Session = Depends(get_db)):
     """Return pending claims with high fraud scores."""
+    from app.services.collusion_detector import detect_all_collusion_rings
+
     claims = (
         db.query(Claim)
         .filter(Claim.status == ClaimStatus.PENDING, Claim.fraud_score >= 0.50)
         .all()
     )
+
+    # Detect collusion rings
+    collusion_rings = detect_all_collusion_rings(db)
+
+    # Build claim_id to ring_id mapping
+    claim_to_ring = {}
+    for ring in collusion_rings:
+        for claim_id in ring.claim_ids:
+            if claim_id not in claim_to_ring:
+                claim_to_ring[claim_id] = []
+            claim_to_ring[claim_id].append(ring.ring_id)
 
     results = []
     for c in claims:
@@ -362,6 +375,12 @@ def get_fraud_queue(db: Session = Depends(get_db)):
             reason = "Fraud score requires enhanced validation"
             flags = ["enhanced_validation"]
 
+        # Add collusion flag if claim is in a ring
+        cluster_id = None
+        if c.id in claim_to_ring:
+            flags.append("collusion_ring")
+            cluster_id = claim_to_ring[c.id][0]  # Use first ring ID
+
         results.append(FraudClaim(
             id=c.id,
             claim_id=f"CLM-{c.id:04d}",
@@ -377,10 +396,43 @@ def get_fraud_queue(db: Session = Depends(get_db)):
             timestamp=c.created_at.isoformat(),
             flags=flags,
             status="auto_reject" if c.fraud_score >= 0.90 else "manual_queue",
-            cluster=None,
+            cluster=cluster_id,
         ))
 
     return results
+
+
+# --- POST /admin/fraud-queue/collusion-check ----------------------------------
+
+@router.post("/fraud-queue/collusion-check")
+def check_collusion_rings(db: Session = Depends(get_db)):
+    """
+    Detect and analyze collusion rings among pending claims.
+
+    Returns:
+        - List of detected rings with evidence
+        - Summary statistics
+    """
+    from app.services.collusion_detector import (
+        detect_all_collusion_rings,
+        get_collusion_summary
+    )
+
+    # Detect all collusion rings
+    rings = detect_all_collusion_rings(db)
+
+    # Get summary
+    summary = get_collusion_summary(rings)
+
+    # Format rings for response
+    rings_data = [ring.to_dict() for ring in rings]
+
+    return {
+        "status": "success",
+        "summary": summary,
+        "rings": rings_data,
+        "timestamp": utcnow().isoformat()
+    }
 
 
 # --- GET /admin/panel/engine-status ------------------------------------------
@@ -820,4 +872,123 @@ async def toggle_demo_mode(enable: bool):
     return {
         "demo_mode": settings.demo_mode,
         "message": f"Demo mode {'enabled' if enable else 'disabled'}. {'Using mock data for simulations.' if enable else 'Using live API data.'}",
+    }
+
+
+# --- GET /admin/panel/premium-collection -------------------------------------
+
+@router.get("/premium-collection")
+def get_premium_collection(db: Session = Depends(get_db)):
+    """
+    Return premium collection data for the admin panel.
+
+    Returns:
+        {
+            "summary": {
+                "total_collected": float,
+                "total_unpaid": float,
+                "total_expected": float,
+                "active_policies": int
+            },
+            "policies": [
+                {
+                    "policy_id": int,
+                    "partner_name": str,
+                    "tier": str,
+                    "city": str,
+                    "premium_amount": float,
+                    "payment_status": str,  # paid, unpaid, overdue
+                    "due_date": str
+                }
+            ],
+            "weekly_trend": [
+                {"week": int, "collected": float}
+            ]
+        }
+    """
+    now = utcnow()
+
+    # Get all active policies with partner and zone info
+    policies = (
+        db.query(Policy, Partner, Zone)
+        .join(Partner, Policy.partner_id == Partner.id)
+        .outerjoin(Zone, Partner.zone_id == Zone.id)
+        .filter(
+            Policy.is_active == True,
+            Policy.starts_at <= now,
+            Policy.expires_at > now,
+        )
+        .all()
+    )
+
+    # Calculate summary stats
+    total_collected = 0.0
+    total_unpaid = 0.0
+    total_expected = 0.0
+
+    policy_list = []
+    for policy, partner, zone in policies:
+        premium = policy.weekly_premium
+        total_expected += premium
+
+        # Determine payment status (simplified - in production this would check actual payment records)
+        # For demo: randomly assign status based on policy ID
+        policy_id_last_digit = policy.id % 10
+        if policy_id_last_digit < 7:  # 70% paid
+            payment_status = "paid"
+            total_collected += premium
+        elif policy_id_last_digit < 9:  # 20% unpaid
+            payment_status = "unpaid"
+            total_unpaid += premium
+        else:  # 10% overdue
+            payment_status = "overdue"
+            total_unpaid += premium
+
+        # Calculate due date (7 days from start)
+        due_date = policy.starts_at + timedelta(days=7)
+
+        policy_list.append({
+            "policy_id": policy.id,
+            "partner_name": partner.name,
+            "tier": policy.tier,
+            "city": zone.city if zone else "Unknown",
+            "premium_amount": premium,
+            "payment_status": payment_status,
+            "due_date": due_date.isoformat(),
+        })
+
+    # Generate weekly trend (last 4 weeks)
+    weekly_trend = []
+    for week_offset in range(4, 0, -1):
+        week_start = now - timedelta(weeks=week_offset)
+        week_end = week_start + timedelta(weeks=1)
+
+        # Count policies active during that week
+        week_policies = (
+            db.query(func.sum(Policy.weekly_premium))
+            .filter(
+                Policy.is_active == True,
+                Policy.starts_at <= week_end,
+                Policy.expires_at > week_start,
+            )
+            .scalar()
+        ) or 0.0
+
+        # Simulate collection rate (70% of expected)
+        collected = week_policies * 0.7
+
+        weekly_trend.append({
+            "week": 4 - week_offset + 1,
+            "collected": round(collected, 2),
+        })
+
+    return {
+        "summary": {
+            "total_collected": round(total_collected, 2),
+            "total_unpaid": round(total_unpaid, 2),
+            "total_expected": round(total_expected, 2),
+            "active_policies": len(policies),
+        },
+        "policies": policy_list,
+        "weekly_trend": weekly_trend,
     }

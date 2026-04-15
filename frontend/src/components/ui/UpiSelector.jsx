@@ -293,7 +293,7 @@ export function UpiSelector({ value, onChange }) {
             setUpiName(name);
             setSelectedHandle('@' + rest.join('@'));
         }
-    }, []);
+    }, [value]);
 
     const filtered = search.trim()
         ? UPI_HANDLES.filter(h =>
@@ -303,7 +303,7 @@ export function UpiSelector({ value, onChange }) {
         : UPI_HANDLES;
 
     function handleNameChange(e) {
-        const name = e.target.value.replace(/[^a-zA-Z0-9._\-]/g, '');
+        const name = e.target.value.replace(/[^a-zA-Z0-9._-]/g, '');
         setUpiName(name);
         if (selectedHandle) {
             onChange(name + selectedHandle);
@@ -317,7 +317,7 @@ export function UpiSelector({ value, onChange }) {
     }
 
     const fullUpi = upiName && selectedHandle ? upiName + selectedHandle : '';
-    const isValid = fullUpi && /^[\w.\-]{3,}@[\w]{3,}$/.test(fullUpi);
+    const isValid = fullUpi && /^[\w.-]{3,}@[\w]{3,}$/.test(fullUpi);
 
     return (
         <>

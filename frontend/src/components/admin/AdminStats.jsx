@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -15,27 +15,7 @@ export default function AdminStats({ stats }) {
     return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => {
-    fetchZones();
-  }, []);
-
-  async function fetchZones() {
-    try {
-      const res = await fetch(`${API_BASE}/zones`);
-      if (res.ok) {
-        const list = await res.json();
-        setZones(list);
-        if (list.length > 0) {
-          setSelectedLiveZone(list[0].code);
-          fetchLiveData(list[0].code);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch zones:', err);
-    }
-  }
-
-  async function fetchLiveData(zoneCode) {
+  const fetchLiveData = useCallback(async (zoneCode) => {
     const code = zoneCode || selectedLiveZone;
     if (!code) return;
     setLiveLoading(true);
@@ -44,11 +24,30 @@ export default function AdminStats({ stats }) {
       if (res.ok) {
         setLiveData(await res.json());
       }
-    } catch (err) {
-      console.error('Failed to fetch live data:', err);
+    } catch (_err) {
+      console.error('Failed to fetch live data:', _err);
     }
     setLiveLoading(false);
-  }
+  }, [selectedLiveZone]);
+
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/zones`);
+        if (res.ok) {
+          const list = await res.json();
+          setZones(list);
+          if (list.length > 0) {
+            setSelectedLiveZone(list[0].code);
+            fetchLiveData(list[0].code);
+          }
+        }
+      } catch (_err) {
+        console.error('Failed to fetch zones:', _err);
+      }
+    };
+    fetchZones();
+  }, [fetchLiveData]);
 
   if (!stats) return null;
 

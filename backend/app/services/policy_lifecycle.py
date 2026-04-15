@@ -101,6 +101,10 @@ def compute_policy_status(
         from datetime import timezone
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
+    # Make now naive too for comparison
+    if now.tzinfo is not None:
+        now = now.replace(tzinfo=None)
+
     # Calculate grace period end (48 hours after expiry)
     grace_ends_at = expires_at + timedelta(hours=GRACE_PERIOD_HOURS)
 

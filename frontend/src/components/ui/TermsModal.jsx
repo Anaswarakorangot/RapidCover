@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 // src/components/ui/TermsModal.jsx
 // Drop this file into frontend/src/components/ui/
 

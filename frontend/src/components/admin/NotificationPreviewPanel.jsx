@@ -88,7 +88,10 @@ export default function NotificationPreviewPanel() {
   }
 
   useEffect(() => { loadTemplates(); }, []);
-  useEffect(() => { if (templates) loadPreview(); }, [selectedType, selectedLang]);
+  useEffect(() => {
+    if (templates) loadPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedType, selectedLang, templates]);
 
   if (loading) return <AdminLoader message="Loading notification templates…" />;
   if (error)   return <AdminError message={error} onRetry={loadTemplates} />;

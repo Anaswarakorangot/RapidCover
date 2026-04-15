@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { getMyReassignments, acceptReassignment, rejectReassignment } from '../services/proofApi';
 import { useAuth } from '../context/AuthContext';
@@ -392,7 +392,7 @@ function ZoneReassignmentCard({ card, onAccept, onDismiss, processing }) {
 /** Loyalty/streak progress bars – same visual as original */
 function StreakProgressBar({ loyalty }) {
   if (!loyalty) return null;
-  const { streak_weeks, next_milestone } = loyalty;
+  const { streak_weeks } = loyalty;
   const w4  = Math.min((streak_weeks / 4)  * 100, 100);
   const w12 = Math.min((streak_weeks / 12) * 100, 100);
   const done4  = streak_weeks >= 4;
@@ -520,7 +520,6 @@ export function WeeklyPremiumBreakdown({ breakdown, policy }) {
 
 export function Dashboard() {
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   const [expState,      setExpState]      = useState(null);
   const [policy,        setPolicy]        = useState(null);
@@ -538,7 +537,6 @@ export function Dashboard() {
   const [offlineSim, setOfflineSim] = useState(false);
   const { isSupported, permission, isSubscribed, enableNotifications } = useNotifications();
   const [hasActivatedThisSession, setHasActivatedThisSession] = useState(false);
-  const [notifLoading, setNotifLoading] = useState(false);
 
   const pollRef         = useRef(null);
   const activityRef     = useRef(null);
@@ -606,7 +604,7 @@ export function Dashboard() {
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, [user?.zone_id, resetActivityTimer, reassignDismissed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.zone_id, resetActivityTimer, reassignDismissed]);
 
   useEffect(() => {
     fetchAll(true);

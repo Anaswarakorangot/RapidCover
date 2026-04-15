@@ -7,26 +7,6 @@ import { useState, useEffect } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-// Demo zones -- replace with real API data when Person 1/2 wires the zones endpoint
-const DEMO_ZONES = [
-  // Bangalore
-  { id: 'BLR-047', city: 'BLR', name: 'Koramangala',   density: 'High',   partners: 210, lr: 71, sustained: false, active_trigger: 'Rain',  x: 22, y: 62 },
-  { id: 'BLR-031', city: 'BLR', name: 'Indiranagar',   density: 'Medium', partners: 120, lr: 58, sustained: false, active_trigger: null,    x: 24, y: 58 },
-  { id: 'BLR-015', city: 'BLR', name: 'Whitefield',    density: 'Low',    partners: 45,  lr: 44, sustained: false, active_trigger: null,    x: 28, y: 60 },
-  { id: 'BLR-089', city: 'BLR', name: 'Bellandur',     density: 'Medium', partners: 95,  lr: 82, sustained: true,  active_trigger: 'Rain',  x: 26, y: 64 },
-  // Mumbai
-  { id: 'MUM-021', city: 'MUM', name: 'Andheri East',  density: 'High',   partners: 180, lr: 54, sustained: false, active_trigger: null,    x: 12, y: 42 },
-  { id: 'MUM-034', city: 'MUM', name: 'Dadar',         density: 'High',   partners: 195, lr: 79, sustained: true,  active_trigger: 'Rain',  x: 11, y: 46 },
-  { id: 'MUM-008', city: 'MUM', name: 'Powai',         density: 'Low',    partners: 38,  lr: 41, sustained: false, active_trigger: null,    x: 13, y: 40 },
-  // Delhi
-  { id: 'DEL-009', city: 'DEL', name: 'Connaught Place',density:'Low',    partners: 42,  lr: 48, sustained: false, active_trigger: null,    x: 22, y: 22 },
-  { id: 'DEL-044', city: 'DEL', name: 'Anand Vihar',   density: 'High',   partners: 165, lr: 91, sustained: true,  active_trigger: 'AQI',   x: 26, y: 20 },
-  { id: 'DEL-067', city: 'DEL', name: 'Dwarka',        density: 'Medium', partners: 88,  lr: 62, sustained: false, active_trigger: null,    x: 19, y: 23 },
-  // Chennai
-  { id: 'CHN-011', city: 'CHN', name: 'T. Nagar',      density: 'High',   partners: 155, lr: 55, sustained: false, active_trigger: null,    x: 24, y: 78 },
-  { id: 'CHN-029', city: 'CHN', name: 'Velachery',     density: 'Medium', partners: 90,  lr: 66, sustained: false, active_trigger: null,    x: 25, y: 80 },
-];
-
 const DENSITY_COLORS = {
   Low:    { fill: '#f1f5f1', stroke: '#1a2e1a', label: 'Low (<50)',     dot: 'var(--green-primary)' },
   Medium: { fill: '#fef9c3', stroke: '#d97706', label: 'Medium (50-150)', dot: 'var(--warning)' },
@@ -80,35 +60,53 @@ function ZoneCircle({ zone, onSelect, selected }) {
 }
 
 export default function ZoneMapPanel({ onZoneClick }) {
-  const [zones, setZones] = useState(DEMO_ZONES);
+  const [zones, setZones] = useState([]);
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  function handleZoneSelect(zone) {
+  const fetchZones = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(`${API_BASE}/admin/panel/zones`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.zones?.length) {
+          setZones(data.zones);
+        } else {
+          setZones([]);
+        }
+      } else {
+        setError('Failed to load zones');
+      }
+    } catch (err) {
+      setError(`Error loading zones: ${err.message}`);
+      console.error('Zone fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleZoneSelect = (zone) => {
     setSelected(zone);
     // Notify parent for drill panel integration
     if (onZoneClick && zone.id) {
       onZoneClick(zone.id);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchZones();
-    const t = setInterval(fetchZones, 20000);
+    const loadZones = async () => {
+      await fetchZones();
+    };
+    loadZones();
+    const t = setInterval(() => {
+      loadZones();
+    }, 20000);
     return () => clearInterval(t);
   }, []);
-
-  async function fetchZones() {
-    try {
-      const res = await fetch(`${API_BASE}/admin/panel/zones`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.zones?.length) setZones(data.zones);
-      }
-    } catch {
-      // Use demo data
-    }
-  }
 
   const filteredZones = filter === 'All'
     ? zones
@@ -118,6 +116,53 @@ export default function ZoneMapPanel({ onZoneClick }) {
 
   const sustainedCount = zones.filter(z => z.sustained).length;
   const highCount      = zones.filter(z => z.density === 'High').length;
+
+  // Loading state
+  if (loading && zones.length === 0) {
+    return (
+      <section className="zone-map-panel">
+        <div style={{ padding: '3rem', textAlign: 'center' }}>
+          <p style={{ fontSize: '1rem', color: 'var(--text-mid)' }}>Loading zones...</p>
+        </div>
+      </section>
+    );
+  }
+
+  // Error state
+  if (error && zones.length === 0) {
+    return (
+      <section className="zone-map-panel">
+        <div style={{ padding: '3rem', textAlign: 'center' }}>
+          <p style={{ fontSize: '1rem', color: 'var(--error)', marginBottom: '1rem' }}>{error}</p>
+          <button
+            onClick={fetchZones}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: 'var(--green-primary)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              fontWeight: 700
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  // No zones state
+  if (zones.length === 0) {
+    return (
+      <section className="zone-map-panel">
+        <div style={{ padding: '3rem', textAlign: 'center' }}>
+          <p style={{ fontSize: '1rem', color: 'var(--text-mid)' }}>No zones available</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="zone-map-panel">

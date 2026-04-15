@@ -1,7 +1,7 @@
 // frontend/src/components/admin/DrillPanel.jsx
 // Structured drill execution panel with preset selection and real-time timeline
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import DrillTimeline from './DrillTimeline';
 import ImpactPanel from './ImpactPanel';
 
@@ -42,19 +42,12 @@ export default function DrillPanel({ onZoneSelect }) {
   const [forceMode, setForceMode] = useState(true);
   const [simulateSustained, setSimulateSustained] = useState(false);
   const [drillId, setDrillId] = useState(null);
-  const [drillStatus, setDrillStatus] = useState(null);
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [impactData, setImpactData] = useState(null);
   const [running, setRunning] = useState(false);
   const [history, setHistory] = useState([]);
 
-  // Fetch zones for dropdown
-  useEffect(() => {
-    fetchZones();
-    fetchHistory();
-  }, []);
-
-  async function fetchZones() {
+  const fetchZones = async () => {
     try {
       const res = await fetch(`${API_BASE}/zones`);
       if (res.ok) {
@@ -73,9 +66,9 @@ export default function DrillPanel({ onZoneSelect }) {
       ]);
       setSelectedZone('BLR-047');
     }
-  }
+  };
 
-  async function fetchHistory() {
+  const fetchHistory = async () => {
     try {
       const res = await fetch(`${API_BASE}/admin/panel/drills/history?limit=10`);
       if (res.ok) {
@@ -85,14 +78,13 @@ export default function DrillPanel({ onZoneSelect }) {
     } catch {
       // Ignore
     }
-  }
+  };
 
-  async function runDrill() {
+  const runDrill = async () => {
     if (!selectedZone) return;
 
     setRunning(true);
     setDrillId(null);
-    setDrillStatus(null);
     setTimelineEvents([]);
     setImpactData(null);
 
@@ -111,7 +103,6 @@ export default function DrillPanel({ onZoneSelect }) {
       if (res.ok) {
         const data = await res.json();
         setDrillId(data.drill_id);
-        setDrillStatus(data.status);
 
         // Stream events
         await streamDrillEvents(data.drill_id);
@@ -125,9 +116,9 @@ export default function DrillPanel({ onZoneSelect }) {
 
     setRunning(false);
     fetchHistory();
-  }
+  };
 
-  async function streamDrillEvents(id) {
+  const streamDrillEvents = async (id) => {
     try {
       const res = await fetch(`${API_BASE}/admin/panel/drills/${id}/stream`);
       if (!res.ok || !res.body) return;
@@ -158,9 +149,9 @@ export default function DrillPanel({ onZoneSelect }) {
     } catch {
       // Fallback handled
     }
-  }
+  };
 
-  async function fetchImpact(id) {
+  const fetchImpact = async (id) => {
     try {
       const res = await fetch(`${API_BASE}/admin/panel/drills/${id}/impact`);
       if (res.ok) {
@@ -170,14 +161,20 @@ export default function DrillPanel({ onZoneSelect }) {
     } catch {
       // Ignore
     }
-  }
+  };
 
-  function handleZoneFromMap(zoneCode) {
-    setSelectedZone(zoneCode);
-  }
+  // Fetch zones for dropdown
+  useEffect(() => {
+    fetchZones();
+    fetchHistory();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Expose zone selection for parent
   useEffect(() => {
+    const handleZoneFromMap = (zoneCode) => {
+      setSelectedZone(zoneCode);
+    };
     if (onZoneSelect) {
       onZoneSelect(handleZoneFromMap);
     }

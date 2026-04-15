@@ -5,7 +5,7 @@
  * total savings from preventing duplicate payouts, and per-claim aggregation details.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   getAggregationStats,
   getClaimAggregation,
@@ -46,8 +46,8 @@ function AggregationDetail({ claimId, onClose }) {
       try {
         const result = await getClaimAggregation(claimId);
         setData(result);
-      } catch (err) {
-        setError(err.message);
+      } catch (_err) {
+        setError(_err.message);
       }
       setLoading(false);
     })();
@@ -175,7 +175,23 @@ export default function AggregationPanel() {
   const [loading, setLoading] = useState(true);
   const [expandedClaim, setExpandedClaim] = useState(null);
 
-  const loadData = useCallback(async () => {
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [statsRes, claimsRes] = await Promise.allSettled([
+          getAggregationStats(),
+          getAdminClaims({ limit: 50 }),
+        ]);
+        if (statsRes.status === 'fulfilled') setStats(statsRes.value);
+        if (claimsRes.status === 'fulfilled') setClaims(claimsRes.value || []);
+      } catch { /* graceful fallback */ }
+      setLoading(false);
+    };
+    loadData();
+  }, []);
+
+  const loadData = async () => {
     setLoading(true);
     try {
       const [statsRes, claimsRes] = await Promise.allSettled([
@@ -186,9 +202,7 @@ export default function AggregationPanel() {
       if (claimsRes.status === 'fulfilled') setClaims(claimsRes.value || []);
     } catch { /* graceful fallback */ }
     setLoading(false);
-  }, []);
-
-  useEffect(() => { loadData(); }, [loadData]);
+  };
 
   if (loading) {
     return (

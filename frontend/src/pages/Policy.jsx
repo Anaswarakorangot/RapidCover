@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 
 /* ─── Design tokens matching Register.jsx ───────────────────────────────── */
@@ -106,6 +106,15 @@ const S = `
   .apb-badge.st-cancelled     { background: #f3f4f6; color: #374151; }
   .apb-sub { font-size: 12px; color: var(--text-mid); margin-top: 3px; }
   .apb-next-premium { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+
+  .renewal-risk-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px;
+    margin-top: 6px;
+  }
+  .renewal-risk-badge.low { background: #dcfce7; color: #166534; }
+  .renewal-risk-badge.medium { background: #fef9c3; color: #854d0e; }
+  .renewal-risk-badge.high { background: #fee2e2; color: #991b1b; }
 
   .apb-toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
   .rc-toggle {
@@ -338,13 +347,12 @@ function PremiumBreakdown({ breakdown }) {
 
 /* ─── Main Policy ─────────────────────────────────────────────────────── */
 export default function Policy() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [activePolicy, setActivePolicy] = useState(null);
   const [eligibility, setEligibility] = useState(null);
   const [breakdown, setBreakdown] = useState(null);
-  const [quotes, setQuotes] = useState([]);
+  const [_quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(null);
   const [cancelling, setCancelling] = useState(false);
@@ -383,7 +391,7 @@ export default function Policy() {
       setPaymentStatus('cancelled');
       setSearchParams({});
     }
-  }, [searchParams]);
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => { load(); }, []);
 
@@ -510,6 +518,24 @@ export default function Policy() {
     return null;
   }
 
+  function getRenewalRisk() {
+    if (!activePolicy) return null;
+    const daysLeft = activePolicy.days_until_expiry ?? 0;
+    const hasAutoRenew = activePolicy.auto_renew;
+    const status = activePolicy.status;
+
+    // High risk: expired/cancelled or <7 days with no auto-renew
+    if (status === 'lapsed' || status === 'cancelled' || (daysLeft < 7 && !hasAutoRenew)) {
+      return { level: 'high', label: 'High renewal risk', icon: '🔴' };
+    }
+    // Medium risk: 7-14 days or no auto-renew
+    if (daysLeft >= 7 && daysLeft <= 14 || !hasAutoRenew) {
+      return { level: 'medium', label: 'Monitor renewal', icon: '🟡' };
+    }
+    // Low risk: >14 days with auto-renew
+    return { level: 'low', label: 'Low renewal risk', icon: '🟢' };
+  }
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--gray-bg)' }}>
       <div style={{ width: 32, height: 32, border: '3px solid var(--green-light)', borderTopColor: 'var(--green-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -521,6 +547,7 @@ export default function Policy() {
   const cd = countdown();
   const currentTier = activePolicy?.tier || null;
   const gateBlocked = eligibility?.gate_blocked ?? false;
+  const renewalRisk = getRenewalRisk();
 
   return (
     <>
@@ -585,7 +612,12 @@ export default function Policy() {
               <div>
                 <p className="apb-tier">{activePolicy.tier.toUpperCase()} Plan</p>
                 <p className="apb-sub">{cd || `Expires ${new Date(activePolicy.expires_at).toLocaleDateString('en-IN')}`}</p>
-                <p className="apb-next-premium">Next premium: ₹{breakdown?.total ?? TIER_LIMITS[activePolicy.tier].weekly_premium}/week</p>
+                <p className="apb-next-premium">Next week: ₹{breakdown?.next_week_premium ?? breakdown?.total ?? TIER_LIMITS[activePolicy.tier].weekly_premium}/week</p>
+                {renewalRisk && (
+                  <span className={`renewal-risk-badge ${renewalRisk.level}`}>
+                    {renewalRisk.icon} {renewalRisk.label}
+                  </span>
+                )}
               </div>
               <span className={`apb-badge st-${polSt}`}>{ST_LABELS[polSt]}</span>
             </div>
@@ -617,7 +649,6 @@ export default function Policy() {
         {/* Plan cards */}
         {['flex', 'standard', 'pro'].map(tier => {
           const isCurrent = currentTier === tier;
-          const isAllowed = eligibility?.allowed_tiers?.includes(tier) ?? true;
           const isBlocked = eligibility?.blocked_tiers?.includes(tier) ?? gateBlocked;
           const meta = TIER_META[tier];
           const limits = TIER_LIMITS[tier];
