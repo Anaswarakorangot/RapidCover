@@ -44,6 +44,37 @@ def create_checkout_session(
     Returns a checkout URL that redirects user to Stripe's hosted payment page.
     After payment, Stripe redirects to /payments/success with session_id.
     """
+    # ── Check 1: SS Code eligibility (90/120-day engagement rule) ────────
+    from app.services.ss_code_service import check_ss_code_eligibility, update_engagement_days
+    from app.services.policy_lifecycle import check_adverse_selection
+    from app.api.policies import check_city_enrollment_status
+
+    # Refresh engagement days before checking
+    update_engagement_days(partner, db)
+
+    eligible, reason = check_ss_code_eligibility(partner)
+    if not eligible:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=reason,
+        )
+
+    # ── Check 2: Adverse selection blocking ──────────────────────────────
+    allowed, reason = check_adverse_selection(partner, db)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=reason,
+        )
+
+    # ── Check 3: City enrollment status (loss ratio < 85%) ──────────────
+    allowed, reason, _ = check_city_enrollment_status(partner, db)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=reason,
+        )
+
     # Check for existing active policy
     existing = (
         db.query(Policy)
@@ -188,6 +219,35 @@ def confirm_payment_and_create_policy(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="You already have an active policy.",
+            )
+
+        # ── Check 1: SS Code eligibility (90/120-day engagement rule) ────────
+        from app.services.ss_code_service import check_ss_code_eligibility, update_engagement_days
+        from app.services.policy_lifecycle import check_adverse_selection
+        from app.api.policies import check_city_enrollment_status
+
+        update_engagement_days(partner, db)
+        eligible, reason = check_ss_code_eligibility(partner)
+        if not eligible:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=reason,
+            )
+
+        # ── Check 2: Adverse selection blocking ──────────────────────────────
+        allowed, reason = check_adverse_selection(partner, db)
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=reason,
+            )
+
+        # ── Check 3: City enrollment status (loss ratio < 85%) ──────────────
+        allowed, reason, _ = check_city_enrollment_status(partner, db)
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=reason,
             )
 
         # Extract metadata using bracket notation
