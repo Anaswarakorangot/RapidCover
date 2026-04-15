@@ -120,96 +120,155 @@ export function Admin() {
     }
   }
 
+  const MENU_GROUPS = [
+    {
+      label: 'Dashboards',
+      items: ['overview', 'intelligence', 'map', 'bcr', 'live-data']
+    },
+    {
+      label: 'Operations',
+      items: ['fraud', 'payments', 'premium', 'aggregation', 'disruption', 'reassign']
+    },
+    {
+      label: 'Tools & Testing',
+      items: ['drills', 'verify', 'stress', 'trigger-proof', 'riqi', 'notif-preview', 'checklist', 'oracle', 'triggers']
+    }
+  ];
+
   if (loading) {
     return (
-      <div className="admin-root">
-        <div className="admin-loader">
-          <div className="admin-loader__spinner" />
-          <span>Loading control panel...</span>
-        </div>
+      <div className="admin-loader">
+        <div className="admin-loader__spinner" />
+        <span>Loading control panel...</span>
       </div>
     );
   }
 
   return (
-    <div className="admin-root">
-      {/* Header */}
-      <header className="admin-header">
-        <div>
-          <h1 className="admin-title">Admin control panel</h1>
-          <p className="admin-subtitle">RapidCover · Live · {today}</p>
+    <div className="admin-layout">
+      {/* Sidebar Navigation */}
+      <aside className="admin-sidebar">
+        <div className="sidebar-logo">
+          <span style={{ fontSize: '1.2rem' }}>🛡️</span>
+          RapidCover
         </div>
-        <div className="admin-status">
-          <span className={`admin-status__dot ${statusDotClass}`} />
-          {systemStatus.text}
+        <div className="sidebar-menu">
+          {MENU_GROUPS.map(group => (
+            <div key={group.label} className="menu-section">
+              <span className="menu-label">{group.label}</span>
+              {group.items.map(tabId => {
+                const tab = TABS.find(t => t.id === tabId);
+                if (!tab) return null;
+                return (
+                  <button
+                    key={tabId}
+                    className={`menu-item ${activeTab === tabId ? 'menu-item--active' : ''}`}
+                    onClick={() => setActiveTab(tabId)}
+                  >
+                    <span className="menu-item__icon">{tab.label.split(' ')[0]}</span>
+                    {tab.label.split(' ').slice(1).join(' ') || tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
-      </header>
+      </aside>
 
-      {/* Tab nav */}
-      <nav className="admin-tabs">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            className={`admin-tab ${activeTab === t.id ? 'admin-tab--active' : ''}`}
-            onClick={() => setActiveTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <main className="admin-main">
+        {/* Top Navigation Bar */}
+        <header className="admin-topnav">
+          <div className="topnav-left">
+            <input type="text" className="topnav-search" placeholder="Search for stats, workers, or claims..." />
+            <button 
+              className={`demo-top-toggle ${activeTab === 'demo' ? 'demo-top-toggle--active' : ''}`}
+              onClick={() => setActiveTab('demo')}
+              style={{ 
+                width: 'auto', 
+                padding: '0.4rem 1.25rem', 
+                borderRadius: '30px', 
+                fontSize: '0.75rem', 
+                fontWeight: 800,
+                letterSpacing: '0.05em',
+                marginLeft: '1rem', 
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                border: activeTab === 'demo' ? 'none' : '1px solid var(--border-light)',
+                background: activeTab === 'demo' ? 'var(--primary)' : 'var(--white)',
+                color: activeTab === 'demo' ? 'var(--white)' : 'var(--text-dark)',
+                textTransform: 'uppercase'
+              }}
+            >
+              Demo Mode
+            </button>
+          </div>
+          
+          <div className="topnav-right">
+            <div className="topnav-icon">🔔 <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--danger)', color: 'white', fontSize: '0.6rem', padding: '1px 4px', borderRadius: '10px' }}>3</span></div>
+            <div className="topnav-icon">⚙️</div>
+            
+            <div className="topnav-profile">
+              <div className="profile-info" style={{ textAlign: 'right' }}>
+                <div className="profile-name">Admin User</div>
+                <div className="profile-role">Platform Manager</div>
+              </div>
+              <div className="profile-avatar">AD</div>
+            </div>
+          </div>
+        </header>
 
-      {/* Tab content */}
-      <div className="admin-content">
-        {activeTab === 'overview'  && (
-          stats
-            ? <AdminStats stats={stats} />
-            : (
-              <section className="admin-section">
-                <div
-                  style={{
-                    background: 'var(--white)',
-                    border: '1.5px solid var(--border)',
-                    borderRadius: '24px',
-                    padding: '2rem',
-                    textAlign: 'center',
-                  }}
-                >
-                  <h2 style={{ fontFamily: 'Nunito', fontWeight: 900, color: 'var(--text-dark)', marginBottom: '0.5rem' }}>
-                    No admin stats available
-                  </h2>
-                  <p style={{ color: 'var(--text-light)', margin: 0 }}>
-                    {statsError ? 'The panel stats endpoint is unavailable right now.' : 'No panel data has been recorded yet.'}
-                  </p>
-                </div>
-              </section>
-            )
-        )}
-        {activeTab === 'bcr'       && <BCRPanel />}
-        {activeTab === 'intelligence' && <InsurerIntelligencePanel />}
-        {activeTab === 'map'       && <ZoneMapPanel onZoneClick={handleMapZoneClick} />}
-        {activeTab === 'fraud'     && <FraudQueuePanel />}
-        {activeTab === 'payments'  && <PaymentReconciliationPanel />}
-        {activeTab === 'premium'   && <PremiumCollectionPanel />}
-        {activeTab === 'demo'      && <DemoModePanel />}
-        {activeTab === 'aggregation' && <AggregationPanel />}
-        {activeTab === 'disruption' && <PartialDisruptionPanel />}
-        {activeTab === 'drills'    && <DrillPanel onZoneSelect={(fn) => { drillZoneSelectRef.current = fn; }} />}
-        {activeTab === 'live-data' && <LiveDataPanel />}
-        {activeTab === 'verify'    && <VerificationPanel />}
-        {activeTab === 'stress'    && <StressProofPanel />}
-        {activeTab === 'reassign'  && <ReassignmentQueuePanel />}
-        {activeTab === 'trigger-proof' && <TriggerProofPanel />}
-        {activeTab === 'riqi'      && <RiqiProvenancePanel />}
-        {activeTab === 'notif-preview' && <NotificationPreviewPanel />}
-        {activeTab === 'checklist' && <DemoChecklist />}
-        {activeTab === 'oracle'    && <SocialOraclePanel />}
-        {activeTab === 'triggers'  && (
-          <>
-            <TriggerPanel />
-            <ExclusionsCard />
-          </>
-        )}
-      </div>
+        {/* Dynamic Content Area */}
+        <div className="admin-content-scroll">
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-dark)', margin: 0 }}>
+              {TABS.find(t => t.id === activeTab)?.label.split(' ').slice(1).join(' ') || "Dashboard"}
+            </h2>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+              RapidCover Insurance · {activeTab.toUpperCase()} · {today}
+            </p>
+          </div>
+
+          <div className="admin-content">
+            {activeTab === 'overview'  && (
+              stats
+                ? <AdminStats stats={stats} />
+                : (
+                  <section className="admin-section">
+                    <div style={{ background: 'var(--white)', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '2rem', textAlign: 'center' }}>
+                      <h2 style={{ fontWeight: 800, color: 'var(--text-dark)', marginBottom: '0.5rem' }}>No admin stats available</h2>
+                      <p style={{ color: 'var(--text-muted)', margin: 0 }}>{statsError ? 'Backend unavailable' : 'No data recorded'}</p>
+                    </div>
+                  </section>
+                )
+            )}
+            {activeTab === 'bcr'       && <BCRPanel />}
+            {activeTab === 'intelligence' && <InsurerIntelligencePanel />}
+            {activeTab === 'map'       && <ZoneMapPanel onZoneClick={handleMapZoneClick} />}
+            {activeTab === 'fraud'     && <FraudQueuePanel />}
+            {activeTab === 'payments'  && <PaymentReconciliationPanel />}
+            {activeTab === 'premium'   && <PremiumCollectionPanel />}
+            {activeTab === 'demo'      && <DemoModePanel />}
+            {activeTab === 'aggregation' && <AggregationPanel />}
+            {activeTab === 'disruption' && <PartialDisruptionPanel />}
+            {activeTab === 'drills'    && <DrillPanel onZoneSelect={(fn) => { drillZoneSelectRef.current = fn; }} />}
+            {activeTab === 'live-data' && <LiveDataPanel />}
+            {activeTab === 'verify'    && <VerificationPanel />}
+            {activeTab === 'stress'    && <StressProofPanel />}
+            {activeTab === 'reassign'  && <ReassignmentQueuePanel />}
+            {activeTab === 'trigger-proof' && <TriggerProofPanel />}
+            {activeTab === 'riqi'      && <RiqiProvenancePanel />}
+            {activeTab === 'notif-preview' && <NotificationPreviewPanel />}
+            {activeTab === 'checklist' && <DemoChecklist />}
+            {activeTab === 'oracle'    && <SocialOraclePanel />}
+            {activeTab === 'triggers'  && (
+              <>
+                <TriggerPanel />
+                <ExclusionsCard />
+              </>
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
