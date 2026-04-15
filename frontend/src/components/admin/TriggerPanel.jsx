@@ -42,22 +42,22 @@ export default function TriggerPanel() {
   const logRef = useRef(null);
 
   // Fix 6 — poll every 10s for live LAST POLL updates + stale detection
-  const fetchEngineStatus = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/admin/panel/engine-status`);
-      if (res.ok) {
-        setEngineStatus(await res.json());
-      }
-    } catch {
-      setEngineStatus(null);
-    }
-  }, []);
-
   useEffect(() => {
+    async function fetchEngineStatus() {
+      try {
+        const res = await fetch(`${API_BASE}/admin/panel/engine-status`);
+        if (res.ok) {
+          setEngineStatus(await res.json());
+        }
+      } catch {
+        setEngineStatus(null);
+      }
+    }
+
     fetchEngineStatus();
     const interval = setInterval(fetchEngineStatus, 10000);
     return () => clearInterval(interval);
-  }, [fetchEngineStatus]);
+  }, []);
 
   // Determine if scheduler is stale (>2 min since last poll)
   function isSchedulerStale() {
@@ -121,13 +121,15 @@ export default function TriggerPanel() {
 
     // Fallback if backend stream failed
     if (!streamWorked) {
-      await runLocalSimulation(trigger);
+      const mockSim = runLocalSimulation(trigger);
+      await streamLines(mockSim);
+      await new Promise(r => setTimeout(r, 300));
+      setLogLines(prev => [...prev, { ts: 'done', msg: 'Total: 49 seconds', total: 49 }]);
     }
 
     setSimulating(false);
     setActiveTrigger(null);
     setLocalActiveEvents(null); // Reset — let real status take over
-    setTimeout(fetchEngineStatus, 500);
   }
 
   // Stream lines one-by-one using Promise chain
@@ -147,22 +149,19 @@ export default function TriggerPanel() {
     });
   }
 
-  async function runLocalSimulation(trigger) {
-    const mockSteps = [
+  const runLocalSimulation = useCallback((trigger) => {
+    const txnId = Math.floor(Math.random() * 9000 + 1000);
+    return [
       { ts: '5:47:23', msg: `Zone ${trigger.zone} polygon match confirmed — IMD red alert active` },
       { ts: '5:47:31', msg: `Zepto mock ops: zone suspended — 72mm/hr rainfall detected` },
       { ts: '5:47:39', msg: `Traffic cross-validation: confirms severe disruption` },
       { ts: '5:47:44', msg: `GPS coherence: normal — no spoofing anomalies` },
       { ts: '5:47:51', msg: `Run count confirmed: 3 deliveries completed before suspension` },
       { ts: '5:47:58', msg: `Fraud score: 0.11 → auto-approve` },
-      { ts: '5:48:09', msg: `₹272 UPI credit via Razorpay mock — txn RC${trigger.zone}-${Math.floor(Math.random()*9000+1000)}` },
+      { ts: '5:48:09', msg: `₹272 UPI credit via Razorpay mock — txn RC${trigger.zone}-${txnId}` },
       { ts: '5:48:12', msg: `Push notification sent (Kannada) — claim processed` },
     ];
-
-    await streamLines(mockSteps);
-    await new Promise(r => setTimeout(r, 300));
-    setLogLines(prev => [...prev, { ts: 'done', msg: 'Total: 49 seconds', total: 49 }]);
-  }
+  }, []);
 
   // Display active events: use local override during simulation, else real data
   const displayActiveEvents = localActiveEvents !== null
