@@ -100,15 +100,13 @@ def compute_policy_status(
     """
     now = utcnow()
 
-    # Ensure expires_at is timezone-aware for consistent comparison
-    expires_at = policy.expires_at
-    if expires_at.tzinfo is None:
-        from datetime import timezone
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-
-    # Make now naive too for comparison
+    # Make both datetimes naive for SQLite compatibility
     if now.tzinfo is not None:
         now = now.replace(tzinfo=None)
+
+    expires_at = policy.expires_at
+    if expires_at.tzinfo is not None:
+        expires_at = expires_at.replace(tzinfo=None)
 
     # Calculate grace period end (48 hours after expiry)
     grace_ends_at = expires_at + timedelta(hours=GRACE_PERIOD_HOURS)
