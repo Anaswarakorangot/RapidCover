@@ -13,7 +13,7 @@ import json
 import random
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -27,6 +27,14 @@ from app.models.zone import Zone
 from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent, TriggerType
 from app.config import get_settings
+from app.services.demo_mode import (
+    cleanup_demo_run,
+    get_demo_mode_status as build_demo_mode_status,
+    get_demo_run,
+    list_demo_scenarios,
+    run_demo_scenario,
+    set_demo_mode,
+)
 
 router = APIRouter(prefix="/admin/panel", tags=["admin-panel"])
 
@@ -99,16 +107,40 @@ class SuspendCityRequest(BaseModel):
     suspended: bool
 
 
+class DemoScenarioRunRequest(BaseModel):
+    scenario_type: str
+    zone_id: int
+    trigger_type: str = "rain"
+    severity: int = 4
+    enforce_restrictions: bool = True
+    inject_sustained_days: int = 0
+    partial_factor_override: Optional[float] = None
+    expected_orders: Optional[int] = None
+    actual_orders: Optional[int] = None
+    auto_mark_paid: bool = True
+    disruption_hours: Optional[float] = None
+
+
+class DemoManualTriggerRequest(BaseModel):
+    zone_id: int
+    trigger_type: str = "rain"
+    severity: int = 4
+    inject_sustained_days: int = 0
+    partial_factor_override: Optional[float] = None
+    expected_orders: Optional[int] = None
+    actual_orders: Optional[int] = None
+    auto_mark_paid: bool = True
+    disruption_hours: Optional[float] = None
+
 class SystemSettingSchema(BaseModel):
     key: str
     value: str
     category: str
     description: Optional[str] = None
 
+
 class UpdateSettingsRequest(BaseModel):
     settings: list[SystemSettingSchema]
-
-
 
 # --- GET /admin/panel/stats --------------------------------------------------
 
@@ -845,160 +877,75 @@ def get_live_data(db: Session = Depends(get_db)):
 
 @router.get("/demo-mode/status")
 async def get_demo_mode_status():
-    """
-    Get current demo mode status.
-
-    Returns detailed information about demo mode state and what bypasses are active.
-    """
-    settings = get_settings()
-    return {
-        "enabled": settings.demo_mode,
-        "mode": "demo_override" if settings.demo_mode else "production",
-        "bypasses_active": {
-            "adverse_selection": settings.demo_mode,
-            "activity_gate": settings.demo_mode,
-            "fraud_rejection": False,  # Not implemented yet
-        } if settings.demo_mode else {},
-        "description": (
-            "Demo mode: Bypasses restrictions for feature demonstration. Works on REAL database with REAL users."
-            if settings.demo_mode
-            else "Production mode: All safety checks active."
-        ),
-        "demo_exempt_cities": settings.demo_exempt_cities,
-    }
+    """Get current demo mode status and recent demo runs."""
+    return build_demo_mode_status()
 
 
 @router.post("/demo-mode/toggle")
 async def toggle_demo_mode(enabled: bool = Query(..., description="True to enable demo mode, False to disable")):
-    """
-    Toggle demo mode on or off.
-
-    Demo mode bypasses safety restrictions to demonstrate features on REAL database:
-    - Adverse selection blocking (can buy policy during active events)
-    - 7-day activity gate (can buy policy immediately after registration)
-    - Uses mock data for external API calls
-
-    Args:
-        enabled: True to enable demo mode, False to disable
-
-    Returns:
-        Status and confirmation message
-    """
-    settings = get_settings()
-    settings.demo_mode = enabled
-
+    """Toggle demo mode on or off."""
+    set_demo_mode(enabled)
     return {
-        "enabled": settings.demo_mode,
-        "mode": "demo_override" if settings.demo_mode else "production",
+        **build_demo_mode_status(),
         "message": (
-            "Demo mode ENABLED: Restrictions bypassed, mock data active. Working on REAL database."
-            if settings.demo_mode
+            "Demo mode ENABLED: purchase restrictions can be bypassed for walkthroughs while runs still use the real trigger pipeline."
+            if enabled
             else "Demo mode DISABLED: Production mode restored, all safety checks active."
         ),
-        "bypasses_active": {
-            "adverse_selection": settings.demo_mode,
-            "activity_gate": settings.demo_mode,
-        } if settings.demo_mode else {},
     }
+
+
+@router.get("/demo-mode/scenarios")
+async def get_demo_mode_scenarios(db: Session = Depends(get_db)):
+    """Return available demo scenarios, selectable zones, and recent runs."""
+    return list_demo_scenarios(db)
+
+
+@router.post("/demo-mode/run")
+async def run_demo_mode_scenario(
+    request: DemoScenarioRunRequest,
+    db: Session = Depends(get_db),
+):
+    """Run a structured demo scenario against the real trigger pipeline."""
+    try:
+        return run_demo_scenario(request.model_dump(), db)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/demo-mode/run/{run_id}")
+async def get_demo_mode_run(run_id: int):
+    """Return a previous demo run summary."""
+    run = get_demo_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Demo run not found")
+    return run
+
+
+@router.post("/demo-mode/run/{run_id}/cleanup")
+async def cleanup_demo_mode_run(run_id: int, db: Session = Depends(get_db)):
+    """End trigger side effects and clear temporary demo scenario state."""
+    try:
+        return cleanup_demo_run(run_id, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/demo-mode/create-trigger")
 async def create_manual_trigger(
-    zone_id: int = Query(..., description="Zone ID where trigger should occur"),
-    trigger_type: str = Query(..., description="rain | heat | aqi | shutdown | closure"),
-    severity: int = Query(4, ge=1, le=5, description="Severity level 1-5"),
+    request: DemoManualTriggerRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Manually create a REAL trigger event in the database.
-
-    This is used in demo mode to showcase how the system responds to trigger events.
-    Creates a REAL trigger in the database, which will generate REAL claims for partners
-    with active policies in that zone.
-
-    Args:
-        zone_id: The zone where the trigger occurs
-        trigger_type: Type of trigger (rain, heat, aqi, shutdown, closure)
-        severity: Severity level (1-5, where 3+ blocks new enrollments)
-
-    Returns:
-        Created trigger event details
-    """
-    from app.models.trigger_event import TriggerEvent, TriggerType
-
-    # Verify zone exists
-    zone = db.query(Zone).filter(Zone.id == zone_id).first()
-    if not zone:
-        return {"error": f"Zone {zone_id} not found"}
-
-    # Map string to enum
-    trigger_type_map = {
-        "rain": TriggerType.RAIN,
-        "heat": TriggerType.HEAT,
-        "aqi": TriggerType.AQI,
-        "shutdown": TriggerType.SHUTDOWN,
-        "closure": TriggerType.CLOSURE,
+    """Backward-compatible manual trigger entrypoint backed by the scenario runner."""
+    payload = {
+        "scenario_type": "standard_trigger",
+        **request.model_dump(),
+        "enforce_restrictions": False,
     }
-
-    trigger_enum = trigger_type_map.get(trigger_type.lower())
-    if not trigger_enum:
-        return {"error": f"Invalid trigger type: {trigger_type}"}
-
-    # Check if there's already an active trigger for this zone
-    existing = (
-        db.query(TriggerEvent)
-        .filter(
-            TriggerEvent.zone_id == zone_id,
-            TriggerEvent.trigger_type == trigger_enum,
-            TriggerEvent.ended_at.is_(None),
-        )
-        .first()
-    )
-
-    if existing:
-        return {
-            "error": f"Active {trigger_type} trigger already exists for {zone.name}",
-            "existing_trigger_id": existing.id,
-            "started_at": existing.started_at.isoformat(),
-        }
-
-    # Create new trigger event
-    now = utcnow()
-    trigger = TriggerEvent(
-        zone_id=zone_id,
-        trigger_type=trigger_enum,
-        severity=severity,
-        started_at=now,
-        ended_at=None,  # Active event
-        source_data=json.dumps({
-            "source": "manual_admin",
-            "created_via": "demo_mode_panel",
-            "note": "Manually created for demonstration",
-        }),
-    )
-
-    db.add(trigger)
-    db.commit()
-    db.refresh(trigger)
-
-    # Process claims for this trigger (auto-create claims for affected partners)
-    from app.services.claims_processor import process_trigger_event
-    claims_created = len(process_trigger_event(trigger, db))
-
-    return {
-        "status": "success",
-        "trigger": {
-            "id": trigger.id,
-            "zone": zone.name,
-            "zone_code": zone.code,
-            "type": trigger.trigger_type.value,
-            "severity": trigger.severity,
-            "started_at": trigger.started_at.isoformat(),
-            "active": True,
-        },
-        "claims_created": claims_created,
-        "message": f"Created {trigger_type} trigger (severity {severity}) in {zone.name}. {claims_created} claims auto-generated.",
-    }
+    try:
+        return run_demo_scenario(payload, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # --- GET /admin/panel/premium-collection -------------------------------------

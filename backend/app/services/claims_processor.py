@@ -230,10 +230,17 @@ def build_validation_matrix(
         _check("pin_code_match", False, "Zone unavailable for pin-code check", "none", 0.0)
 
     # 4. Active policy confirmed
+    policy_starts_at = policy.starts_at
+    policy_expires_at = policy.expires_at
+    if policy_starts_at and policy_starts_at.tzinfo is None and now.tzinfo is not None:
+        now = now.replace(tzinfo=None)
+    elif policy_starts_at and policy_starts_at.tzinfo is not None and now.tzinfo is None:
+        policy_starts_at = policy_starts_at.replace(tzinfo=None)
+        policy_expires_at = policy_expires_at.replace(tzinfo=None) if policy_expires_at else None
     policy_active = (
         policy.is_active
-        and policy.starts_at <= now
-        and policy.expires_at > (now - timedelta(hours=48))
+        and policy_starts_at <= now
+        and policy_expires_at > (now - timedelta(hours=48))
     )
     _check("active_policy", policy_active, f"Policy {policy.id} active from {policy.starts_at.date()} to {policy.expires_at.date()}", "database", 1.0)
 
