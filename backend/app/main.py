@@ -56,13 +56,7 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Starting RapidCover API...", extra={"extra_fields": {"environment": settings.environment}})
 
-    if settings.database_url.startswith("sqlite"):
-        init_db()
-        logger.info("Database tables created (SQLite)")
-    else:
-        logger.info("Skipping init_db() - using Alembic for schema management")
-
-    # Run Alembic migrations
+    # Run Alembic migrations for all databases
     try:
         from alembic.config import Config
         from alembic import command
@@ -73,20 +67,23 @@ async def lifespan(app: FastAPI):
         alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
 
         from app.database import engine
+        from sqlalchemy import inspect
 
         with engine.connect() as conn:
             context = MigrationContext.configure(conn)
             current_rev = context.get_current_revision()
+            inspector = inspect(conn)
+            tables_exist = len(inspector.get_table_names()) > 0
 
-        if current_rev is None and not settings.database_url.startswith("sqlite"):
-            # Schema may already exist (pre-Alembic deploy) — stamp it as at head
-            # so Alembic knows it's already applied, then run upgrade for any new ones
-            logger.info("No migration revision found — stamping head then upgrading")
+        # For production PostgreSQL: if no migration revision but tables exist, stamp as head
+        if current_rev is None and tables_exist and not settings.database_url.startswith("sqlite"):
+            logger.info("No migration revision found but tables exist — stamping head")
             command.stamp(alembic_cfg, "head")
-        else:
-            command.upgrade(alembic_cfg, "head")
 
+        # Run migrations to bring database to latest version
+        command.upgrade(alembic_cfg, "head")
         logger.info("Database migrations applied successfully")
+
     except Exception as migration_err:
         logger.error(f"Migration failed: {migration_err}", exc_info=True)
         raise

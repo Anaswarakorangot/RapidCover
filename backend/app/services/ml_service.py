@@ -478,7 +478,7 @@ try:
     _metadata_path = _ML_MODELS_DIR / "model_metadata.json"
 
     if _metadata_path.exists():
-        print("[ML] ─────────────────────────────────────────────────────────")
+        print("[ML] ---------------------------------------------------------")
         print(f"[ML] model_metadata.json found at: {_metadata_path}")
         print("[ML] Loading TRAINED XGBoost/sklearn models (pricing_mode=trained_ml)")
         from app.services.ml_service_trained import (
@@ -486,12 +486,12 @@ try:
             premium_model,
             fraud_model,
         )
-        print("[ML] ✓ zone_risk_model  → TrainedZoneRiskModel")
-        print("[ML] ✓ premium_model    → TrainedPremiumModel")
-        print("[ML] ✓ fraud_model      → TrainedFraudModel")
-        print("[ML] ─────────────────────────────────────────────────────────")
+        print("[ML] OK zone_risk_model  -> TrainedZoneRiskModel")
+        print("[ML] OK premium_model    -> TrainedPremiumModel")
+        print("[ML] OK fraud_model      -> TrainedFraudModel")
+        print("[ML] ---------------------------------------------------------")
     else:
-        print("[ML] ─────────────────────────────────────────────────────────")
+        print("[ML] ---------------------------------------------------------")
         print(f"[ML] No model_metadata.json at {_metadata_path}")
         print("[ML] Loading MANUAL calibrated models (pricing_mode=fallback_rule_based)")
         zone_risk_model = ZoneRiskModel()
@@ -500,10 +500,10 @@ try:
         print("[ML] ✓ zone_risk_model  → ZoneRiskModel (manual weights)")
         print("[ML] ✓ premium_model    → PremiumModel (manual formula)")
         print("[ML] ✓ fraud_model      → FraudModel (7-factor manual)")
-        print("[ML] ─────────────────────────────────────────────────────────")
+        print("[ML] ---------------------------------------------------------")
 
 except ImportError as _e:
-    print("[ML] ─────────────────────────────────────────────────────────")
+    print("[ML] ---------------------------------------------------------")
     print(f"[ML] ImportError while loading trained models: {_e}")
     print("[ML] Falling back to MANUAL calibrated models")
     zone_risk_model = ZoneRiskModel()
@@ -512,4 +512,4 @@ except ImportError as _e:
     print("[ML] ✓ zone_risk_model  → ZoneRiskModel (manual weights)")
     print("[ML] ✓ premium_model    → PremiumModel (manual formula)")
     print("[ML] ✓ fraud_model      → FraudModel (7-factor manual)")
-    print("[ML] ─────────────────────────────────────────────────────────")
+    print("[ML] ---------------------------------------------------------")
