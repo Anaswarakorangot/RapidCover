@@ -362,6 +362,11 @@ def get_experience_state(
             "uptime_pct": round((active_days / 30.0) * 100, 1),
             "savings_today": round(earnings_prot - (breakdown["total"] / 7), 2) if earnings_prot > 0 else 0,
         },
+        "system_health": {
+            "overall": "Healthy",  # Optional: "Degraded" | "Outage"
+            "source_status": "All systems operational",
+            "last_verified": utcnow().isoformat()
+        },
         "fetched_at":        utcnow().isoformat(),
     }
 

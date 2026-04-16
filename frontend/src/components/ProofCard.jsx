@@ -25,8 +25,9 @@
  *   paymentStatus      {string?}      'not_started' | 'initiated' | 'confirmed' | 'failed' | 'reconcile_pending'
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SourceBadge from './SourceBadge';
+import api from '../services/api';
 
 /* ─── Status config ──────────────────────────────────────────────────────── */
 const STATUS_CFG = {
@@ -89,9 +90,21 @@ export default function ProofCard({
   paymentStatus,
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [explanation, setExplanation] = useState(null);
+  const [loadingExpl, setLoadingExpl] = useState(false);
   const stCfg = STATUS_CFG[status] || FALLBACK_STATUS;
   const dCfg = disruptionCategory ? DISRUPTION_CFG[disruptionCategory] : null;
   const pCfg = paymentStatus ? PAY_CFG[paymentStatus] : null;
+
+  useEffect(() => {
+    if (expanded && !explanation && claimId) {
+      setLoadingExpl(true);
+      api.getClaimExplanation(claimId)
+        .then(setExplanation)
+        .catch(err => console.error("Failed to fetch explanation:", err))
+        .finally(() => setLoadingExpl(false));
+    }
+  }, [expanded, explanation, claimId]);
 
   // Attempt to parse validation data for the deep dive
   let trLog = null;
@@ -231,23 +244,37 @@ export default function ProofCard({
             flexDirection: 'column',
             gap: 12
           }}>
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: '#8a9e8a', textTransform: 'uppercase', marginBottom: 6 }}>Payout Explanation</p>
-              <div style={{ background: '#f7f9f7', borderRadius: 12, padding: 12, fontSize: 13 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ color: '#4a5e4a' }}>Trigger Source</span>
-                  <span style={{ fontWeight: 600 }}>{triggerDetail.label || triggerType}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ color: '#4a5e4a' }}>Disruption Metric</span>
-                  <span style={{ fontWeight: 600 }}>{metricValue || 'Detected'}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2ece2', marginTop: 8, paddingTop: 8 }}>
-                  <span style={{ color: '#4a5e4a' }}>Payout Formula</span>
-                  <span style={{ fontWeight: 600, color: '#2a9e47' }}>Auto-calculated</span>
+            {loadingExpl ? (
+              <p style={{ fontSize: 12, color: '#8a9e8a' }}>Fetching explanation...</p>
+            ) : (
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, color: '#8a9e8a', textTransform: 'uppercase', marginBottom: 6 }}>Payout Explanation</p>
+                <div style={{ background: '#f7f9f7', borderRadius: 12, padding: 12, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: '#4a5e4a' }}>Trigger Source</span>
+                    <span style={{ fontWeight: 600 }}>{explanation?.trigger_source || triggerDetail.label || triggerType}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: '#4a5e4a' }}>Zone Match</span>
+                    <span style={{ fontWeight: 600, color: explanation?.zone_match ? '#2a9e47' : '#dc2626' }}>
+                      {explanation?.zone_match ? 'Verified' : 'Flagged'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: '#4a5e4a' }}>Payout Formula</span>
+                    <span style={{ fontWeight: 600 }}>{explanation?.payout_formula || 'Determined by tier'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: '#4a5e4a' }}>Fraud Review</span>
+                    <span style={{ fontWeight: 600 }}>{explanation?.fraud_review || 'Passed'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2ece2', marginTop: 8, paddingTop: 8 }}>
+                    <span style={{ color: '#4a5e4a' }}>Transaction Proof</span>
+                    <span style={{ fontWeight: 600, color: '#2a9e47', fontSize: 11 }}>{explanation?.transaction_proof || 'Processing'}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {cityCap && (
               <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 10 }}>

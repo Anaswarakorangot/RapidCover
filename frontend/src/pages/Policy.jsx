@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
+import PayoutLedger from '../components/PayoutLedger';
+import { useAuth } from '../context/AuthContext';
 
 /* ─── Design tokens matching Register.jsx ───────────────────────────────── */
 const S = `
@@ -347,6 +349,7 @@ function PremiumBreakdown({ breakdown }) {
 
 /* ─── Main Policy ─────────────────────────────────────────────────────── */
 export default function Policy() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [activePolicy, setActivePolicy] = useState(null);
@@ -716,6 +719,11 @@ export default function Policy() {
             <li>48-hour grace period after expiry for renewal</li>
           </ul>
         </div>
+
+        {/* Payout Proof Ledger */}
+        {(activePolicy || user?.zone_id) && (
+          <PayoutLedger zoneId={activePolicy?.zone_id || user?.zone_id} />
+        )}
 
         {/* Renewal modal */}
         {showRenewalModal && (
