@@ -27,7 +27,7 @@ import PaymentReconciliationPanel from '../components/admin/PaymentReconciliatio
 import AggregationPanel from '../components/admin/AggregationPanel';
 import PartialDisruptionPanel from '../components/admin/PartialDisruptionPanel';
 import PremiumCollectionPanel from '../components/admin/PremiumCollectionPanel';
-import DemoModePanel from '../components/admin/DemoModePanel';
+import DemoModeScenarioPanel from '../components/admin/DemoModeScenarioPanel';
 import './Admin.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
@@ -269,7 +269,7 @@ export function Admin() {
             {activeTab === 'fraud'     && <FraudQueuePanel />}
             {activeTab === 'payments'  && <PaymentReconciliationPanel />}
             {activeTab === 'premium'   && <PremiumCollectionPanel />}
-            {activeTab === 'demo'      && <DemoModePanel />}
+            {activeTab === 'demo'      && <DemoModeScenarioPanel />}
             {activeTab === 'aggregation' && <AggregationPanel />}
             {activeTab === 'disruption' && <PartialDisruptionPanel />}
             {activeTab === 'drills'    && <DrillPanel onZoneSelect={(fn) => { drillZoneSelectRef.current = fn; }} />}
