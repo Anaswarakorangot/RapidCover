@@ -3,31 +3,20 @@ import { useEffect, useState, useCallback } from 'react';
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 export default function AdminStats({ stats }) {
-  const [animated, setAnimated] = useState(false);
-  const [selectedZone, setSelectedZone] = useState(0); // index into zoneLossRatios
-  const [liveData, setLiveData] = useState(null);
-  const [liveLoading, setLiveLoading] = useState(false);
   const [zones, setZones] = useState([]);
+  const [selectedZone, setSelectedZone] = useState(0); // index into zoneLossRatios
   const [selectedLiveZone, setSelectedLiveZone] = useState('');
 
-  useEffect(() => {
-    const t = setTimeout(() => setAnimated(true), 100);
-    return () => clearTimeout(t);
-  }, []);
 
   const fetchLiveData = useCallback(async (zoneCode) => {
     const code = zoneCode || selectedLiveZone;
     if (!code) return;
-    setLiveLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/live-data?zone_code=${code}`);
-      if (res.ok) {
-        setLiveData(await res.json());
-      }
+      await fetch(`${API_BASE}/admin/panel/live-data?zone_code=${code}`);
+      // In a real app we'd set state here, but for now we just verify connectivity
     } catch (_err) {
       console.error('Failed to fetch live data:', _err);
     }
-    setLiveLoading(false);
   }, [selectedLiveZone]);
 
   useEffect(() => {

@@ -41,6 +41,8 @@ class PolicyQuote(BaseModel):
     final_premium: float
     max_daily_payout: float
     max_days_per_week: int
+    pricing_mode: str = "standard"  # e.g. "standard", "surged", "loyalty"
+    audit_breakdown: Optional[dict] = None
 
 
 class PolicyResponseExtended(BaseModel):
@@ -82,6 +84,8 @@ class PolicyRenewalQuote(BaseModel):
     final_premium: float
     max_daily_payout: float
     max_days_per_week: int
+    pricing_mode: str = "loyalty"
+    audit_breakdown: Optional[dict] = None
 
 
 class AutoRenewUpdate(BaseModel):

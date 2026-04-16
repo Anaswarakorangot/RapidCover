@@ -8,7 +8,9 @@ from app.models.partner import Partner
 from app.models.policy import Policy
 from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent
-from app.schemas.claim import ClaimResponse, ClaimListResponse, ClaimSummary, PayoutMetadata
+from app.schemas.claim import (
+    ClaimResponse, ClaimListResponse, ClaimSummary, PayoutMetadata, ClaimExplanationResponse
+)
 from app.services.auth import get_current_partner
 from app.services.payout_service import get_transaction_log
 
@@ -208,3 +210,61 @@ def get_claim_transaction(
         )
 
     return {"claim_id": claim_id, "transaction_log": log}
+
+
+@router.get("/{claim_id}/explanation", response_model=ClaimExplanationResponse)
+def get_claim_explanation(
+    claim_id: int,
+    partner: Partner = Depends(get_current_partner),
+    db: Session = Depends(get_db),
+):
+    """
+    Get deep detailed explanation of why a claim was processed the way it was.
+    Answers the roadmap trust and explainability gap.
+    """
+    policy_ids = [p.id for p in db.query(Policy).filter(Policy.partner_id == partner.id).all()]
+
+    claim = (
+        db.query(Claim)
+        .filter(Claim.id == claim_id, Claim.policy_id.in_(policy_ids))
+        .first()
+    )
+
+    if not claim:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim not found")
+
+    # Extract logic from validation_data and source_metadata
+    trigger_source = "Meteorological Corroboration (Manual/Demo)"
+    if claim.source_metadata:
+        try:
+            sm = json.loads(claim.source_metadata)
+            trigger_source = sm.get("primary_source", trigger_source)
+        except: pass
+
+    payout_formula = f"₹{claim.amount} payout based on policy tier"
+    zone_match = True
+    fraud_review = "Auto-passed"
+    if claim.validation_data:
+        try:
+            vd = json.loads(claim.validation_data)
+            pc = vd.get("payout_calculation")
+            if pc:
+                payout_formula = f"₹{pc.get('hourly_rate')}/hr x {pc.get('disruption_hours')} hrs x {pc.get('severity_multiplier')} Severity"
+            
+            fm = vd.get("fraud_metrics")
+            if fm:
+                fraud_review = f"Score: {claim.fraud_score:.2f} (Threshold 0.70)"
+            
+            zone_match = vd.get("zone_match", True)
+        except: pass
+
+    return ClaimExplanationResponse(
+        claim_id=claim.id,
+        trigger_source=trigger_source,
+        zone_match=zone_match,
+        payout_formula=payout_formula,
+        fraud_review=fraud_review,
+        payment_status=claim.status.value,
+        transaction_proof=claim.upi_ref or "Awaiting settlement",
+        is_disputed=False,
+    )

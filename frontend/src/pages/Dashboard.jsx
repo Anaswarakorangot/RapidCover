@@ -20,6 +20,7 @@ import SourceBadge from '../components/SourceBadge';
 import ReassignmentCountdown from '../components/ReassignmentCountdown';
 import { useNotifications } from '../hooks/useNotifications';
 import OfflineFallbackCard from '../components/OfflineFallbackCard';
+import ZoneMapPanel from '../components/admin/ZoneMapPanel';
 
 const POLL_INTERVAL_MS = 5_000;
 const POLL_TIMEOUT_MS  = 120_000;
@@ -281,6 +282,38 @@ const S = `
   }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
   @keyframes spin   { to { transform: rotate(360deg); } }
+
+  /* ── Trigger Evidence Panel ── */
+  .evidence-panel {
+    background: #ffffff;
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    padding: 18px;
+    margin-bottom: 8px;
+  }
+  .evidence-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .evidence-title  { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 14px; color: var(--text-dark); }
+  .evidence-status { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+  .ev-active { background: #fee2e2; color: #dc2626; }
+  .ev-inactive { background: #f3f4f6; color: #6b7280; }
+  
+  .evidence-metrics { display: flex; flex-direction: column; gap: 8px; }
+  .metric-row { display: flex; align-items: center; justify-content: space-between; }
+  .metric-label { font-size: 12px; color: var(--text-mid); }
+  .metric-val { font-size: 13px; font-weight: 700; color: var(--text-dark); }
+  .metric-progress { height: 6px; background: #e5e7eb; border-radius: 10px; overflow: hidden; margin-top: 4px; }
+  .metric-progress-fill { height: 100%; border-radius: 10px; transition: width 0.5s ease; }
+  
+  .evidence-message {
+    background: #f7f9f7;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--text-mid);
+    margin-top: 12px;
+    border-left: 3px solid var(--green-primary);
+  }
+  .evidence-source { font-size: 10px; color: var(--text-light); margin-top: 8px; text-align: right; }
 `;
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
@@ -384,6 +417,47 @@ function ZoneReassignmentCard({ card, onAccept, onDismiss, processing }) {
             {processing ? 'Processing...' : 'Accept New Zone'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Why Not Triggered UI - Explains exact metrics vs thresholds */
+function TriggerEvidencePanel({ evidence }) {
+  if (!evidence) return null;
+  
+  const pct = Math.min((evidence.current_value / evidence.threshold_value) * 100, 100);
+  const color = evidence.is_active ? '#dc2626' : (pct > 70 ? '#f59e0b' : '#3DB85C');
+
+  return (
+    <div className="evidence-panel">
+      <div className="evidence-header">
+        <span className="evidence-title">Live {evidence.metric_name}</span>
+        <span className={`evidence-status ${evidence.is_active ? 'ev-active' : 'ev-inactive'}`}>
+          {evidence.is_active ? '🔴 TRIGGERED' : '🟢 BELOW THRESHOLD'}
+        </span>
+      </div>
+      
+      <div className="evidence-metrics">
+        <div className="metric-row">
+          <span className="metric-label">Current Intensity</span>
+          <span className="metric-val" style={{ color }}>{evidence.current_value} units</span>
+        </div>
+        <div className="metric-progress">
+          <div className="metric-progress-fill" style={{ width: `${pct}%`, background: color }} />
+        </div>
+        <div className="metric-row" style={{ marginTop: 2 }}>
+          <span className="metric-label">Payout Threshold</span>
+          <span className="metric-val" style={{ opacity: 0.6 }}>{evidence.threshold_value} units</span>
+        </div>
+      </div>
+
+      <div className="evidence-message">
+        {evidence.message}
+      </div>
+      
+      <div className="evidence-source">
+         Source: {evidence.source_health === 'Healthy' ? '✅' : '⚠️'} {evidence.metric_name} API · Updated {new Date(evidence.last_updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </div>
     </div>
   );
@@ -526,6 +600,7 @@ export function Dashboard() {
   const [summary,       setSummary]       = useState(null);
   const [zone,          setZone]          = useState(null);
   const [triggers,      setTriggers]      = useState([]);
+  const [evidence,      setEvidence]      = useState(null);
   const [recentClaims,  setRecentClaims]  = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState(null);
@@ -591,11 +666,15 @@ export function Dashboard() {
       }
 
       // Also load zone & active triggers if we have a zone_id
-      if (isInitial && user?.zone_id) {
-        const z  = await api.getZone(user.zone_id).catch(() => null);
-        const tr = await api.getActiveTriggers(user.zone_id).catch(() => ({ triggers: [] }));
+      if (user?.zone_id) {
+        const [z, tr, ev] = await Promise.all([
+          api.getZone(user.zone_id).catch(() => null),
+          api.getActiveTriggers(user.zone_id).catch(() => ({ triggers: [] })),
+          api.getZoneTriggerEvidence(user.zone_id).catch(() => null)
+        ]);
         setZone(z);
         setTriggers(tr.triggers || []);
+        setEvidence(ev);
       }
 
       if (isInitial) setError(null);
@@ -698,9 +777,41 @@ export function Dashboard() {
     <>
       <style>{S}</style>
       <div className="dash-wrap">
+        {/* System Health Banner (Degraded Mode) */}
+        {expState?.system_health?.overall !== 'Healthy' && (
+          <div style={{ 
+            background: expState?.system_health?.overall === 'Outage' ? '#fef2f2' : '#fffbeb',
+            border: `1.5px solid ${expState?.system_health?.overall === 'Outage' ? '#fecaca' : '#fde68a'}`,
+            borderRadius: 16,
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            margin: '16px 16px 8px'
+          }}>
+            <span style={{ fontSize: 20 }}>{expState?.system_health?.overall === 'Outage' ? '🛑' : '⚠️'}</span>
+            <div>
+              <p style={{ 
+                fontFamily: 'Nunito', 
+                fontWeight: 800, 
+                fontSize: 13, 
+                color: expState?.system_health?.overall === 'Outage' ? '#991b1b' : '#92400e' 
+              }}>
+                {expState?.system_health?.overall} System Status
+              </p>
+              <p style={{ 
+                fontSize: 11, 
+                color: expState?.system_health?.overall === 'Outage' ? '#dc2626' : '#b45309',
+                marginTop: 1
+              }}>
+                {expState?.system_health?.source_status} · Payouts may be delayed
+              </p>
+            </div>
+          </div>
+        )}
 
-        {/* ── Welcome header ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '24px 16px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h1 style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 900, fontSize: 22, color: 'var(--text-dark)' }}>
               Hello, {user?.name?.split(' ')[0] || 'Partner'} 👋
@@ -846,6 +957,9 @@ export function Dashboard() {
         {/* ── 6. Loyalty Streak ── */}
         <StreakProgressBar loyalty={loyalty} />
 
+        {/* ── 6.5 Trigger Evidence (Explainability) ── */}
+        <TriggerEvidencePanel evidence={evidence} />
+
         {/* ── 7. Weekly Premium Breakdown ── */}
         <WeeklyPremiumBreakdown breakdown={premiumBreakdown} policy={policy} />
 
@@ -901,20 +1015,20 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* ── 10. Quick Actions ── */}
+        {/* ── 9.5. Live Coverage Map ── */}
         <div>
-          <p className="rc-section-title">Quick Actions</p>
-          <div className="qa-grid">
-            <Link to="/policy" className="qa-tile">
-              <div className="qa-tile-icon">📋</div>
-              <p className="qa-tile-label">View Policy</p>
-            </Link>
-            <Link to="/claims" className="qa-tile">
-              <div className="qa-tile-icon">💰</div>
-              <p className="qa-tile-label">Claim History</p>
-            </Link>
+          <div className="rc-card" style={{ marginBottom: 16 }}>
+            <div className="rc-card-body">
+              <ZoneMapPanel
+                riderZoneId={user?.zone_id ?? null}
+                activeTriggers={triggers}
+                demoMode={offlineSim}
+              />
+            </div>
           </div>
         </div>
+
+
 
         {/* ── 11. Coverage events ── */}
         <div className="rc-card">
@@ -935,10 +1049,10 @@ export function Dashboard() {
             {error}
           </div>
         )}
-
       </div>
-    </>
-  );
+    </div>
+  </>
+);
 }
 
 export default Dashboard;

@@ -188,6 +188,11 @@ async function getClaims(params = {}) {
   return handleResponse(res);
 }
 
+async function getClaimExplanation(claimId) {
+  const res = await fetch(`${BASE}/claims/${claimId}/explanation`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
 // ── Triggers ──────────────────────────────────────────────────────────────────
 
 async function getActiveTriggers(zoneId = null) {
@@ -202,10 +207,27 @@ async function getZone(zoneId) {
   return handleResponse(res);
 }
 
+async function getZoneTriggerEvidence(zoneId) {
+  const res = await fetch(`${BASE}/zones/${zoneId}/trigger-evidence`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function getZonePayoutLedger(zoneId) {
+  const res = await fetch(`${BASE}/zones/${zoneId}/payout-ledger`, { headers: authHeaders() });
+  return handleResponse(res);
+}
+
 // ── Zones ─────────────────────────────────────────────────────────────────────
 
 async function getZones(city = null) {
   const url = new URL(`${BASE}/zones`, window.location.origin);
+  if (city) url.searchParams.set('city', city);
+  const res = await fetch(url.toString(), { headers: authHeaders() });
+  return handleResponse(res);
+}
+
+async function getZonesMap(city = null) {
+  const url = new URL(`${BASE}/zones/map`, window.location.origin);
   if (city) url.searchParams.set('city', city);
   const res = await fetch(url.toString(), { headers: authHeaders() });
   return handleResponse(res);
@@ -388,12 +410,16 @@ const api = {
   // Claims
   getClaimsSummary,
   getClaims,
+  getClaimExplanation,
   // Triggers
   getActiveTriggers,
   // Zones
   getZone,
   getZones,
   getNearestZones,
+  getZoneTriggerEvidence,
+  getZonePayoutLedger,
+  getZonesMap,
   // RIQI
   getRiqiScores,
   getCityRiqi,

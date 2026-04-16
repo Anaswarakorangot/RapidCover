@@ -59,3 +59,15 @@ class ClaimSummary(BaseModel):
     total_paid: float
     pending_claims: int
     pending_amount: float
+
+
+class ClaimExplanationResponse(BaseModel):
+    """Deep detailed explanation of why a claim was processed the way it was."""
+    claim_id: int
+    trigger_source: str           # e.g. "OpenWeatherMap + AQI-IN Corroboration"
+    zone_match: bool              # GPS coherence
+    payout_formula: str           # Readable text: "₹45/hr x 3.5 hrs x 1.2 Severity"
+    fraud_review: str             # "Auto-passed: Velocity < 50km/hr"
+    payment_status: str           # "Completed"
+    transaction_proof: str        # Stripe/UPI ID
+    is_disputed: bool = False

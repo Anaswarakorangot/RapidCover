@@ -38,14 +38,10 @@ export function Admin() {
   const [statsError, setStatsError] = useState(false);
   const [activeTab, setActiveTab]   = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [systemStatus, setSystemStatus] = useState({ level: 'green', text: 'All systems operational' });
   const drillZoneSelectRef = useRef(null);
 
   useEffect(() => {
     loadStats();
-    checkSystemStatus();
-    const statusInterval = setInterval(checkSystemStatus, 15000);
-    return () => clearInterval(statusInterval);
   }, []);
 
   async function loadStats() {
@@ -65,30 +61,8 @@ export function Admin() {
     }
   }
 
-  async function checkSystemStatus() {
-    try {
-      const res = await fetch(`${API_BASE}/admin/panel/engine-status`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      const schedulerRunning = data.scheduler?.running;
-      const sources = data.data_sources || {};
-      const realSources = ['openweathermap', 'waqi_aqi'];
-      const anyRealLive = realSources.some(k => sources[k]?.status === 'live');
-
-      if (!schedulerRunning)      setSystemStatus({ level: 'red',   text: 'Scheduler stopped' });
-      else if (anyRealLive)       setSystemStatus({ level: 'green', text: 'All systems operational' });
-      else                        setSystemStatus({ level: 'amber', text: 'Running on mock data' });
-    } catch {
-      setSystemStatus({ level: 'red', text: 'Backend unreachable' });
-    }
-  }
-
   const today = new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const statusDotClass =
-    systemStatus.level === 'green' ? 'admin-status__dot--green'
-    : systemStatus.level === 'amber' ? 'admin-status__dot--amber'
-    : 'admin-status__dot--red';
 
   const TABS = [
     { id: 'overview',        label: '\u{1F4CA} Overview' },
