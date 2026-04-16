@@ -41,7 +41,8 @@ class PolicyQuote(BaseModel):
     final_premium: float
     max_daily_payout: float
     max_days_per_week: int
-    pricing_mode: str = "standard"  # e.g. "standard", "surged", "loyalty"
+    # Unified premium engine fields (always populated)
+    pricing_mode: str = "fallback_rule_based"  # "trained_ml" | "fallback_rule_based"
     audit_breakdown: Optional[dict] = None
 
 
@@ -84,8 +85,6 @@ class PolicyRenewalQuote(BaseModel):
     final_premium: float
     max_daily_payout: float
     max_days_per_week: int
-    pricing_mode: str = "loyalty"
-    audit_breakdown: Optional[dict] = None
 
 
 class AutoRenewUpdate(BaseModel):

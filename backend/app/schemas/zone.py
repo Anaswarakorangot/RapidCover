@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 
 
 class ZoneResponse(BaseModel):
@@ -32,58 +32,95 @@ class ZoneCreate(BaseModel):
     dark_store_lng: Optional[float] = None
 
 
-class TriggerEvidenceResponse(BaseModel):
-    """Evidence of why a trigger DID or DID NOT fire."""
-    zone_id: int
-    metric_name: str              # e.g. "Rainfall Rate"
-    current_value: float          # e.g. 22.0
-    threshold_value: float        # e.g. 30.0
+# =============================================================================
+# Trust API Schemas (Person 1 deliverables)
+# =============================================================================
+
+class NonTriggerEvidence(BaseModel):
+    """A single non-trigger measurement compared against the threshold."""
+    measured_at: datetime
     trigger_type: str
-    is_active: bool
-    source_health: str            # "Healthy", "Degraded", "Stale"
-    last_updated: datetime
-    message: str                  # "Rain reached 22mm/hr. Your plan triggers at 30mm/hr."
+    measured_value: float
+    threshold: float
+    unit: str
+    gap: float          # how far below threshold (threshold - measured)
+    source: str
+    plain_reason: str   # e.g. "Rain reached 22mm/hr. Your plan triggers at 55mm/hr."
 
 
-class PayoutLedgerEntry(BaseModel):
+class TriggerThreshold(BaseModel):
+    value: float
+    unit: str
+    duration: str
+
+
+class TriggerEvidenceResponse(BaseModel):
+    """
+    GET /zones/{zone_id}/trigger-evidence
+    Explains recent non-trigger cases: measured vs threshold comparisons.
+    """
+    zone_id: int
+    zone_name: str
+    checked_at: datetime
+    recent_non_triggers: List[NonTriggerEvidence]
+    thresholds: dict  # trigger_type -> TriggerThreshold dict
+    source_health: str = "live"   # "live" | "stale" | "fallback"
+
+
+class AnonymizedPayout(BaseModel):
+    """A single anonymized payout record for the ledger."""
+    anonymized_id: str      # e.g. "P-7f2a" — never raw partner_id
     amount: float
+    trigger_type: str
     paid_at: datetime
-    payout_time_mins: int
 
 
 class PayoutLedgerResponse(BaseModel):
-    """Trust building recent payout data for a zone."""
-    zone_id: int
-    recent_payouts: List[PayoutLedgerEntry]
-    median_payout_time_mins: int
-    total_paid_this_month: float
-    total_paid_this_week: float
-    miss_rate_disclosure: float   # e.g. 0.02 (2% rejected)
-    last_payout_at: Optional[datetime]
-
-
-class ZoneMapPolygon(BaseModel):
+    """
+    GET /zones/{zone_id}/payout-ledger
+    Anonymized proof of past payouts in a zone.
+    """
     zone_id: int
     zone_name: str
-    coordinates: List[List[float]] # List of [lat, lng]
-    color: str                    # Hex base on risk
-    is_active: bool
+    period_days: int
+    total_paid: float
+    total_claims: int
+    affected_partners_count: int
+    median_payout_time_hours: Optional[float]
+    last_successful_payout_at: Optional[datetime]
+    miss_rate_pct: float    # % of trigger windows with 0 claims (measurement gap)
+    recent_payouts: List[AnonymizedPayout]
+
+
+class ActiveTriggerSummary(BaseModel):
+    trigger_type: str
+    started_at: datetime
+
+
+class LedgerSummary(BaseModel):
+    total_paid: float
+    last_payout_at: Optional[datetime]
+    median_payout_hours: Optional[float]
+    total_claims: int
+
+
+class ZoneMapEntry(BaseModel):
+    """
+    GET /zones/map  —  one entry per zone.
+    Frontend renders polygons + markers from this response.
+    """
+    id: int
+    code: str
+    name: str
+    city: str
+    risk_score: float
+    density_band: str
     is_suspended: bool
+    dark_store_lat: Optional[float]
+    dark_store_lng: Optional[float]
+    polygon: Optional[str]       # GeoJSON string
+    active_trigger: Optional[ActiveTriggerSummary]
+    ledger_summary: LedgerSummary
+    source_health: str            # "live" | "stale" | "fallback"
+    pricing_mode: str             # "trained_ml" | "fallback_rule_based"
 
-
-class ZoneMapMarker(BaseModel):
-    id: str
-    type: str                     # "dark_store", "trigger"
-    lat: float
-    lng: float
-    label: str
-
-
-class ZoneMapResponse(BaseModel):
-    """Full map state for Leaflet rendering."""
-    polygons: List[ZoneMapPolygon]
-    markers: List[ZoneMapMarker]
-    center: Optional[List[float]] = None # [lat, lng]
-    zoom: Optional[int] = None
-    risk_color_layer: str         # "density", "risk", "status"
-    fetched_at: datetime

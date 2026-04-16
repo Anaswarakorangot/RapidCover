@@ -191,12 +191,52 @@ export default function ZoneMapPanel({ riderZoneId, activeTriggers = [], onZoneC
   const [nearbyRadius] = useState(10); // km
 
   // ── Fetch zone map data ──────────────────────────────────────────────────
+  // The API now returns list[ZoneMapEntry] (richer format from main branch).
+  // We transform it into the {polygons, markers, center, zoom} shape this
+  // component uses internally, preserving both friends' changes.
   const fetchMap = async (cityFilter = null) => {
     try {
-      const data = await api.getZonesMap(cityFilter);
-      setMapData(data);
-    } catch {
-      // Map data unavailable
+      const zones = await api.getZonesMap(cityFilter);
+      if (!Array.isArray(zones)) { setMapData(zones); return; } // fallback for old format
+
+      const polygons = zones.map(z => {
+        let coordinates = [];
+        if (z.polygon) { try { coordinates = JSON.parse(z.polygon); } catch {} }
+        if (!coordinates.length && z.dark_store_lat && z.dark_store_lng) {
+          const lat = z.dark_store_lat, lng = z.dark_store_lng;
+          coordinates = [
+            [lat + 0.015, lng - 0.015],
+            [lat + 0.015, lng + 0.015],
+            [lat - 0.015, lng + 0.015],
+            [lat - 0.015, lng - 0.015],
+          ];
+        }
+        return {
+          zone_id:      z.id,
+          zone_name:    z.name,
+          coordinates,
+          color:        z.risk_score < 40 ? '#3DB85C' : z.risk_score < 70 ? '#F59E0B' : '#EF4444',
+          is_active:    !z.is_suspended,
+          is_suspended: z.is_suspended,
+          // Embed the active_trigger from the API so we can show weather icons
+          api_trigger:  z.active_trigger || null,
+        };
+      });
+
+      const markers = zones
+        .filter(z => z.dark_store_lat && z.dark_store_lng)
+        .map(z => ({ id: `ds_${z.id}`, type: 'dark_store', lat: z.dark_store_lat, lng: z.dark_store_lng, label: `${z.name} Store` }));
+
+      // Derive sensible center (prefer Hyderabad if filtered, else bbox center)
+      const hydZone = zones.find(z => z.city?.toLowerCase().includes('hyderabad'));
+      const center = hydZone
+        ? [hydZone.dark_store_lat, hydZone.dark_store_lng]
+        : zones[0] ? [zones[0].dark_store_lat, zones[0].dark_store_lng]
+        : [17.3850, 78.4867];
+
+      setMapData({ polygons, markers, center, zoom: cityFilter ? 13 : 11 });
+    } catch (e) {
+      console.warn('Map fetch failed:', e);
     } finally {
       setLoading(false);
     }
@@ -251,12 +291,24 @@ export default function ZoneMapPanel({ riderZoneId, activeTriggers = [], onZoneC
     }
 
     // Build trigger index: zone_id → [triggers]
+    // Sources: 1) activeTriggers prop (from Dashboard polling)
+    //          2) api_trigger embedded in each polygon (from your friend's ZoneMapEntry API)
     const trigByZone = {};
     activeTriggers.forEach(t => {
       const zid = t.zone_id ?? t.zoneId;
       if (zid != null) {
         if (!trigByZone[zid]) trigByZone[zid] = [];
         trigByZone[zid].push(t);
+      }
+    });
+    // Also pick up triggers embedded directly in polygon from the API response
+    mapData.polygons.forEach(poly => {
+      if (poly.api_trigger) {
+        const zid = poly.zone_id;
+        if (!trigByZone[zid]) trigByZone[zid] = [];
+        // Only add if not already present (avoid duplicates)
+        const already = trigByZone[zid].some(t => t.trigger_type === poly.api_trigger.trigger_type);
+        if (!already) trigByZone[zid].push({ trigger_type: poly.api_trigger.trigger_type, zone_id: zid });
       }
     });
 

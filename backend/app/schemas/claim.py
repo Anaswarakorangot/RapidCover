@@ -61,13 +61,48 @@ class ClaimSummary(BaseModel):
     pending_amount: float
 
 
+# =============================================================================
+# Claim Explanation Schema (Person 1 trust deliverable)
+# =============================================================================
+
 class ClaimExplanationResponse(BaseModel):
-    """Deep detailed explanation of why a claim was processed the way it was."""
+    """
+    GET /claims/{claim_id}/explanation
+    Full human-readable explanation of a claim decision.
+    Turns every claim into something a rider, judge, or admin can understand.
+    """
     claim_id: int
-    trigger_source: str           # e.g. "OpenWeatherMap + AQI-IN Corroboration"
-    zone_match: bool              # GPS coherence
-    payout_formula: str           # Readable text: "₹45/hr x 3.5 hrs x 1.2 Severity"
-    fraud_review: str             # "Auto-passed: Velocity < 50km/hr"
-    payment_status: str           # "Completed"
-    transaction_proof: str        # Stripe/UPI ID
-    is_disputed: bool = False
+    status: str                          # paid | pending | rejected
+    decision: str                        # One-line summary of what happened
+
+    # Trigger context
+    trigger_source: Optional[str]        # e.g. "OpenWeatherMap"
+    trigger_type: Optional[str]          # rain | heat | aqi | shutdown | closure
+    trigger_started_at: Optional[datetime]
+    trigger_ended_at: Optional[datetime]
+
+    # Zone context
+    zone_match: bool
+    zone_name: Optional[str]
+    zone_code: Optional[str]
+
+    # Payout formula (human-readable string built from stored data)
+    payout_formula: Optional[str]        # e.g. "3.5 hrs × ₹120/hr × 1.25 RIQI = ₹525"
+    amount: float
+
+    # Fraud assessment
+    fraud_decision: str                  # auto_approve | enhanced_validation | manual_review | auto_reject
+    fraud_score: float
+    fraud_reasons: list[str]             # plain-language fraud factor notes
+
+    # Payment
+    payment_status: Optional[str]        # completed | pending | failed
+    upi_ref: Optional[str]
+    paid_at: Optional[datetime]
+
+    # The plain-language explanation (main copy)
+    plain_language_reason: str
+
+    # Data provenance
+    source_mode: str = "live"            # "live" | "demo" | "fallback"
+    data_sources: list[str] = []        # e.g. ["OpenWeatherMap", "IMD"]
