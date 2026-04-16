@@ -533,6 +533,7 @@ def calculate_fraud_score(
 
     # Zone suspended - true if trigger event exists and is active
     zone_suspended = trigger_event is not None and trigger_event.ended_at is None
+    traffic_disrupted = zone_suspended
 
     # Build features and score
     features = ClaimFeatures(
@@ -591,19 +592,20 @@ def calculate_fraud_score(
             reason = f"Device fingerprint issue: {device_check['reason']}"
 
     # Return in old format for compatibility
+    factor_scores = result.get("factors", {})
     return {
         "score": result["fraud_score"],
         "factors": {
-            "gps_coherence": 1 - result["factors"]["w1_gps_coherence"],
-            "activity_paradox": 1 - result["factors"]["w2_run_count_clean"],
-            "claim_frequency": result["factors"]["w4_claim_frequency"],
+            "gps_coherence": 1 - factor_scores.get("w1_gps_coherence", 0.0),
+            "activity_paradox": 1 - factor_scores.get("w2_run_count_clean", 0.0),
+            "claim_frequency": factor_scores.get("w4_claim_frequency", 0.0),
             "duplicate_claim": 0.0,  # Handled separately in claims_processor
             "account_age": 0.0,  # Not in 7-factor model
-            "zone_boundary": 1 - result["factors"]["w3_zone_polygon_match"],
+            "zone_boundary": 1 - factor_scores.get("w3_zone_polygon_match", 0.0),
             # New factors from 7-factor model
-            "centroid_drift_km": result["factors"]["w7_centroid_drift_km"],
-            "device_consistent": result["factors"]["w5_device_consistent"],
-            "traffic_disrupted": result["factors"]["w6_traffic_disrupted"],
+            "centroid_drift_km": factor_scores.get("w7_centroid_drift_km", 0.0),
+            "device_consistent": factor_scores.get("w5_device_consistent", 0.0),
+            "traffic_disrupted": factor_scores.get("w6_traffic_disrupted", 0.0),
             # Phase 2 enhancements - historical data checks
             "weather_consistent": weather_check["consistent"],
             "weather_confidence": weather_check["confidence"],
