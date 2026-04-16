@@ -41,6 +41,9 @@ class PolicyQuote(BaseModel):
     final_premium: float
     max_daily_payout: float
     max_days_per_week: int
+    # Unified premium engine fields (always populated)
+    pricing_mode: str = "fallback_rule_based"  # "trained_ml" | "fallback_rule_based"
+    audit_breakdown: Optional[dict] = None
 
 
 class PolicyResponseExtended(BaseModel):

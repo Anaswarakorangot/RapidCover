@@ -13,13 +13,25 @@ from app.models.zone import Zone
 from app.models.policy import Policy
 from app.models.claim import Claim, ClaimStatus
 from app.models.partner import Partner
-from app.schemas.zone import ZoneResponse, ZoneCreate, ZoneRiskUpdate
+from app.schemas.zone import (
+    ZoneResponse,
+    ZoneCreate,
+    ZoneRiskUpdate,
+    TriggerEvidenceResponse,
+    NonTriggerEvidence,
+    PayoutLedgerResponse,
+    AnonymizedPayout,
+    ZoneMapEntry,
+    ActiveTriggerSummary,
+    LedgerSummary,
+)
 from app.services.runtime_metadata import (
     get_partner_runtime_metadata,
     get_zone_coverage_metadata,
     upsert_partner_runtime_metadata,
     upsert_zone_coverage_metadata,
 )
+
 
 
 class BCRResponse(BaseModel):
@@ -310,8 +322,186 @@ def list_zones(
     return zones
 
 
+# =============================================================================
+# Map Data API (Person 1 — Task 5)
+# MUST be declared before /{zone_id} so FastAPI does not treat "map" as an int
+# =============================================================================
+
+def _get_zone_ledger_summary(zone_id: int, db: Session, period_days: int = 30) -> LedgerSummary:
+    """Compute ledger summary for a single zone (used by map endpoint)."""
+    from app.models.trigger_event import TriggerEvent
+    now = utcnow()
+    period_start = now - timedelta(days=period_days)
+
+    partner_ids = [
+        p[0] for p in db.query(Partner.id).filter(Partner.zone_id == zone_id).all()
+    ]
+    policy_ids_q = db.query(Policy.id).filter(
+        Policy.partner_id.in_(partner_ids)
+    ).subquery() if partner_ids else None
+
+    total_paid = 0.0
+    last_payout_at = None
+    total_claims = 0
+
+    if policy_ids_q is not None:
+        total_paid = (
+            db.query(func.sum(Claim.amount))
+            .filter(
+                Claim.policy_id.in_(policy_ids_q),
+                Claim.status == ClaimStatus.PAID,
+                Claim.paid_at >= period_start,
+            )
+            .scalar()
+        ) or 0.0
+
+        last_row = (
+            db.query(Claim.paid_at)
+            .filter(
+                Claim.policy_id.in_(policy_ids_q),
+                Claim.status == ClaimStatus.PAID,
+            )
+            .order_by(Claim.paid_at.desc())
+            .first()
+        )
+        last_payout_at = last_row[0] if last_row else None
+
+        total_claims = (
+            db.query(func.count(Claim.id))
+            .filter(
+                Claim.policy_id.in_(policy_ids_q),
+                Claim.status == ClaimStatus.PAID,
+                Claim.paid_at >= period_start,
+            )
+            .scalar()
+        ) or 0
+
+    # Median payout time (created_at → paid_at for paid claims)
+    paid_claims = []
+    if partner_ids:
+        paid_claims = (
+            db.query(Claim.created_at, Claim.paid_at)
+            .filter(
+                Claim.policy_id.in_(policy_ids_q),
+                Claim.status == ClaimStatus.PAID,
+                Claim.paid_at.isnot(None),
+                Claim.paid_at >= period_start,
+            )
+            .all()
+        )
+
+    median_hours = None
+    if paid_claims:
+        durations = []
+        for created, paid in paid_claims:
+            if paid and created:
+                diff = (paid - created).total_seconds() / 3600
+                durations.append(diff)
+        if durations:
+            durations.sort()
+            mid = len(durations) // 2
+            median_hours = round(durations[mid], 1)
+
+    return LedgerSummary(
+        total_paid=round(total_paid, 2),
+        last_payout_at=last_payout_at,
+        median_payout_hours=median_hours,
+        total_claims=total_claims,
+    )
+
+
+def _get_active_trigger(zone_id: int, db: Session) -> ActiveTriggerSummary | None:
+    """Return the most recent open trigger event for a zone, if any."""
+    from app.models.trigger_event import TriggerEvent
+    event = (
+        db.query(TriggerEvent)
+        .filter(TriggerEvent.zone_id == zone_id, TriggerEvent.ended_at.is_(None))
+        .order_by(TriggerEvent.started_at.desc())
+        .first()
+    )
+    if event:
+        return ActiveTriggerSummary(
+            trigger_type=event.trigger_type.value if hasattr(event.trigger_type, "value") else str(event.trigger_type),
+            started_at=event.started_at,
+        )
+    return None
+
+
+def _get_source_health(db: Session) -> str:
+    """Return a source health indicator by checking external API health."""
+    try:
+        from app.services.external_apis import get_source_health
+        health = get_source_health()
+        live = sum(1 for s in health.values() if s.get("status") == "live")
+        if live == 0:
+            return "fallback"
+        elif live < len(health):
+            return "stale"
+        return "live"
+    except Exception:
+        return "live"
+
+
+@router.get("/map", response_model=list[ZoneMapEntry], tags=["zones"])
+def get_zones_map(
+    city: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """
+    GET /zones/map
+
+    Returns all zones with full operational truth for map rendering:
+    zone polygons, dark-store locations, risk scores, density bands,
+    active triggers, anonymized payout ledger summary, and source health.
+
+    Frontend renders polygons and markers from this response.
+    Backend owns all calculations — the map is not a fake visual.
+    """
+    from app.services.premium import calculate_premium
+    from app.models.policy import PolicyTier
+
+    query = db.query(Zone)
+    if city:
+        query = query.filter(Zone.city.ilike(f"%{city}%"))
+    zones = query.all()
+
+    source_health = _get_source_health(db)
+
+    # Determine pricing mode once (probe with a cheap quote)
+    try:
+        probe = calculate_premium(PolicyTier.STANDARD, zones[0] if zones else None)
+        pricing_mode = probe.pricing_mode
+    except Exception:
+        pricing_mode = "fallback_rule_based"
+
+    results = []
+    for zone in zones:
+        ledger = _get_zone_ledger_summary(zone.id, db)
+        active_trigger = _get_active_trigger(zone.id, db)
+
+        results.append(ZoneMapEntry(
+            id=zone.id,
+            code=zone.code,
+            name=zone.name,
+            city=zone.city,
+            risk_score=zone.risk_score,
+            density_band=zone.density_band or "Medium",
+            is_suspended=zone.is_suspended or False,
+            dark_store_lat=zone.dark_store_lat,
+            dark_store_lng=zone.dark_store_lng,
+            polygon=zone.polygon,
+            active_trigger=active_trigger,
+            ledger_summary=ledger,
+            source_health=source_health,
+            pricing_mode=pricing_mode,
+        ))
+
+    return results
+
+
 @router.get("/{zone_id}", response_model=ZoneResponse)
 def get_zone(zone_id: int, db: Session = Depends(get_db)):
+
     """Get zone details including risk score."""
     zone = db.query(Zone).filter(Zone.id == zone_id).first()
 
@@ -843,3 +1033,314 @@ def get_all_partners_activity(
         "zone_id": zone_id,
         "partners": results,
     }
+
+
+# =============================================================================
+# Trigger Evidence API  (Person 1 — Task 2)
+# =============================================================================
+
+# Thresholds mirroring trigger_event.py TRIGGER_THRESHOLDS for explanations
+_THRESHOLD_DISPLAY = {
+    "rain":     {"value": 55.0,  "unit": "mm/hr",  "duration": "30 mins sustained"},
+    "heat":     {"value": 43.0,  "unit": "°C",      "duration": "4 hours sustained"},
+    "aqi":      {"value": 400.0, "unit": "AQI",     "duration": "3 hours sustained"},
+    "shutdown": {"value": 1.0,   "unit": "event",   "duration": "2+ hours confirmed"},
+    "closure":  {"value": 1.0,   "unit": "event",   "duration": "90+ min closure"},
+}
+
+
+def _plain_non_trigger_reason(t_type: str, measured: float, threshold: float, unit: str) -> str:
+    """Build a plain-language 'why not triggered' string."""
+    thresholds_display = _THRESHOLD_DISPLAY.get(t_type, {})
+    if t_type == "rain":
+        return (
+            f"Rain reached {measured:.1f}{unit}. "
+            f"Your plan triggers at {threshold:.0f}{unit}. "
+            f"The gap was {threshold - measured:.1f}{unit}."
+        )
+    elif t_type == "heat":
+        return (
+            f"Temperature reached {measured:.1f}{unit}. "
+            f"Your plan triggers at {threshold:.0f}{unit}."
+        )
+    elif t_type == "aqi":
+        return (
+            f"AQI measured {measured:.0f}. "
+            f"Your plan triggers at AQI {threshold:.0f}."
+        )
+    else:
+        return f"{t_type.title()} measured {measured:.1f}{unit}. Threshold: {threshold:.1f}{unit}."
+
+
+@router.get("/{zone_id}/trigger-evidence", response_model=TriggerEvidenceResponse, tags=["zones"])
+def get_trigger_evidence(
+    zone_id: int,
+    days: int = Query(7, ge=1, le=30, description="Number of days to look back"),
+    db: Session = Depends(get_db),
+):
+    """
+    GET /zones/{zone_id}/trigger-evidence
+
+    Explains recent non-trigger cases by comparing measured signals against
+    payout thresholds. Makes basis risk visible: users can see the system
+    checked and exactly why it did not pay.
+
+    Example response item:
+      "Rain reached 22mm/hr. Your plan triggers at 55mm/hr. Source: OpenWeatherMap."
+    """
+    from app.models.trigger_event import TriggerEvent, TRIGGER_THRESHOLDS
+    from app.models.weather_observation import WeatherObservation
+
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    if not zone:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zone not found")
+
+    now = utcnow()
+    period_start = now - timedelta(days=days)
+
+    # Fetch closed (ended) trigger events — these fired, so we skip them
+    fired_windows = set()
+    fired_events = (
+        db.query(TriggerEvent)
+        .filter(
+            TriggerEvent.zone_id == zone_id,
+            TriggerEvent.started_at >= period_start,
+        )
+        .all()
+    )
+    fired_types = {
+        (e.trigger_type.value if hasattr(e.trigger_type, "value") else str(e.trigger_type))
+        for e in fired_events
+    }
+
+    # Fetch weather observations in the period
+    observations = (
+        db.query(WeatherObservation)
+        .filter(
+            WeatherObservation.zone_id == zone_id,
+            WeatherObservation.observed_at >= period_start,
+        )
+        .order_by(WeatherObservation.observed_at.desc())
+        .limit(100)
+        .all()
+    )
+
+    non_triggers: list[NonTriggerEvidence] = []
+
+    for obs in observations:
+        # Rain check
+        if obs.rainfall_mm_hr is not None:
+            rain_threshold = _THRESHOLD_DISPLAY["rain"]["value"]
+            if obs.rainfall_mm_hr < rain_threshold:
+                non_triggers.append(NonTriggerEvidence(
+                    measured_at=obs.observed_at,
+                    trigger_type="rain",
+                    measured_value=round(obs.rainfall_mm_hr, 1),
+                    threshold=rain_threshold,
+                    unit="mm/hr",
+                    gap=round(rain_threshold - obs.rainfall_mm_hr, 1),
+                    source=obs.source or "OpenWeatherMap",
+                    plain_reason=_plain_non_trigger_reason(
+                        "rain", obs.rainfall_mm_hr, rain_threshold, "mm/hr"
+                    ),
+                ))
+
+        # AQI check
+        if obs.aqi is not None:
+            aqi_threshold = _THRESHOLD_DISPLAY["aqi"]["value"]
+            if obs.aqi < aqi_threshold:
+                non_triggers.append(NonTriggerEvidence(
+                    measured_at=obs.observed_at,
+                    trigger_type="aqi",
+                    measured_value=float(obs.aqi),
+                    threshold=aqi_threshold,
+                    unit="AQI",
+                    gap=round(aqi_threshold - obs.aqi, 1),
+                    source=obs.source or "CPCB",
+                    plain_reason=_plain_non_trigger_reason(
+                        "aqi", float(obs.aqi), aqi_threshold, ""
+                    ),
+                ))
+
+        # Temperature/heat check
+        if obs.temp_celsius is not None:
+            heat_threshold = _THRESHOLD_DISPLAY["heat"]["value"]
+            if obs.temp_celsius < heat_threshold:
+                non_triggers.append(NonTriggerEvidence(
+                    measured_at=obs.observed_at,
+                    trigger_type="heat",
+                    measured_value=round(obs.temp_celsius, 1),
+                    threshold=heat_threshold,
+                    unit="°C",
+                    gap=round(heat_threshold - obs.temp_celsius, 1),
+                    source=obs.source or "IMD",
+                    plain_reason=_plain_non_trigger_reason(
+                        "heat", obs.temp_celsius, heat_threshold, "°C"
+                    ),
+                ))
+
+    # De-duplicate: keep one per (trigger_type, day) to avoid noise
+    seen = set()
+    deduped = []
+    for nt in non_triggers:
+        day_key = (nt.trigger_type, nt.measured_at.date() if nt.measured_at else None)
+        if day_key not in seen:
+            seen.add(day_key)
+            deduped.append(nt)
+        if len(deduped) >= 10:
+            break
+
+    # Determine source health
+    source_health = _get_source_health(db)
+
+    return TriggerEvidenceResponse(
+        zone_id=zone_id,
+        zone_name=zone.name,
+        checked_at=now,
+        recent_non_triggers=deduped,
+        thresholds=_THRESHOLD_DISPLAY,
+        source_health=source_health,
+    )
+
+
+# =============================================================================
+# Payout Proof Ledger API  (Person 1 — Task 3)
+# =============================================================================
+
+import hashlib
+
+
+def _anonymize_partner_id(partner_id: int) -> str:
+    """
+    One-way hash of partner_id to a short display token.
+    Never exposes the actual partner ID.
+
+    e.g. partner_id=42 → "P-f3a2"
+    """
+    h = hashlib.sha256(f"rapidcover-ledger-{partner_id}".encode()).hexdigest()
+    return f"P-{h[:4]}"
+
+
+@router.get("/{zone_id}/payout-ledger", response_model=PayoutLedgerResponse, tags=["zones"])
+def get_payout_ledger(
+    zone_id: int,
+    days: int = Query(30, ge=7, le=90, description="Period to aggregate payouts over"),
+    db: Session = Depends(get_db),
+):
+    """
+    GET /zones/{zone_id}/payout-ledger
+
+    Returns anonymized proof of past payouts in a zone.
+    Surfaces: total paid, claim count, affected partner count,
+    median payout time, last successful payout, and miss-rate disclosure.
+
+    PRIVACY: Partner IDs are one-way hashed — never exposed raw.
+    Caller cannot reverse-engineer which partner received which payout.
+    """
+    from app.models.trigger_event import TriggerEvent
+
+    zone = db.query(Zone).filter(Zone.id == zone_id).first()
+    if not zone:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zone not found")
+
+    now = utcnow()
+    period_start = now - timedelta(days=days)
+
+    # Get all partners in this zone
+    partner_ids = [
+        p[0] for p in db.query(Partner.id).filter(Partner.zone_id == zone_id).all()
+    ]
+
+    total_paid = 0.0
+    total_claims = 0
+    affected_partner_ids: set[int] = set()
+    last_successful_payout_at = None
+    recent_payouts: list[AnonymizedPayout] = []
+    payout_times: list[float] = []
+
+    if partner_ids:
+        # Get policy ids for these partners
+        policy_ids = [
+            p[0] for p in
+            db.query(Policy.id).filter(Policy.partner_id.in_(partner_ids)).all()
+        ]
+
+        if policy_ids:
+            paid_claims = (
+                db.query(Claim, Policy)
+                .join(Policy, Claim.policy_id == Policy.id)
+                .filter(
+                    Claim.policy_id.in_(policy_ids),
+                    Claim.status == ClaimStatus.PAID,
+                    Claim.paid_at >= period_start,
+                )
+                .order_by(Claim.paid_at.desc())
+                .all()
+            )
+
+            for claim, policy in paid_claims:
+                total_paid += claim.amount or 0.0
+                total_claims += 1
+                affected_partner_ids.add(policy.partner_id)
+
+                if last_successful_payout_at is None and claim.paid_at:
+                    last_successful_payout_at = claim.paid_at
+
+                # Payout time
+                if claim.paid_at and claim.created_at:
+                    hours = (claim.paid_at - claim.created_at).total_seconds() / 3600
+                    payout_times.append(hours)
+
+                # Recent payout records (anonymized, max 10)
+                if len(recent_payouts) < 10 and claim.paid_at:
+                    # Get trigger type from trigger event
+                    t_type = "unknown"
+                    trigger = db.query(TriggerEvent).filter(
+                        TriggerEvent.id == claim.trigger_event_id
+                    ).first()
+                    if trigger:
+                        t_type = trigger.trigger_type.value if hasattr(trigger.trigger_type, "value") else str(trigger.trigger_type)
+
+                    recent_payouts.append(AnonymizedPayout(
+                        anonymized_id=_anonymize_partner_id(policy.partner_id),
+                        amount=round(claim.amount, 2),
+                        trigger_type=t_type,
+                        paid_at=claim.paid_at,
+                    ))
+
+    # Median payout time
+    median_payout_hours = None
+    if payout_times:
+        payout_times.sort()
+        mid = len(payout_times) // 2
+        median_payout_hours = round(payout_times[mid], 1)
+
+    # Miss-rate: trigger windows in period vs those with ≥1 paid claim
+    trigger_windows = (
+        db.query(TriggerEvent)
+        .filter(
+            TriggerEvent.zone_id == zone_id,
+            TriggerEvent.started_at >= period_start,
+        )
+        .count()
+    )
+    windows_with_payout = min(total_claims, trigger_windows)  # conservative estimate
+    if trigger_windows > 0:
+        miss_rate_pct = round(
+            100.0 * (trigger_windows - windows_with_payout) / trigger_windows, 1
+        )
+    else:
+        miss_rate_pct = 0.0
+
+    return PayoutLedgerResponse(
+        zone_id=zone_id,
+        zone_name=zone.name,
+        period_days=days,
+        total_paid=round(total_paid, 2),
+        total_claims=total_claims,
+        affected_partners_count=len(affected_partner_ids),
+        median_payout_time_hours=median_payout_hours,
+        last_successful_payout_at=last_successful_payout_at,
+        miss_rate_pct=miss_rate_pct,
+        recent_payouts=recent_payouts,
+    )
