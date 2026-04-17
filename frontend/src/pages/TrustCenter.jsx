@@ -1,0 +1,882 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
+
+/* ─── Design tokens (mirror Policy.jsx / Register.jsx) ─────────────────── */
+const S = `
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  :root {
+    --green-primary: #3DB85C;
+    --green-dark:    #2a9e47;
+    --green-light:   #e8f7ed;
+    --text-dark:     #1a2e1a;
+    --text-mid:      #4a5e4a;
+    --text-light:    #8a9e8a;
+    --white:         #ffffff;
+    --gray-bg:       #f7f9f7;
+    --border:        #e2ece2;
+    --error:         #dc2626;
+    --blue:          #3b82f6;
+    --blue-light:    #eff6ff;
+    --blue-border:   #bfdbfe;
+    --purple:        #7c3aed;
+    --purple-light:  #f5f3ff;
+    --purple-border: #ddd6fe;
+  }
+
+  /* ── Page wrapper ── */
+  .tc-wrap {
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text-dark);
+    animation: fadeIn 0.3s ease;
+  }
+
+  /* ── Hero banner ── */
+  .tc-hero {
+    background: linear-gradient(135deg, #1a2e1a 0%, #2a9e47 60%, #3DB85C 100%);
+    border-radius: 20px;
+    padding: 24px 20px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .tc-hero::after {
+    content: '🔍';
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 52px;
+    opacity: 0.15;
+  }
+  .tc-hero-title {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 26px;
+    color: white;
+    margin-bottom: 4px;
+  }
+  .tc-hero-sub {
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+    line-height: 1.5;
+  }
+
+  /* ── Tab bar ── */
+  .tc-tabs {
+    display: flex;
+    gap: 6px;
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    padding: 5px;
+    margin-bottom: 20px;
+  }
+  .tc-tab {
+    flex: 1;
+    padding: 10px 6px;
+    border-radius: 12px;
+    border: none;
+    background: transparent;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .tc-tab.active {
+    background: var(--green-primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(61,184,92,0.35);
+  }
+  .tc-tab:not(.active):hover { color: var(--text-dark); background: var(--gray-bg); }
+
+  /* ── Generic card ── */
+  .tc-card {
+    background: var(--white);
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+    margin-bottom: 14px;
+    animation: fadeIn 0.25s ease;
+  }
+  .tc-card-header {
+    padding: 16px 18px 0;
+  }
+  .tc-card-body {
+    padding: 14px 18px 18px;
+  }
+  .tc-card-title {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 16px;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+  }
+  .tc-card-sub {
+    font-size: 12px;
+    color: var(--text-light);
+  }
+
+  /* ── Selector ── */
+  .tc-selector-wrap {
+    margin-bottom: 14px;
+  }
+  .tc-selector-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-mid);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .tc-selector {
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    background: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--text-dark);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a9e8a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    cursor: pointer;
+  }
+  .tc-selector:focus { outline: none; border-color: var(--green-primary); box-shadow: 0 0 0 3px rgba(61,184,92,0.12); }
+
+  /* ── Info row (key/value) ── */
+  .tc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .tc-row:last-child { border-bottom: none; }
+  .tc-row-key { color: var(--text-mid); }
+  .tc-row-val { font-weight: 600; color: var(--text-dark); }
+
+  /* ── Summary stat grid ── */
+  .tc-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .tc-stat {
+    border-radius: 14px;
+    padding: 12px 10px;
+    text-align: center;
+  }
+  .tc-stat.green  { background: var(--green-light); }
+  .tc-stat.blue   { background: var(--blue-light); }
+  .tc-stat.purple { background: var(--purple-light); }
+  .tc-stat-label { font-size: 11px; color: var(--text-light); margin-bottom: 4px; }
+  .tc-stat-val   { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px; }
+  .tc-stat.green  .tc-stat-val { color: var(--green-dark); }
+  .tc-stat.blue   .tc-stat-val { color: var(--blue); }
+  .tc-stat.purple .tc-stat-val { color: var(--purple); }
+
+  /* ── Evidence item ── */
+  .tc-evidence-item {
+    background: var(--gray-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .tc-evidence-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  .tc-evidence-type {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-dark);
+    text-transform: capitalize;
+  }
+  .tc-evidence-time {
+    font-size: 11px;
+    color: var(--text-light);
+  }
+  .tc-evidence-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    padding: 2px 0;
+    color: var(--text-mid);
+  }
+  .tc-evidence-row span:last-child { font-weight: 600; color: var(--text-dark); }
+
+  /* ── Payout item ── */
+  .tc-payout-item {
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .tc-payout-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .tc-payout-name { font-weight: 700; font-size: 14px; color: var(--text-dark); }
+  .tc-payout-time { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+  .tc-payout-amount {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 20px;
+    color: var(--green-dark);
+  }
+  .tc-payout-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .tc-payout-meta-item { font-size: 12px; color: var(--text-mid); }
+  .tc-payout-meta-item span { font-weight: 600; color: var(--text-dark); }
+  .tc-payout-ledger-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--green-dark);
+  }
+
+  /* ── Badge ── */
+  .tc-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 10px;
+  }
+  .tc-badge.green  { background: #dcfce7; color: #166534; }
+  .tc-badge.blue   { background: #dbeafe; color: #1e40af; }
+  .tc-badge.yellow { background: #fef9c3; color: #854d0e; }
+  .tc-badge.red    { background: #fee2e2; color: #991b1b; }
+  .tc-badge.gray   { background: #f3f4f6; color: #374151; }
+
+  /* ── Fraud bar ── */
+  .tc-fraud-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 6px 0 4px;
+  }
+  .tc-fraud-bar-fill {
+    height: 100%;
+    border-radius: 8px;
+    transition: width 0.5s ease;
+  }
+  .tc-fraud-bar-fill.low    { background: var(--green-primary); }
+  .tc-fraud-bar-fill.medium { background: #f59e0b; }
+  .tc-fraud-bar-fill.high   { background: var(--error); }
+
+  /* ── Validation check ── */
+  .tc-check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .tc-check-item:last-child { border-bottom: none; }
+  .tc-check-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .tc-check-name { font-weight: 600; color: var(--text-dark); }
+  .tc-check-reason { font-size: 11px; color: var(--text-mid); margin-top: 2px; }
+
+  /* ── Summary block  ── */
+  .tc-summary-box {
+    background: var(--blue-light);
+    border: 1px solid var(--blue-border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #1e3a8a;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+
+  /* ── Consensus ── */
+  .tc-consensus {
+    background: var(--green-light);
+    border: 1.5px solid #bbf7d0;
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+  }
+  .tc-consensus-label { font-size: 13px; color: var(--text-mid); }
+  .tc-consensus-val {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 22px;
+    color: var(--green-dark);
+  }
+
+  /* ── Commitment card ── */
+  .tc-commitment {
+    background: linear-gradient(135deg, var(--green-light) 0%, #e0f2fe 100%);
+    border: 1.5px solid #bbf7d0;
+    border-radius: 20px;
+    padding: 20px;
+    margin-top: 6px;
+  }
+  .tc-commitment-title {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 16px;
+    color: var(--text-dark);
+    margin-bottom: 8px;
+  }
+  .tc-commitment-items { display: flex; flex-direction: column; gap: 8px; }
+  .tc-commitment-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-mid);
+  }
+  .tc-commitment-icon { font-size: 16px; flex-shrink: 0; }
+
+  /* ── Empty / loading states ── */
+  .tc-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-light);
+    font-size: 13px;
+  }
+  .tc-empty-icon { font-size: 32px; margin-bottom: 8px; }
+  .tc-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+  .tc-spinner {
+    width: 28px; height: 28px;
+    border: 3px solid var(--green-light);
+    border-top-color: var(--green-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .tc-error-box {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #991b1b;
+    margin-bottom: 12px;
+  }
+
+  /* ── Section divider ── */
+  .tc-divider {
+    border: none;
+    border-top: 1.5px solid var(--border);
+    margin: 14px 0;
+  }
+
+  /* ── Zone info header ── */
+  .tc-zone-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 14px 16px;
+    background: var(--gray-bg);
+    border-bottom: 1.5px solid var(--border);
+  }
+  .tc-zone-name { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 15px; color: var(--text-dark); }
+  .tc-zone-city { font-size: 12px; color: var(--text-mid); margin-top: 2px; }
+  .tc-zone-code { font-size: 11px; color: var(--text-light); font-family: monospace; }
+`;
+
+/* ─── ClaimExplainer ─────────────────────────────────────────────────────── */
+function ClaimExplainer({ claimId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!claimId) return;
+    setLoading(true);
+    api.getClaimExplanation(claimId)
+      .then(d => { setData(d); setError(null); })
+      .catch(e => setError(e.message || 'Failed to load explanation'))
+      .finally(() => setLoading(false));
+  }, [claimId]);
+
+  if (!claimId) return (
+    <div className="tc-empty">
+      <div className="tc-empty-icon">📋</div>
+      <p>Select a claim above to see its full explanation</p>
+    </div>
+  );
+
+  if (loading) return <div className="tc-loading"><div className="tc-spinner" /></div>;
+  if (error)   return <div className="tc-error-box">⚠️ {error}</div>;
+  if (!data)   return null;
+
+  const fraudLevel = data.fraud_score < 0.5 ? 'low' : data.fraud_score < 0.75 ? 'medium' : 'high';
+  const fraudPct   = (data.fraud_score * 100).toFixed(1);
+
+  return (
+    <>
+      {/* Summary */}
+      {data.summary && <div className="tc-summary-box">💬 {data.summary}</div>}
+
+      {/* Trigger Details */}
+      {data.trigger_details && (
+        <div className="tc-card">
+          <div className="tc-card-header">
+            <p className="tc-card-title">⚡ Trigger Details</p>
+          </div>
+          <div className="tc-card-body">
+            <div className="tc-row">
+              <span className="tc-row-key">Type</span>
+              <span className="tc-row-val" style={{ textTransform: 'capitalize' }}>{data.trigger_details.type}</span>
+            </div>
+            {data.trigger_details.severity && (
+              <div className="tc-row">
+                <span className="tc-row-key">Severity</span>
+                <span className="tc-row-val">{data.trigger_details.severity}/5</span>
+              </div>
+            )}
+            {data.trigger_details.timestamp && (
+              <div className="tc-row">
+                <span className="tc-row-key">Triggered at</span>
+                <span className="tc-row-val">{new Date(data.trigger_details.timestamp).toLocaleString('en-IN')}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Payout Calculation */}
+      {data.payout_calculation && (
+        <div className="tc-card">
+          <div className="tc-card-header">
+            <p className="tc-card-title">💰 Payout Calculation</p>
+          </div>
+          <div className="tc-card-body">
+            {data.payout_calculation.base_amount && (
+              <div className="tc-row">
+                <span className="tc-row-key">Base Amount</span>
+                <span className="tc-row-val">₹{data.payout_calculation.base_amount}</span>
+              </div>
+            )}
+            {data.payout_calculation.riqi_multiplier && (
+              <div className="tc-row">
+                <span className="tc-row-key">RIQI Multiplier</span>
+                <span className="tc-row-val">×{data.payout_calculation.riqi_multiplier}</span>
+              </div>
+            )}
+            {data.payout_calculation.final_amount !== undefined && (
+              <div className="tc-row">
+                <span className="tc-row-key" style={{ fontWeight: 700, color: 'var(--text-dark)' }}>Final Payout</span>
+                <span className="tc-row-val" style={{ color: 'var(--green-dark)', fontSize: 16 }}>₹{data.payout_calculation.final_amount}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Fraud Assessment */}
+      {data.fraud_score !== undefined && (
+        <div className="tc-card">
+          <div className="tc-card-header">
+            <p className="tc-card-title">🔒 Fraud Assessment</p>
+          </div>
+          <div className="tc-card-body">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-mid)' }}>Fraud Score</span>
+              <span style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 800, fontSize: 15, color: fraudLevel === 'low' ? 'var(--green-dark)' : fraudLevel === 'medium' ? '#b45309' : 'var(--error)' }}>
+                {fraudPct}%
+              </span>
+            </div>
+            <div className="tc-fraud-bar-bg">
+              <div className={`tc-fraud-bar-fill ${fraudLevel}`} style={{ width: `${fraudPct}%` }} />
+            </div>
+            {data.decision && (
+              <p style={{ fontSize: 12, color: 'var(--text-mid)', marginTop: 6 }}>
+                Decision: <strong style={{ textTransform: 'capitalize' }}>{data.decision.replace(/_/g, ' ')}</strong>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Validation Checks */}
+      {data.validation_checks?.length > 0 && (
+        <div className="tc-card">
+          <div className="tc-card-header">
+            <p className="tc-card-title">✅ Validation Checks</p>
+          </div>
+          <div className="tc-card-body">
+            {data.validation_checks.map((check, i) => (
+              <div className="tc-check-item" key={i}>
+                <span className="tc-check-icon">{check.passed ? '✅' : '❌'}</span>
+                <div>
+                  <p className="tc-check-name">{check.name}</p>
+                  {check.reason && <p className="tc-check-reason">{check.reason}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ─── EvidenceViewer ─────────────────────────────────────────────────────── */
+function EvidenceViewer({ zoneId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!zoneId) return;
+    setLoading(true);
+    api.getZoneTriggerEvidence(zoneId)
+      .then(d => { setData(d); setError(null); })
+      .catch(e => setError(e.message || 'Failed to load evidence'))
+      .finally(() => setLoading(false));
+  }, [zoneId]);
+
+  if (!zoneId) return (
+    <div className="tc-empty">
+      <div className="tc-empty-icon">🌐</div>
+      <p>Select a zone above to see trigger evidence</p>
+    </div>
+  );
+
+  if (loading) return <div className="tc-loading"><div className="tc-spinner" /></div>;
+  if (error)   return <div className="tc-error-box">⚠️ {error}</div>;
+  if (!data)   return null;
+
+  const nonTriggers = data.recent_non_triggers || [];
+
+  return (
+    <>
+      {/* Zone Info */}
+      {data.zone && (
+        <div className="tc-card" style={{ overflow: 'hidden' }}>
+          <div className="tc-zone-header">
+            <div>
+              <p className="tc-zone-name">{data.zone.name}</p>
+              <p className="tc-zone-city">{data.zone.city}</p>
+            </div>
+            <span className="tc-zone-code">{data.zone.code}</span>
+          </div>
+          {data.consensus_score !== undefined && (
+            <div className="tc-consensus" style={{ margin: 12, borderRadius: 12 }}>
+              <span className="tc-consensus-label">Data Source Consensus</span>
+              <span className="tc-consensus-val">{(data.consensus_score * 100).toFixed(0)}%</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recent Non-Triggers */}
+      <div className="tc-card">
+        <div className="tc-card-header">
+          <p className="tc-card-title">📊 Recent Conditions</p>
+          <p className="tc-card-sub">Monitoring events that did NOT trigger a payout</p>
+        </div>
+        <div className="tc-card-body">
+          {nonTriggers.length > 0 ? nonTriggers.map((item, i) => (
+            <div className="tc-evidence-item" key={i}>
+              <div className="tc-evidence-top">
+                <span className="tc-evidence-type">{item.condition_type}</span>
+                <span className="tc-evidence-time">{new Date(item.timestamp).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="tc-evidence-row">
+                <span>Measured</span>
+                <span>{item.measured_value}</span>
+              </div>
+              <div className="tc-evidence-row">
+                <span>Threshold</span>
+                <span>{item.threshold}</span>
+              </div>
+              <div className="tc-evidence-row">
+                <span>Status</span>
+                <span style={{ color: 'var(--green-dark)' }}>✓ Below threshold</span>
+              </div>
+            </div>
+          )) : (
+            <div className="tc-empty" style={{ padding: '20px 0 8px' }}>
+              <p>No recent trigger evidence for this zone</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ─── LedgerDisplay ─────────────────────────────────────────────────────── */
+function LedgerDisplay({ zoneId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!zoneId) return;
+    setLoading(true);
+    api.getZonePayoutLedger(zoneId)
+      .then(d => { setData(d); setError(null); })
+      .catch(e => setError(e.message || 'Failed to load ledger'))
+      .finally(() => setLoading(false));
+  }, [zoneId]);
+
+  if (!zoneId) return (
+    <div className="tc-empty">
+      <div className="tc-empty-icon">📒</div>
+      <p>Select a zone above to see the payout ledger</p>
+    </div>
+  );
+
+  if (loading) return <div className="tc-loading"><div className="tc-spinner" /></div>;
+  if (error)   return <div className="tc-error-box">⚠️ {error}</div>;
+  if (!data)   return null;
+
+  const payouts = data.recent_payouts || [];
+
+  return (
+    <>
+      {/* Summary */}
+      {data.summary && (
+        <div className="tc-stat-grid" style={{ marginBottom: 14 }}>
+          <div className="tc-stat green">
+            <p className="tc-stat-label">Total Paid</p>
+            <p className="tc-stat-val">₹{data.summary.total_paid || 0}</p>
+          </div>
+          <div className="tc-stat blue">
+            <p className="tc-stat-label">Payouts</p>
+            <p className="tc-stat-val">{data.summary.payout_count || 0}</p>
+          </div>
+          <div className="tc-stat purple">
+            <p className="tc-stat-label">Avg Payout</p>
+            <p className="tc-stat-val">₹{data.summary.avg_payout || 0}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Payout list */}
+      {payouts.length > 0 ? (
+        <>
+          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 10 }}>
+            Recent Payouts
+          </p>
+          {payouts.map((payout, i) => (
+            <div className="tc-payout-item" key={i}>
+              <div className="tc-payout-top">
+                <div>
+                  <p className="tc-payout-name">{payout.partner_name || `Partner #${payout.partner_id}`}</p>
+                  <p className="tc-payout-time">{new Date(payout.timestamp).toLocaleString('en-IN')}</p>
+                </div>
+                <span className="tc-payout-amount">₹{payout.amount}</span>
+              </div>
+              <div className="tc-payout-meta">
+                <div className="tc-payout-meta-item">Trigger: <span>{payout.trigger_type}</span></div>
+                {payout.upi_ref    && <div className="tc-payout-meta-item">UPI: <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{payout.upi_ref}</span></div>}
+                {payout.claim_id   && <div className="tc-payout-meta-item">Claim: <span>#{payout.claim_id}</span></div>}
+                {payout.status     && (
+                  <div className="tc-payout-meta-item">
+                    Status: <span className={`tc-badge ${payout.status === 'paid' ? 'green' : 'gray'}`}>{payout.status}</span>
+                  </div>
+                )}
+              </div>
+              {payout.transaction_log && (
+                <div className="tc-payout-ledger-note">
+                  🔏 Transaction verified · Immutable record
+                </div>
+              )}
+            </div>
+          ))}
+        </>
+      ) : (
+        <div className="tc-empty">
+          <div className="tc-empty-icon">📭</div>
+          <p>No payouts recorded for this zone yet</p>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ─── Main TrustCenter ──────────────────────────────────────────────────── */
+export default function TrustCenter() {
+  const { user } = useAuth();                     // fixed: was `partner` which doesn't exist
+  const [activeTab, setActiveTab] = useState('claims');
+
+  const [recentClaims, setRecentClaims]     = useState([]);
+  const [zones, setZones]                   = useState([]);
+  const [selectedClaimId, setSelectedClaimId] = useState(null);
+  const [selectedZoneId, setSelectedZoneId]   = useState(null);
+
+  useEffect(() => {
+    api.getClaims().then(d => {
+      const list = Array.isArray(d) ? d : [];
+      setRecentClaims(list.slice(0, 5));
+      if (list.length > 0) setSelectedClaimId(list[0].id);
+    }).catch(() => {});
+
+    api.getZones().then(d => {
+      const list = Array.isArray(d) ? d : [];
+      setZones(list);
+      const prefZone = user?.zone_id
+        ? list.find(z => z.id === user.zone_id)?.id
+        : list[0]?.id;
+      if (prefZone) setSelectedZoneId(prefZone);
+    }).catch(() => {});
+  }, [user]);
+
+  const TABS = [
+    { id: 'claims',   label: '📋 Explainer' },
+    { id: 'evidence', label: '⚡ Evidence' },
+    { id: 'ledger',   label: '📒 Ledger' },
+  ];
+
+  return (
+    <>
+      <style>{S}</style>
+      <div className="tc-wrap">
+
+        {/* Hero */}
+        <div className="tc-hero">
+          <p className="tc-hero-title">Trust Center</p>
+          <p className="tc-hero-sub">
+            Transparent evidence · Explainable decisions · Immutable records
+          </p>
+        </div>
+
+        {/* Tab bar */}
+        <div className="tc-tabs">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              className={`tc-tab ${activeTab === t.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Claim Explainer tab ── */}
+        {activeTab === 'claims' && (
+          <>
+            {recentClaims.length > 0 && (
+              <div className="tc-selector-wrap">
+                <p className="tc-selector-label">Select Claim</p>
+                <select
+                  className="tc-selector"
+                  value={selectedClaimId || ''}
+                  onChange={e => setSelectedClaimId(Number(e.target.value))}
+                >
+                  {recentClaims.map(c => (
+                    <option key={c.id} value={c.id}>
+                      Claim #{c.id} · ₹{c.amount} · {c.status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <ClaimExplainer claimId={selectedClaimId} />
+          </>
+        )}
+
+        {/* ── Trigger Evidence tab ── */}
+        {activeTab === 'evidence' && (
+          <>
+            {zones.length > 0 && (
+              <div className="tc-selector-wrap">
+                <p className="tc-selector-label">Select Zone</p>
+                <select
+                  className="tc-selector"
+                  value={selectedZoneId || ''}
+                  onChange={e => setSelectedZoneId(Number(e.target.value))}
+                >
+                  {zones.map(z => (
+                    <option key={z.id} value={z.id}>{z.name} · {z.city}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <EvidenceViewer zoneId={selectedZoneId} />
+          </>
+        )}
+
+        {/* ── Payout Ledger tab ── */}
+        {activeTab === 'ledger' && (
+          <>
+            {zones.length > 0 && (
+              <div className="tc-selector-wrap">
+                <p className="tc-selector-label">Select Zone</p>
+                <select
+                  className="tc-selector"
+                  value={selectedZoneId || ''}
+                  onChange={e => setSelectedZoneId(Number(e.target.value))}
+                >
+                  {zones.map(z => (
+                    <option key={z.id} value={z.id}>{z.name} · {z.city}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <LedgerDisplay zoneId={selectedZoneId} />
+          </>
+        )}
+
+        {/* Commitment card — always visible */}
+        <div className="tc-commitment">
+          <p className="tc-commitment-title">Our Commitment to Transparency</p>
+          <div className="tc-commitment-items">
+            <div className="tc-commitment-item">
+              <span className="tc-commitment-icon">📡</span>
+              <span>Every claim backed by verifiable data from multiple independent sources</span>
+            </div>
+            <div className="tc-commitment-item">
+              <span className="tc-commitment-icon">🔢</span>
+              <span>All calculations are explainable — no black-box decisions</span>
+            </div>
+            <div className="tc-commitment-item">
+              <span className="tc-commitment-icon">🔏</span>
+              <span>Every payout is recorded in an immutable, tamper-proof ledger</span>
+            </div>
+            <div className="tc-commitment-item">
+              <span className="tc-commitment-icon">⚡</span>
+              <span>You can verify every decision we make, in real time</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </>
+  );
+}
