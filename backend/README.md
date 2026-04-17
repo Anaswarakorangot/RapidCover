@@ -142,18 +142,22 @@ Premium is adjusted based on zone risk score:
 
 ## Development
 
-### Database Migrations (coming soon)
+### Database Migrations
+
+Alembic is configured for database migrations. Migration files are in `backend/alembic/versions/`.
 
 ```bash
-# Initialize Alembic
-alembic init migrations
-
-# Create migration
+# Create a new migration
 alembic revision --autogenerate -m "description"
 
-# Apply migrations
+# Apply all pending migrations
 alembic upgrade head
+
+# Check current revision
+alembic current
 ```
+
+**Note:** In production (PostgreSQL), migrations run automatically on startup. For local SQLite development, `init_db()` creates tables directly.
 
 ### Running Tests (coming soon)
 
