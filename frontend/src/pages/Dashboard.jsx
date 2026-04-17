@@ -814,8 +814,9 @@ export function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h1 style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 900, fontSize: 22, color: 'var(--text-dark)' }}>
-              Hello, {user?.name?.split(' ')[0] || 'Partner'} 👋
+              Hello, {user?.name?.split(' ')[0] || 'Warrior'} 👋
             </h1>
+
             <p style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 2 }}>
               {zone ? `${zone.name} (${zone.code})` : 'Set your zone in profile'}
             </p>

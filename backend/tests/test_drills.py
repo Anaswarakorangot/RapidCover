@@ -518,7 +518,72 @@ class TestDrillIntegration:
         print("[PASS] Drill impact collection")
 
 
+        print("[PASS] Drill impact collection")
+
+
+class TestInstantReplay:
+    """Tests for the Instant Replay demo system."""
+
+    def test_replay_scenarios_list(self):
+        """Verify scenario list retrieval."""
+        from app.services.replay_service import get_replay_scenarios_list
+        scenarios = get_replay_scenarios_list()
+        
+        assert len(scenarios) > 0
+        assert any(s['id'] == 'mumbai_monsoon_2024' for s in scenarios)
+        assert any(s['id'] == 'fraud_attack_mumbai' for s in scenarios)
+        print("[PASS] Replay scenarios list")
+
+    def test_trigger_replay_scenario_basic(self):
+        """Verify basic scenario execution."""
+        from app.services.replay_service import trigger_replay_scenario
+        from app.models.zone import Zone
+        
+        mock_db = MagicMock()
+        mock_zone = Zone(id=1, code="MUM-01", city="Mumbai")
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_zone
+        
+        # Mock claims_processor.process_trigger_event to return empty list
+        with patch('app.services.replay_service.process_trigger_event', return_value=[]):
+            result = trigger_replay_scenario("mumbai_monsoon_2024", mock_db)
+            
+            assert result['status'] == 'success'
+            assert result['scenario'] == 'mumbai_monsoon_2024'
+            assert result['zone_code'] == 'MUM-01'
+            mock_db.add.assert_called()
+        print("[PASS] Trigger replay scenario basic")
+
+    def test_trigger_replay_with_fraud(self):
+        """Verify fraud injection during replay."""
+        from app.services.replay_service import trigger_replay_scenario
+        from app.models.zone import Zone
+        from app.models.partner import Partner
+        
+        mock_db = MagicMock()
+        mock_zone = Zone(id=1, code="MUM-01", city="Mumbai", dark_store_lat=19.0, dark_store_lng=72.0)
+        
+        # Setup mocks for zone lookup and partner lookup
+        def mock_query(model):
+            q = MagicMock()
+            if model == Zone:
+                q.filter.return_value.first.return_value = mock_zone
+            elif model == Partner:
+                q.filter.return_value.limit.return_value.all.return_value = [Partner(id=101)]
+            return q
+            
+        mock_db.query.side_effect = mock_query
+        
+        with patch('app.services.replay_service.process_trigger_event', return_value=[]):
+            result = trigger_replay_scenario("fraud_attack_mumbai", mock_db)
+            
+            assert result['status'] == 'success'
+            # Verify GPS ping was added (at least 2 add calls: 1 for trigger, 1 for ping)
+            assert mock_db.add.call_count >= 2
+        print("[PASS] Trigger replay with fraud injection")
+
+
 # ============================================================================
+
 # RUN TESTS
 # ============================================================================
 

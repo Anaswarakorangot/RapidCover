@@ -28,6 +28,8 @@ import AggregationPanel from '../components/admin/AggregationPanel';
 import PartialDisruptionPanel from '../components/admin/PartialDisruptionPanel';
 import PremiumCollectionPanel from '../components/admin/PremiumCollectionPanel';
 import DemoModeScenarioPanel from '../components/admin/DemoModeScenarioPanel';
+import InstantReplayPanel from '../components/admin/InstantReplayPanel';
+
 import './Admin.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
@@ -88,6 +90,7 @@ export function Admin() {
     { id: 'oracle',          label: '\u{1F52E} Auto-Oracle' },
     { id: 'settings',        label: '\u2699\u{FE0F} Settings' },
     { id: 'triggers',        label: '\u{2699}\u{FE0F} Legacy Sim' },
+    { id: 'replay',          label: '\u{1F504} Instant Replay' },
   ];
 
   // Handle zone selection from map to drill panel
@@ -109,7 +112,7 @@ export function Admin() {
     },
     {
       label: 'Tools & Testing',
-      items: ['drills', 'verify', 'stress', 'trigger-proof', 'riqi', 'notif-preview', 'checklist', 'oracle', 'triggers']
+      items: ['drills', 'replay', 'verify', 'stress', 'trigger-proof', 'riqi', 'notif-preview', 'checklist', 'oracle', 'triggers']
     }
   ];
 
@@ -285,6 +288,7 @@ export function Admin() {
                 <ExclusionsCard />
               </>
             )}
+            {activeTab === 'replay'     && <InstantReplayPanel />}
           </div>
         </div>
       </main>
