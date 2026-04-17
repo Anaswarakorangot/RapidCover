@@ -170,8 +170,9 @@ const S = `
   }
   .excl-sheet {
     background: var(--white); width: 100%; max-width: 480px;
-    border-radius: 24px 24px 0 0; max-height: 90vh;
+    border-radius: 24px 24px 0 0; max-height: 78vh;
     display: flex; flex-direction: column;
+    margin-bottom: 64px;
   }
   .excl-header { padding: 20px 20px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .excl-title  { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px; color: var(--text-dark); }
