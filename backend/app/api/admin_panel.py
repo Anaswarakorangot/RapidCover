@@ -679,87 +679,125 @@ async def simulate_trigger(req: SimulateTriggerRequest):
 # --- GET /admin/panel/live-data ----------------------------------------------
 
 @router.get("/live-data")
-def get_live_api_data(
+def get_live_data(
     zone_code: str = Query("BLR-KOR", description="Zone code to fetch data for"),
     db: Session = Depends(get_db),
 ):
     """
-    Fetch current data from all external APIs for a zone.
-
-    Returns weather, AQI, platform status, and shutdown status with source info.
-    Use this to verify what data the trigger engine is seeing.
+    Return live data summary: raw zone data, oracle reliability, and partner activity.
+    Consolidates oracle engine status, data source badges, and platform activity
+    into a single panel response. Feeds the admin LiveDataPanel.
     """
     from app.services.external_apis import (
-        MockWeatherAPI,
-        MockAQIAPI,
-        MockPlatformAPI,
-        MockCivicAPI,
-        get_source_health,
+        MockWeatherAPI, MockAQIAPI, MockPlatformAPI, MockCivicAPI,
+        get_oracle_reliability_report, get_source_health, evaluate_partner_platform_eligibility
     )
+    from app.services.claims_processor import get_db_partner_platform_activity
 
-    # Find zone
+    # 1. Fetch zone-specific raw data
     zone = db.query(Zone).filter(Zone.code == zone_code).first()
     if not zone:
         # Fallback to first zone
         zone = db.query(Zone).first()
 
-    if not zone:
-        return {"error": "No zones found. Run seed first."}
+    raw_data = {}
+    if zone:
+        weather = MockWeatherAPI.get_current(zone.id, zone.dark_store_lat, zone.dark_store_lng)
+        aqi = MockAQIAPI.get_current(zone.id, zone.dark_store_lat, zone.dark_store_lng)
+        platform = MockPlatformAPI.get_store_status(zone.id)
+        shutdown = MockCivicAPI.get_shutdown_status(zone.id)
+        
+        raw_data = {
+            "zone": {
+                "id": zone.id,
+                "code": zone.code,
+                "name": zone.name,
+                "city": zone.city,
+                "lat": zone.dark_store_lat,
+                "lng": zone.dark_store_lng,
+            },
+            "weather": {
+                "temp_celsius": weather.temp_celsius,
+                "rainfall_mm_hr": weather.rainfall_mm_hr,
+                "humidity": weather.humidity,
+                "source": weather.source,
+                "timestamp": weather.timestamp.isoformat(),
+            },
+            "aqi": {
+                "aqi": aqi.aqi,
+                "pm25": aqi.pm25,
+                "pm10": aqi.pm10,
+                "category": aqi.category,
+                "source": aqi.source,
+                "timestamp": aqi.timestamp.isoformat(),
+            },
+            "platform": {
+                "is_open": platform.is_open,
+                "closure_reason": platform.closure_reason,
+                "source": platform.source,
+                "timestamp": platform.timestamp.isoformat(),
+            },
+            "shutdown": {
+                "is_active": shutdown.is_active,
+                "reason": shutdown.reason,
+                "source": shutdown.source,
+                "timestamp": shutdown.timestamp.isoformat(),
+            }
+        }
+    else:
+        raw_data = {"error": "No zones found. Run seed first."}
 
-    # Fetch data from all sources (will try live, fallback to mock)
-    weather = MockWeatherAPI.get_current(zone.id, zone.dark_store_lat, zone.dark_store_lng)
-    aqi = MockAQIAPI.get_current(zone.id, zone.dark_store_lat, zone.dark_store_lng)
-    platform = MockPlatformAPI.get_store_status(zone.id)
-    shutdown = MockCivicAPI.get_shutdown_status(zone.id)
+    # 2. Fetch Oracle setup and fleet-level activity
+    oracle = get_oracle_reliability_report()
+    source_health = get_source_health()
 
-    # Get source health
-    health = get_source_health()
+    sources_serialized = {}
+    for name, info in source_health.items():
+        sources_serialized[name] = {
+            "status": info["status"],
+            "last_check": info["last_check"].isoformat() if info.get("last_check") else None,
+            "last_success": info["last_success"].isoformat() if info.get("last_success") else None,
+        }
+
+    # Sample platform activity (top 10 partners)
+    partners = db.query(Partner).filter(Partner.is_active == True).limit(10).all()
+    activity_summary = []
+    active_on_platform = 0
+    for p in partners:
+        activity = get_db_partner_platform_activity(p.id, db)
+        eligibility = evaluate_partner_platform_eligibility(p.id)
+        if activity["active_shift"] and activity["platform_logged_in"]:
+            active_on_platform += 1
+        activity_summary.append({
+            "partner_id": p.id,
+            "partner_name": p.name,
+            "platform": activity.get("platform", "unknown"),
+            "active_shift": activity["active_shift"],
+            "platform_logged_in": activity["platform_logged_in"],
+            "orders_completed_recent": activity["orders_completed_recent"],
+            "platform_eligible": eligibility["eligible"],
+            "platform_score": eligibility["score"],
+        })
 
     return {
-        "zone": {
-            "id": zone.id,
-            "code": zone.code,
-            "name": zone.name,
-            "city": zone.city,
-            "lat": zone.dark_store_lat,
-            "lng": zone.dark_store_lng,
+        **raw_data,
+        "oracle": {
+            "system_health": oracle["system_health"],
+            "average_reliability": oracle["average_reliability"],
+            "live_sources": oracle["live_sources"],
+            "mock_sources": oracle["mock_sources"],
+            "stale_sources": oracle["stale_sources"],
+            "sources": oracle["sources"],
         },
-        "weather": {
-            "temp_celsius": weather.temp_celsius,
-            "rainfall_mm_hr": weather.rainfall_mm_hr,
-            "humidity": weather.humidity,
-            "source": weather.source,
-            "timestamp": weather.timestamp.isoformat(),
-        },
-        "aqi": {
-            "aqi": aqi.aqi,
-            "pm25": aqi.pm25,
-            "pm10": aqi.pm10,
-            "category": aqi.category,
-            "source": aqi.source,
-            "timestamp": aqi.timestamp.isoformat(),
-        },
-        "platform": {
-            "is_open": platform.is_open,
-            "closure_reason": platform.closure_reason,
-            "source": platform.source,
-            "timestamp": platform.timestamp.isoformat(),
-        },
-        "shutdown": {
-            "is_active": shutdown.is_active,
-            "reason": shutdown.reason,
-            "source": shutdown.source,
-            "timestamp": shutdown.timestamp.isoformat(),
-        },
-        "source_health": {
-            name: {
-                "status": info["status"],
-                "last_check": info["last_check"].isoformat() if info["last_check"] else None,
-            }
-            for name, info in health.items()
+        "data_sources": sources_serialized,
+        "platform_activity": {
+            "total_sampled": len(activity_summary),
+            "active_on_platform": active_on_platform,
+            "inactive_on_platform": len(activity_summary) - active_on_platform,
+            "partners": activity_summary,
         },
         "demo_mode": get_settings().demo_mode,
-        "fetched_at": utcnow().isoformat(),
+        "computed_at": utcnow().isoformat(),
     }
 
 
@@ -798,76 +836,6 @@ def get_oracle_reliability(zone_id: int = None):
             "rain_trigger": rain_confidence,
             "shutdown_trigger": shutdown_confidence,
         },
-    }
-
-
-# --- GET /admin/panel/live-data ----------------------------------------------
-
-@router.get("/live-data")
-def get_live_data(db: Session = Depends(get_db)):
-    """
-    Return live data summary: source health, oracle reliability, partner activity snapshot.
-
-    Consolidates oracle engine status, data source badges, and platform activity
-    into a single panel response. Feeds the admin LiveDataPanel.
-    """
-    from app.services.external_apis import (
-        get_oracle_reliability_report,
-        compute_trigger_confidence,
-        get_source_health,
-    )
-    from app.services.claims_processor import get_db_partner_platform_activity
-    from app.services.external_apis import evaluate_partner_platform_eligibility
-
-    oracle = get_oracle_reliability_report()
-    source_health = get_source_health()
-
-    # Serialize source health datetimes
-    sources_serialized = {}
-    for name, info in source_health.items():
-        sources_serialized[name] = {
-            "status": info["status"],
-            "last_check": info["last_check"].isoformat() if info.get("last_check") else None,
-            "last_success": info["last_success"].isoformat() if info.get("last_success") else None,
-        }
-
-    # Sample platform activity (top 10 partners)
-    partners = db.query(Partner).filter(Partner.is_active == True).limit(10).all()
-    activity_summary = []
-    active_on_platform = 0
-    for p in partners:
-        activity = get_db_partner_platform_activity(p.id, db)
-        eligibility = evaluate_partner_platform_eligibility(p.id)
-        if activity["active_shift"] and activity["platform_logged_in"]:
-            active_on_platform += 1
-        activity_summary.append({
-            "partner_id": p.id,
-            "partner_name": p.name,
-            "platform": activity.get("platform", "unknown"),
-            "active_shift": activity["active_shift"],
-            "platform_logged_in": activity["platform_logged_in"],
-            "orders_completed_recent": activity["orders_completed_recent"],
-            "platform_eligible": eligibility["eligible"],
-            "platform_score": eligibility["score"],
-        })
-
-    return {
-        "oracle": {
-            "system_health": oracle["system_health"],
-            "average_reliability": oracle["average_reliability"],
-            "live_sources": oracle["live_sources"],
-            "mock_sources": oracle["mock_sources"],
-            "stale_sources": oracle["stale_sources"],
-            "sources": oracle["sources"],
-        },
-        "data_sources": sources_serialized,
-        "platform_activity": {
-            "total_sampled": len(activity_summary),
-            "active_on_platform": active_on_platform,
-            "inactive_on_platform": len(activity_summary) - active_on_platform,
-            "partners": activity_summary,
-        },
-        "computed_at": utcnow().isoformat(),
     }
 
 
