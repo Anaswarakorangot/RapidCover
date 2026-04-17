@@ -412,7 +412,262 @@ const S = `
   .tc-zone-name { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 15px; color: var(--text-dark); }
   .tc-zone-city { font-size: 12px; color: var(--text-mid); margin-top: 2px; }
   .tc-zone-code { font-size: 11px; color: var(--text-light); font-family: monospace; }
-`;
+
+  /* ── ML Engine Tab ── */
+  .tc-model-card {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .tc-model-card-header {
+    padding: 14px 18px 12px;
+    border-bottom: 1.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .tc-model-card-icon { font-size: 22px; }
+  .tc-model-card-title {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 15px;
+    color: var(--text-dark);
+  }
+  .tc-model-card-sub { font-size: 11px; color: var(--text-light); margin-top: 1px; }
+  .tc-model-card-body { padding: 14px 18px 16px; }
+  .tc-model-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+    gap: 8px;
+  }
+  .tc-model-row:last-child { border-bottom: none; }
+  .tc-model-row-key { color: var(--text-mid); flex-shrink: 0; min-width: 110px; }
+  .tc-model-row-val { color: var(--text-dark); font-weight: 600; text-align: right; }
+  .tc-metric-pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--green-light);
+    color: var(--green-dark);
+  }
+  .tc-metric-pill.blue { background: var(--blue-light); color: var(--blue); }
+  .tc-metric-pill.purple { background: var(--purple-light); color: var(--purple); }
+
+  /* ── Boundary table ── */
+  .tc-boundary-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tc-boundary-table th {
+    text-align: left; padding: 8px 10px;
+    background: var(--gray-bg); color: var(--text-mid);
+    font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
+    border-bottom: 1.5px solid var(--border);
+  }
+  .tc-boundary-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .tc-boundary-table tr:last-child td { border-bottom: none; }
+  .tc-boundary-table .ml-col { color: var(--blue); font-weight: 600; }
+  .tc-boundary-table .rule-col { color: #991b1b; font-weight: 600; }
+  .tc-boundary-table .domain-col { color: var(--text-dark); }
+
+  /* ── Judge FAQ ── */
+  .tc-faq-item {
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .tc-faq-q {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 16px;
+    cursor: pointer;
+    background: var(--white);
+    gap: 8px;
+  }
+  .tc-faq-q-text {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    color: var(--text-dark);
+  }
+  .tc-faq-a {
+    padding: 12px 16px 14px;
+    background: var(--gray-bg);
+    font-size: 12.5px;
+    color: var(--text-mid);
+    line-height: 1.6;
+    border-top: 1px solid var(--border);
+  }
+
+
+/* ─── MLEngineTab ────────────────────────────────────────────────── */
+const MODEL_CARDS = [
+  {
+    icon: '📍',
+    title: 'Zone Risk Model',
+    sub: 'Gradient Boosted Regressor',
+    pill: 'green',
+    rows: [
+      { k: 'Purpose',          v: 'Score 0–100 disruption risk for a delivery zone' },
+      { k: 'Input features',   v: 'City, rainfall history, AQI baseline, shutdown frequency, closure rate' },
+      { k: 'Target',           v: 'Historical trigger frequency (independent of pricing formula)' },
+      { k: 'Training data',    v: 'Zone-level weather events + admin drill scenarios' },
+      { k: 'Fallback',         v: 'Manual actuarial formula if model unavailable or city unseen' },
+      { k: 'Decision boundary', v: 'Score > 60 → zone surcharge applied. Score ≤ 60 → base rate.' },
+    ],
+  },
+  {
+    icon: '💰',
+    title: 'Premium Pricing Model',
+    sub: 'Gradient Boosted Regressor',
+    pill: 'blue',
+    rows: [
+      { k: 'Purpose',          v: 'Predict weekly premium for a partner given zone + tier + season' },
+      { k: 'Input features',   v: 'Tier, city, zone risk score, seasonal index, RIQI band, activity level' },
+      { k: 'Target',           v: 'Expected weekly loss exposure (not formula-derived)' },
+      { k: 'Training data',    v: 'Partner claim history + zone risk outputs + seasonal signals' },
+      { k: 'Fallback',         v: 'Actuarial base rate table by tier if model unavailable' },
+      { k: 'Decision boundary', v: 'Final premium always clamped: base × 1.0 ≤ output ≤ base × 3.0' },
+    ],
+  },
+  {
+    icon: '🔒',
+    title: 'Fraud Detection Model',
+    sub: 'Isolation Forest (Anomaly Detection)',
+    pill: 'purple',
+    rows: [
+      { k: 'Purpose',          v: 'Score 0–1 anomaly probability for each claim attempt' },
+      { k: 'Input features',   v: 'GPS consistency, claim velocity, trigger timing, partner history' },
+      { k: 'Target',           v: 'Anomaly vs normal — unsupervised (no label required)' },
+      { k: 'Training data',    v: 'Drill replay scenarios + synthetic GPS spoofing + normal claim flows' },
+      { k: 'Fallback',         v: 'Rule-based hard stops always active regardless of ML score' },
+      { k: 'Decision boundary', v: 'Score > 0.75 → hard reject. 0.5–0.75 → manual review. < 0.5 → pass.' },
+    ],
+  },
+];
+
+const BOUNDARY_ROWS = [
+  { domain: 'Premium calculation',   ml: 'Zone risk score, seasonal factor, RIQI band', rule: 'Hard cap: base × 3.0 max. Tier floor enforced.' },
+  { domain: 'Fraud triage',          ml: 'Isolation Forest anomaly score', rule: 'GPS spoofing detected → always reject (no ML override).' },
+  { domain: 'Trigger verification',  ml: 'Not used — deterministic only', rule: 'Multi-source consensus required. Single source → pending.' },
+  { domain: 'Zone risk scoring',     ml: 'GBR predicts 0–100 score', rule: 'Score never used alone. Insurance rules applied on top.' },
+  { domain: 'Payout amount',         ml: 'Not used — deterministic only', rule: 'Tier limit × disruption factor. ML cannot increase payout.' },
+];
+
+const FAQS = [
+  {
+    q: 'What is actually learned here vs hardcoded?',
+    a: 'Zone risk scores (0–100) and premium levels are learned from historical data. Fraud anomalies are detected by Isolation Forest trained on claim patterns. Trigger thresholds, payout amounts, and hard-stop rules are always deterministic — ML assists but never overrides insurance controls.',
+  },
+  {
+    q: 'How do you stop GPS spoofing?',
+    a: 'GPS spoofing is caught by a deterministic hard stop — not ML. We check coordinate consistency across the claim window. If GPS jumps are detected, the claim is auto-rejected regardless of the ML fraud score. ML then adds a secondary anomaly signal for the insurer’s review log.',
+  },
+  {
+    q: 'Why should anyone trust this payout?',
+    a: 'Every payout requires: (1) multi-source trigger verification with consensus ≥ 60%, (2) zone match confirmation, (3) fraud score below threshold or manual insurer review, and (4) an immutable transaction record. The worker sees each step in the Trust Center in real time.',
+  },
+];
+
+function MLEngineTab() {
+  const [openFaq, setOpenFaq] = useState(null);
+
+  return (
+    <div>
+      {/* Positioning statement */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1a2e1a 0%, #2a9e47 100%)',
+        borderRadius: 16, padding: '14px 16px', marginBottom: 16, color: 'white',
+      }}>
+        <p style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 900, fontSize: 15 }}>
+          🤖 ML Decision Engine
+        </p>
+        <p style={{ fontSize: 12, opacity: 0.85, marginTop: 4, lineHeight: 1.5 }}>
+          RapidCover uses learned risk intelligence where it helps,
+          and deterministic insurance controls where it matters.
+        </p>
+      </div>
+
+      {/* Model Cards */}
+      {MODEL_CARDS.map((m, i) => (
+        <div className="tc-model-card" key={i}>
+          <div className="tc-model-card-header">
+            <span className="tc-model-card-icon">{m.icon}</span>
+            <div>
+              <p className="tc-model-card-title">{m.title}</p>
+              <p className="tc-model-card-sub">{m.sub}</p>
+            </div>
+            <span style={{ marginLeft: 'auto' }} className={`tc-metric-pill ${m.pill}`}>Active</span>
+          </div>
+          <div className="tc-model-card-body">
+            {m.rows.map((r, j) => (
+              <div className="tc-model-row" key={j}>
+                <span className="tc-model-row-key">{r.k}</span>
+                <span className="tc-model-row-val">{r.v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* Learned vs Rule Boundary */}
+      <div className="tc-card">
+        <div className="tc-card-header">
+          <p className="tc-card-title">⚖️ ML vs Deterministic Rules</p>
+          <p className="tc-card-sub">What the model decides alone vs what always requires a rule</p>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="tc-boundary-table">
+            <thead>
+              <tr>
+                <th>Domain</th>
+                <th>ML Role</th>
+                <th>Rule Override</th>
+              </tr>
+            </thead>
+            <tbody>
+              {BOUNDARY_ROWS.map((r, i) => (
+                <tr key={i}>
+                  <td className="domain-col">{r.domain}</td>
+                  <td className="ml-col">{r.ml}</td>
+                  <td className="rule-col">{r.rule}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Judge FAQ */}
+      <div className="tc-card">
+        <div className="tc-card-header">
+          <p className="tc-card-title">💬 Judge FAQ</p>
+          <p className="tc-card-sub">Quick answers to likely evaluation questions</p>
+        </div>
+        <div className="tc-card-body">
+          {FAQS.map((f, i) => (
+            <div className="tc-faq-item" key={i}>
+              <div className="tc-faq-q" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
+                <span className="tc-faq-q-text">{f.q}</span>
+                <span style={{ fontSize: 16, color: 'var(--text-light)', flexShrink: 0 }}>
+                  {openFaq === i ? '▲' : '▼'}
+                </span>
+              </div>
+              {openFaq === i && <div className="tc-faq-a">{f.a}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ─── ClaimExplainer ─────────────────────────────────────────────────────── */
 function ClaimExplainer({ claimId }) {
@@ -760,6 +1015,7 @@ export default function TrustCenter() {
     { id: 'claims',   label: '📋 Explainer' },
     { id: 'evidence', label: '⚡ Evidence' },
     { id: 'ledger',   label: '📒 Ledger' },
+    { id: 'ml',       label: '🤖 ML Engine' },
   ];
 
   return (
@@ -767,11 +1023,14 @@ export default function TrustCenter() {
       <style>{S}</style>
       <div className="tc-wrap">
 
-        {/* Hero */}
+        {/* Hero — elevated with ML positioning */}
         <div className="tc-hero">
-          <p className="tc-hero-title">Trust Center</p>
+          <p className="tc-hero-title">🔮 Trust Center</p>
           <p className="tc-hero-sub">
-            Transparent evidence · Explainable decisions · Immutable records
+            The RapidCover ML Decision Engine — Fully Transparent
+          </p>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 6 }}>
+            Explainable premiums · Fraud-resilient claims · Immutable payouts
           </p>
         </div>
 
@@ -852,6 +1111,9 @@ export default function TrustCenter() {
             <LedgerDisplay zoneId={selectedZoneId} />
           </>
         )}
+
+        {/* ── ML Engine tab ── */}
+        {activeTab === 'ml' && <MLEngineTab />}
 
         {/* Commitment card — always visible */}
         <div className="tc-commitment">
