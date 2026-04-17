@@ -12,7 +12,8 @@ const BASE = (import.meta.env.VITE_API_URL || '/api/v1') + '/admin';
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
 function getToken() {
-  return localStorage.getItem('access_token');
+  // Check for admin token first, then fall back to partner access token
+  return localStorage.getItem('admin_token') || localStorage.getItem('access_token');
 }
 
 function jsonHeaders() {
@@ -50,6 +51,74 @@ async function post(path, body = null) {
     method: 'POST',
     headers: jsonHeaders(),
     ...(body != null ? { body: JSON.stringify(body) } : {}),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Authenticated fetch helper - automatically includes admin JWT token
+ * @param {string} url - Full URL or path
+ * @param {object} options - Fetch options
+ */
+export async function authenticatedFetch(url, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...jsonHeaders(),
+    ...options.headers,
+  };
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  return response;
+}
+
+// ── Admin Authentication ──────────────────────────────────────────────────────
+
+/**
+ * Login as admin with email and password
+ * @param {string} email
+ * @param {string} password
+ * @returns {{ access_token: string, admin: object }}
+ */
+export async function loginAdmin(email, password) {
+  // Direct fetch to /api/v1/admin/auth/login (not /admin prefix)
+  const url = `${BASE.replace('/admin', '')}/admin/auth/login`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Register a new admin account
+ * @param {string} email
+ * @param {string} password
+ * @param {string} full_name
+ * @returns {{ access_token: string, admin: object }}
+ */
+export async function registerAdmin(email, password, full_name) {
+  const url = `${BASE.replace('/admin', '')}/admin/auth/register`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, full_name }),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Get current admin profile
+ * @returns {object} admin profile
+ */
+export async function getAdminProfile() {
+  const url = `${BASE.replace('/admin', '')}/admin/auth/me`;
+  const res = await fetch(url, {
+    headers: jsonHeaders(),
   });
   return handleResponse(res);
 }
@@ -107,6 +176,48 @@ export async function rejectClaim(claimId, reason = null) {
 
 export async function payoutClaim(claimId, upiRef = null) {
   return post(`/claims/${claimId}/payout`, upiRef ? { upi_ref: upiRef } : null);
+}
+
+/**
+ * Bulk approve multiple claims
+ * @param {number[]} claimIds
+ * @returns {{ approved: number, total: number }}
+ */
+export async function bulkApproveClaims(claimIds) {
+  return post('/claims/bulk-approve', { claim_ids: claimIds });
+}
+
+/**
+ * Bulk reject multiple claims
+ * @param {number[]} claimIds
+ * @param {string} reason
+ * @returns {{ rejected: number }}
+ */
+export async function bulkRejectClaims(claimIds, reason) {
+  return post('/claims/bulk-reject', { claim_ids: claimIds, reason });
+}
+
+/**
+ * Export all claims to CSV (triggers download)
+ */
+export async function exportClaimsCsv() {
+  const url = `${BASE}/export/claims`;
+  const res = await fetch(url, { headers: jsonHeaders() });
+
+  if (!res.ok) {
+    throw new Error('Failed to export claims');
+  }
+
+  // Trigger browser download
+  const blob = await res.blob();
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = `claims_export_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(downloadUrl);
 }
 
 // ── Simulation ────────────────────────────────────────────────────────────────
@@ -252,6 +363,11 @@ export async function getPaymentStats() {
 // ── Default export ────────────────────────────────────────────────────────────
 
 const adminApi = {
+  // Admin authentication
+  loginAdmin,
+  registerAdmin,
+  getAdminProfile,
+  // Dashboard
   getDashboardStats,
   getAllZones,
   seedZones,
@@ -262,6 +378,11 @@ const adminApi = {
   approveClaim,
   rejectClaim,
   payoutClaim,
+  // Bulk operations
+  bulkApproveClaims,
+  bulkRejectClaims,
+  exportClaimsCsv,
+  // Simulation
   simulateWeather,
   simulateAqi,
   simulateShutdown,

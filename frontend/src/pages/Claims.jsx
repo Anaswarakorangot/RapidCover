@@ -176,7 +176,7 @@ const S = `
   .ite-bar-fill { height: 100%; border-radius: 10px; transition: width 0.5s ease; }
   .ite-source { font-size: 10px; color: var(--text-light); text-align: right; margin-top: 6px; }
   .ite-consensus-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #166534; margin-top: 4px; }
-
+`;
 
 const STATUS_STYLES = {
   paid: { class: 'badge-paid', label: 'PAID', icon: '✅' },
