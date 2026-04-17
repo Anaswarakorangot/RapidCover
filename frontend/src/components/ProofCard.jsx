@@ -72,6 +72,62 @@ function fmtShort(iso) {
   });
 }
 
+/* ─── Consensus Meter ─────────────────────────────────────────────────────── */
+function ConsensusMeter({ explanation }) {
+  if (!explanation) return null;
+
+  // Calculate consensus score based on available evidence
+  const checks = [
+    { label: 'Multi-source', pass: explanation.data_sources && explanation.data_sources.length >= 2 },
+    { label: 'Zone match', pass: explanation.zone_match },
+    { label: 'Live data', pass: explanation.source_mode === 'live' },
+    { label: 'Fresh', pass: explanation.trigger_started_at &&
+      (Date.now() - new Date(explanation.trigger_started_at).getTime()) < 3600000 }, // < 1 hour
+  ];
+
+  const passedChecks = checks.filter(c => c.pass).length;
+  const consensusPercent = Math.round((passedChecks / checks.length) * 100);
+  const barColor = consensusPercent >= 75 ? '#2a9e47' : consensusPercent >= 50 ? '#f97316' : '#dc2626';
+
+  return (
+    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: 12 }}>
+      <p style={{ fontSize: 11, fontWeight: 700, color: '#166534', marginBottom: 8, textTransform: 'uppercase' }}>
+        Data Consensus Score
+      </p>
+
+      {/* Consensus bar */}
+      <div style={{ background: '#e5e7eb', borderRadius: 8, height: 8, marginBottom: 10, overflow: 'hidden' }}>
+        <div style={{
+          background: barColor,
+          height: '100%',
+          width: `${consensusPercent}%`,
+          transition: 'width 0.3s ease'
+        }} />
+      </div>
+
+      {/* Check list */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11 }}>
+        {checks.map((check, idx) => (
+          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 14 }}>{check.pass ? '✅' : '⚠️'}</span>
+            <span style={{ color: check.pass ? '#166534' : '#6b7280' }}>{check.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Sources */}
+      {explanation.data_sources && explanation.data_sources.length > 0 && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #dcfce7' }}>
+          <p style={{ fontSize: 10, color: '#4a5e4a', marginBottom: 4 }}>Data Sources:</p>
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#166534' }}>
+            {explanation.data_sources.join(' • ')}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Component ──────────────────────────────────────────────────────────── */
 export default function ProofCard({
   triggerType,
@@ -266,13 +322,41 @@ export default function ProofCard({
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ color: '#4a5e4a' }}>Fraud Review</span>
-                    <span style={{ fontWeight: 600 }}>{explanation?.fraud_review || 'Passed'}</span>
+                    <span style={{ fontWeight: 600 }}>{explanation?.fraud_decision || 'Passed'}</span>
                   </div>
+                  {explanation?.fraud_score != null && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ color: '#4a5e4a' }}>Fraud Score</span>
+                      <span style={{
+                        fontWeight: 600,
+                        color: explanation.fraud_score > 0.75 ? '#dc2626' : explanation.fraud_score > 0.5 ? '#f97316' : '#2a9e47'
+                      }}>
+                        {explanation.fraud_score.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2ece2', marginTop: 8, paddingTop: 8 }}>
                     <span style={{ color: '#4a5e4a' }}>Transaction Proof</span>
                     <span style={{ fontWeight: 600, color: '#2a9e47', fontSize: 11 }}>{explanation?.transaction_proof || 'Processing'}</span>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Consensus Meter */}
+            <ConsensusMeter explanation={explanation} />
+
+            {/* Fraud Evidence Detail */}
+            {explanation?.fraud_reasons && explanation.fraud_reasons.length > 0 && (
+              <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 12, padding: 12 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: '#92400e', marginBottom: 6, textTransform: 'uppercase' }}>
+                  Fraud Detection Factors
+                </p>
+                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: '#78350f' }}>
+                  {explanation.fraud_reasons.map((reason, idx) => (
+                    <li key={idx} style={{ marginBottom: 4 }}>{reason}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
