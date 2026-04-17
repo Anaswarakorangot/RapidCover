@@ -32,6 +32,7 @@ import PartialDisruptionPanel from '../components/admin/PartialDisruptionPanel';
 import PremiumCollectionPanel from '../components/admin/PremiumCollectionPanel';
 import DemoModeScenarioPanel from '../components/admin/DemoModeScenarioPanel';
 import InstantReplayPanel from '../components/admin/InstantReplayPanel';
+import { adminFetch } from '../services/adminApi';
 
 import './Admin.css';
 
@@ -51,7 +52,7 @@ export function AdminDashboard() {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !admin) {
-      navigate('/login');
+      navigate('/login?admin=1&next=/admin', { replace: true });
     }
   }, [admin, authLoading, navigate]);
 
@@ -65,7 +66,7 @@ export function AdminDashboard() {
     setLoading(true);
     setStatsError(false);
     try {
-      const res = await authenticatedFetch(`${API_BASE}/admin/panel/stats`);
+      const res = await adminFetch(`${API_BASE}/admin/panel/stats`);
       if (!res.ok) {
         throw new Error('Failed to load admin stats');
       }

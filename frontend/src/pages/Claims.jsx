@@ -220,7 +220,7 @@ export default function Claims() {
   const fetchAll = useCallback(async (isInitial = false) => {
     try {
       const [claimsRes, summaryRes, triggersRes] = await Promise.allSettled([
-        api.getClaims({ limit: 20 }),
+        api.getClaims({ page: 1, page_size: 20 }),
         api.getClaimsSummary(),
         api.getActiveTriggers().catch(() => []),
       ]);

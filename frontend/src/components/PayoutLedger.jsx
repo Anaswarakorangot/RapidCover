@@ -51,17 +51,23 @@ const S = `
 
 export default function PayoutLedger({ zoneId }) {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (zoneId) {
-      api.getZonePayoutLedger(zoneId)
-        .then(setData)
-        .catch(err => console.error("Failed to fetch ledger:", err))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    if (!zoneId) return;
+
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+
+    api.getZonePayoutLedger(zoneId)
+      .then(d => !cancelled && setData(d))
+      .catch(err => !cancelled && console.error("Failed to fetch ledger:", err))
+      .finally(() => !cancelled && setLoading(false));
+
+    return () => {
+      cancelled = true;
+    };
   }, [zoneId]);
 
   if (loading) return <div style={{ padding: 20, textAlign: 'center', fontSize: 12, color: '#8a9e8a' }}>Verifying trust ledger...</div>;

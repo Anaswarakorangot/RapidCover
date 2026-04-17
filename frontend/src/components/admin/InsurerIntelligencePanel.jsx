@@ -3,7 +3,7 @@
 // Shows zone predictions, city risk profiles, and recommendations
 
 import { useState, useEffect } from 'react';
-import { authenticatedFetch } from '../../services/adminApi';
+import { adminFetch } from '../../services/adminApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -60,9 +60,9 @@ export default function InsurerIntelligencePanel() {
     setError(null);
     try {
       const [summaryRes, profilesRes, predictionsRes] = await Promise.all([
-        authenticatedFetch(`${API_BASE}/admin/intelligence/summary`),
-        authenticatedFetch(`${API_BASE}/admin/intelligence/risk-profiles`),
-        authenticatedFetch(`${API_BASE}/admin/intelligence/predictions`),
+        adminFetch(`${API_BASE}/admin/intelligence/summary`),
+        adminFetch(`${API_BASE}/admin/intelligence/risk-profiles`),
+        adminFetch(`${API_BASE}/admin/intelligence/predictions`),
       ]);
 
       if (summaryRes.ok) setSummary(await summaryRes.json());
@@ -78,7 +78,7 @@ export default function InsurerIntelligencePanel() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const res = await authenticatedFetch(`${API_BASE}/admin/intelligence/refresh`, { method: 'POST' });
+      const res = await adminFetch(`${API_BASE}/admin/intelligence/refresh`, { method: 'POST' });
       if (res.ok) {
         await fetchData();
       }

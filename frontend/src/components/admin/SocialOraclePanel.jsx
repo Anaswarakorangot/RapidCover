@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { adminFetch } from '../../services/adminApi';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 const styles = `
@@ -112,7 +113,7 @@ export default function SocialOraclePanel() {
     setVerdict(null);
 
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/social-oracle/analyze`, {
+      const res = await adminFetch(`${API_BASE}/admin/panel/social-oracle/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: text.trim() }),
@@ -186,7 +187,7 @@ export default function SocialOraclePanel() {
         }]);
 
         try {
-          const res = await fetch(`${API_BASE}/admin/panel/simulate-trigger`, {
+          const res = await adminFetch(`${API_BASE}/admin/panel/simulate-trigger`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

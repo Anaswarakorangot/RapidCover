@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { AdminLoader, AdminError, AdminEmpty, ProofCard } from './AdminProofShared';
-import { authenticatedFetch } from '../../services/adminApi';
+import { adminFetch } from '../../services/adminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -30,8 +30,8 @@ export default function TriggerProofPanel() {
     setLoading(true); setError(null);
     try {
       const [platform, oracle] = await Promise.all([
-        authenticatedFetch(`${API}/admin/panel/proof/platform-activity`).then(r => r.json()),
-        authenticatedFetch(`${API}/admin/panel/proof/oracle-reliability`).then(r => r.json()),
+        adminFetch(`${API}/admin/panel/proof/platform-activity`).then(r => r.json()),
+        adminFetch(`${API}/admin/panel/proof/oracle-reliability`).then(r => r.json()),
       ]);
       setProofData(platform);
       setOracleData(oracle);
@@ -43,10 +43,10 @@ export default function TriggerProofPanel() {
     if (!partnerId) return;
     setActLoading(true); setActivityMsg(null);
     try {
-      const res = await authenticatedFetch(`${API}/zones/partners/${partnerId}/activity`);
+      const res = await adminFetch(`${API}/zones/partners/${partnerId}/activity`);
       if (!res.ok) throw new Error(`Partner ${partnerId} not found`);
       setActivityForm(await res.json());
-      const eligRes = await authenticatedFetch(`${API}/zones/partners/${partnerId}/activity/eligibility`);
+      const eligRes = await adminFetch(`${API}/zones/partners/${partnerId}/activity/eligibility`);
       if (eligRes.ok) setEligData(await eligRes.json());
     } catch (e) { setActivityMsg({ type: 'error', text: e.message }); }
     finally { setActLoading(false); }
@@ -56,7 +56,7 @@ export default function TriggerProofPanel() {
     if (!activityForm || !partnerId) return;
     setActLoading(true); setActivityMsg(null);
     try {
-      const res = await authenticatedFetch(`${API}/zones/partners/${partnerId}/activity`, {
+      const res = await adminFetch(`${API}/zones/partners/${partnerId}/activity`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -71,7 +71,7 @@ export default function TriggerProofPanel() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setActivityForm(await res.json());
-      const eligRes = await authenticatedFetch(`${API}/zones/partners/${partnerId}/activity/eligibility`);
+      const eligRes = await adminFetch(`${API}/zones/partners/${partnerId}/activity/eligibility`);
       if (eligRes.ok) setEligData(await eligRes.json());
       setActivityMsg({ type: 'success', text: 'Activity updated — claim eligibility re-evaluated.' });
     } catch (e) { setActivityMsg({ type: 'error', text: e.message }); }
@@ -398,7 +398,7 @@ function TriggerEligTab() {
   async function load() {
     setLoading(true); setError(null);
     try {
-      const res = await authenticatedFetch(`${API}/admin/panel/proof/trigger-eligibility`);
+      const res = await adminFetch(`${API}/admin/panel/proof/trigger-eligibility`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
     } catch (e) { setError(e.message); }

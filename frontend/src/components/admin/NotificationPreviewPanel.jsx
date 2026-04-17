@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { AdminLoader, AdminError, AdminEmpty, ProofCard } from './AdminProofShared';
+import { adminFetch } from '../../services/adminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -23,7 +24,7 @@ export default function NotificationPreviewPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/admin/panel/notifications/templates`);
+      const res = await adminFetch(`${API}/admin/panel/notifications/templates`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setTemplates(data);
@@ -42,7 +43,7 @@ export default function NotificationPreviewPanel() {
     setPreviewing(true);
     try {
       const token = localStorage.getItem('access_token');
-      const res = await fetch(`${API}/admin/panel/notifications/preview?type=${selectedType}&lang=${selectedLang}`, {
+      const res = await adminFetch(`${API}/admin/panel/notifications/preview?type=${selectedType}&lang=${selectedLang}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -63,7 +64,7 @@ export default function NotificationPreviewPanel() {
     setLastResponse(null);
     try {
       // Use relative path to leverage Vite proxy and avoid CORS/Auth issues
-      const res = await fetch(`/api/v1/admin/test-push?phone=${encodeURIComponent(testPhone)}`, {
+      const res = await adminFetch(`/api/v1/admin/test-push?phone=${encodeURIComponent(testPhone)}`, {
         method: 'POST'
       });
       const data = await res.json();

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { adminFetch } from '../../services/adminApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -12,7 +13,7 @@ export default function AdminStats({ stats }) {
     const code = zoneCode || selectedLiveZone;
     if (!code) return;
     try {
-      await fetch(`${API_BASE}/admin/panel/live-data?zone_code=${code}`);
+      await adminFetch(`${API_BASE}/admin/panel/live-data?zone_code=${code}`);
       // In a real app we'd set state here, but for now we just verify connectivity
     } catch (_err) {
       console.error('Failed to fetch live data:', _err);
@@ -22,7 +23,7 @@ export default function AdminStats({ stats }) {
   useEffect(() => {
     const fetchZones = async () => {
       try {
-        const res = await fetch(`${API_BASE}/zones`);
+        const res = await adminFetch(`${API_BASE}/zones`);
         if (res.ok) {
           const list = await res.json();
 

@@ -1,19 +1,23 @@
 """
 Admin API endpoints for dashboard, simulation, and management.
 
-Note: In production, these would require admin authentication.
-For demo purposes, they are open.
+All endpoints require admin authentication via JWT token.
 """
 
 import json
+import io
+import csv
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
+from app.core.admin_deps import get_current_admin
+from app.models.admin import Admin
 from app.utils.time_utils import utcnow
 from app.models.partner import Partner
 from app.models.policy import Policy
@@ -192,7 +196,7 @@ class ReconcileRequest(BaseModel):
 
 # Dashboard endpoints
 @router.get("/dashboard", response_model=DashboardStats)
-def get_dashboard_stats(db: Session = Depends(get_db)):
+def get_dashboard_stats(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Get overall platform statistics."""
     now = utcnow()
 
@@ -241,13 +245,13 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 
 # Zone endpoints
 @router.get("/zones", response_model=list[ZoneResponse])
-def get_all_zones(db: Session = Depends(get_db)):
+def get_all_zones(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Get all zones with risk scores."""
     return db.query(Zone).order_by(Zone.city, Zone.name).all()
 
 
 @router.post("/seed", response_model=SeedResponse)
-def seed_database(db: Session = Depends(get_db)):
+def seed_database(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Seed database with initial zone data."""
     created = seed_zones(db)
     total = get_zone_count(db)
@@ -300,7 +304,7 @@ def get_triggers(
 
 
 @router.post("/triggers/{trigger_id}/end")
-def end_trigger_event(trigger_id: int, db: Session = Depends(get_db)):
+def end_trigger_event(trigger_id: int, admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Mark a trigger event as ended."""
     trigger = end_trigger(trigger_id, db)
 
@@ -314,7 +318,7 @@ def end_trigger_event(trigger_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/triggers/{trigger_id}/process")
-def process_trigger(trigger_id: int, db: Session = Depends(get_db)):
+def process_trigger(trigger_id: int, admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Process a trigger into claims for affected policies."""
     trigger = db.query(TriggerEvent).filter(TriggerEvent.id == trigger_id).first()
 
@@ -387,7 +391,7 @@ def get_all_claims(
 @router.post("/claims/{claim_id}/approve")
 def approve_claim_endpoint(
     claim_id: int,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """Manually approve a pending claim."""
     claim = approve_claim(claim_id, db)
@@ -405,7 +409,7 @@ def approve_claim_endpoint(
 def reject_claim_endpoint(
     claim_id: int,
     request: ClaimActionRequest = None,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """Manually reject a claim."""
     reason = request.reason if request else None
@@ -424,7 +428,7 @@ def reject_claim_endpoint(
 def payout_claim_endpoint(
     claim_id: int,
     request: PayoutRequest = None,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """Process an approved claim payout through the payout service."""
     upi_ref = request.upi_ref if request else f"UPI{utcnow().strftime('%Y%m%d%H%M%S')}{claim_id}"
@@ -452,7 +456,7 @@ def payout_claim_endpoint(
 
 # Multi-trigger aggregation endpoints
 @router.get("/aggregation-stats")
-def get_aggregation_stats_endpoint(db: Session = Depends(get_db)):
+def get_aggregation_stats_endpoint(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Get statistics about multi-trigger aggregation.
 
@@ -467,7 +471,7 @@ def get_aggregation_stats_endpoint(db: Session = Depends(get_db)):
 @router.get("/claims/{claim_id}/aggregation")
 def get_claim_aggregation_endpoint(
     claim_id: int,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """
     Get aggregation details for a specific claim.
@@ -494,7 +498,7 @@ def get_claim_aggregation_endpoint(
 @router.get("/claims/{claim_id}/payment-state")
 def get_claim_payment_state_endpoint(
     claim_id: int,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """
     Get payment state for a specific claim.
@@ -517,7 +521,7 @@ def get_claim_payment_state_endpoint(
 @router.post("/claims/{claim_id}/retry-payment")
 def retry_payment_endpoint(
     claim_id: int,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """
     Retry a failed payment.
@@ -550,7 +554,7 @@ def retry_payment_endpoint(
 def reconcile_payment_endpoint(
     claim_id: int,
     request: ReconcileRequest,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """
     Manually reconcile a payment.
@@ -623,7 +627,7 @@ def list_pending_reconciliation_endpoint(
 
 
 @router.get("/payment-stats")
-def get_payment_stats_endpoint(db: Session = Depends(get_db)):
+def get_payment_stats_endpoint(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Get payment processing statistics.
 
@@ -844,7 +848,7 @@ def simulate_closure(
 
 
 @router.post("/simulate/clear/{zone_id}")
-def clear_zone_conditions(zone_id: int, db: Session = Depends(get_db)):
+def clear_zone_conditions(zone_id: int, admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Clear all simulated conditions for a zone."""
     zone = db.query(Zone).filter(Zone.id == zone_id).first()
     if not zone:
@@ -867,7 +871,7 @@ def clear_zone_conditions(zone_id: int, db: Session = Depends(get_db)):
 
 # Auto-renewal endpoint
 @router.post("/process-auto-renewals")
-def process_auto_renewals_endpoint(db: Session = Depends(get_db)):
+def process_auto_renewals_endpoint(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Process auto-renewals for all eligible policies.
 
@@ -910,7 +914,7 @@ def reset_all_simulations():
 # --- Stress Scenarios ---
 
 @router.get("/panel/stress-scenarios")
-def get_stress_scenarios(db: Session = Depends(get_db)):
+def get_stress_scenarios(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Get all stress scenarios with reserve-needed calculations.
 
@@ -925,7 +929,7 @@ def get_stress_scenarios(db: Session = Depends(get_db)):
 
 
 @router.get("/panel/stress-scenarios/{scenario_id}")
-def get_stress_scenario(scenario_id: str, db: Session = Depends(get_db)):
+def get_stress_scenario(scenario_id: str, admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Get a single stress scenario by ID."""
     from app.services.stress_scenario_service import calculate_stress_scenario
 
@@ -941,7 +945,7 @@ def get_stress_scenario(scenario_id: str, db: Session = Depends(get_db)):
 # --- RIQI Provenance ---
 
 @router.get("/panel/riqi")
-def get_all_riqi_profiles(db: Session = Depends(get_db)):
+def get_all_riqi_profiles(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Get RIQI (Road Infrastructure Quality Index) profiles for all zones.
 
@@ -954,7 +958,7 @@ def get_all_riqi_profiles(db: Session = Depends(get_db)):
 
 
 @router.get("/panel/riqi/{zone_code}")
-def get_riqi_for_zone(zone_code: str, db: Session = Depends(get_db)):
+def get_riqi_for_zone(zone_code: str, admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Get RIQI provenance for a specific zone by code."""
     from app.services.riqi_service import get_riqi_by_zone_code
 
@@ -968,7 +972,7 @@ def get_riqi_for_zone(zone_code: str, db: Session = Depends(get_db)):
 
 
 @router.post("/panel/riqi/{zone_code}/recompute")
-def recompute_riqi_for_zone(zone_code: str, db: Session = Depends(get_db)):
+def recompute_riqi_for_zone(zone_code: str, admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Recompute RIQI score for a zone based on current metrics.
 
@@ -987,7 +991,7 @@ def recompute_riqi_for_zone(zone_code: str, db: Session = Depends(get_db)):
 
 
 @router.post("/panel/riqi/seed")
-def seed_riqi_profiles(db: Session = Depends(get_db)):
+def seed_riqi_profiles(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Seed RIQI profiles for all zones with zone-specific or city defaults."""
     from app.services.riqi_service import seed_zone_risk_profiles
 
@@ -1062,7 +1066,7 @@ class TriggerCheckResponse(BaseModel):
 @router.post("/panel/trigger-check", response_model=TriggerCheckResponse)
 def check_trigger_eligibility(
     request: TriggerCheckRequest,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """
     Check if a partner is eligible for a trigger in a specific zone.
@@ -1177,7 +1181,7 @@ def check_trigger_eligibility(
 # --- Proof APIs ---
 
 @router.get("/panel/proof/stress")
-def proof_stress_scenarios(db: Session = Depends(get_db)):
+def proof_stress_scenarios(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Proof endpoint for stress scenario calculations."""
     from app.services.stress_scenario_service import get_all_stress_scenarios
 
@@ -1200,7 +1204,7 @@ def proof_stress_scenarios(db: Session = Depends(get_db)):
 
 
 @router.get("/panel/proof/reassignments")
-def proof_reassignments(db: Session = Depends(get_db)):
+def proof_reassignments(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Proof endpoint for zone reassignment workflow."""
     from app.services.zone_reassignment_service import list_reassignments, expire_stale_proposals
     from app.models.zone_reassignment import ReassignmentStatus
@@ -1230,7 +1234,7 @@ def proof_reassignments(db: Session = Depends(get_db)):
 
 
 @router.get("/panel/proof/trigger-eligibility")
-def proof_trigger_eligibility(db: Session = Depends(get_db)):
+def proof_trigger_eligibility(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Proof endpoint for trigger eligibility checks (pin-code strictness)."""
     # Count partners with/without pin codes
     from app.services.runtime_metadata import (
@@ -1281,7 +1285,7 @@ def proof_trigger_eligibility(db: Session = Depends(get_db)):
 
 
 @router.get("/panel/proof/riqi")
-def proof_riqi(db: Session = Depends(get_db)):
+def proof_riqi(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Proof endpoint for RIQI provenance."""
     from app.services.riqi_service import get_all_riqi_profiles
 
@@ -1313,7 +1317,7 @@ def proof_riqi(db: Session = Depends(get_db)):
 
 
 @router.get("/panel/proof/data-sources")
-def proof_data_sources(db: Session = Depends(get_db)):
+def proof_data_sources(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Proof endpoint showing all data sources used by the admin panel.
 
@@ -1392,7 +1396,7 @@ def proof_data_sources(db: Session = Depends(get_db)):
 # ─── Validation Matrix Proof ──────────────────────────────────────────────────
 
 @router.get("/panel/proof/validation-matrix")
-def proof_validation_matrix(db: Session = Depends(get_db)):
+def proof_validation_matrix(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Proof endpoint: shows validation matrix for the most recent paid/rejected claim.
 
@@ -1454,7 +1458,7 @@ def proof_validation_matrix(db: Session = Depends(get_db)):
 
 
 @router.get("/panel/proof/oracle-reliability")
-def proof_oracle_reliability(db: Session = Depends(get_db)):
+def proof_oracle_reliability(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Proof endpoint: shows oracle reliability engine output.
 
@@ -1492,7 +1496,7 @@ def proof_oracle_reliability(db: Session = Depends(get_db)):
 
 
 @router.get("/panel/proof/platform-activity")
-def proof_platform_activity(db: Session = Depends(get_db)):
+def proof_platform_activity(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Proof endpoint: shows platform activity simulation for delivery partners.
 
@@ -1552,7 +1556,7 @@ def proof_platform_activity(db: Session = Depends(get_db)):
 
 
 @router.get("/claims/{claim_id}/validation-matrix")
-def get_claim_validation_matrix(claim_id: int, db: Session = Depends(get_db)):
+def get_claim_validation_matrix(claim_id: int, admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     GET /admin/claims/{claim_id}/validation-matrix
 
@@ -1582,3 +1586,140 @@ def get_claim_validation_matrix(claim_id: int, db: Session = Depends(get_db)):
         "has_matrix": bool(matrix),
         "computed_at": vd.get("processed_at"),
     }
+
+# =============================================================================
+# BULK OPERATIONS (Admin Auth Required)
+# =============================================================================
+
+@router.post("/claims/bulk-approve", summary="Bulk approve claims")
+def bulk_approve_claims(
+    claim_ids: List[int],
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Approve multiple claims at once.
+
+    Args:
+        claim_ids: List of claim IDs to approve
+
+    Returns:
+        Count of approved claims
+    """
+    claims = db.query(Claim).filter(Claim.id.in_(claim_ids)).all()
+
+    approved_count = 0
+    for claim in claims:
+        if claim.status == ClaimStatus.PENDING:
+            claim.status = ClaimStatus.APPROVED
+            approved_count += 1
+
+    db.commit()
+
+    return {
+        "approved": approved_count,
+        "total": len(claim_ids),
+        "message": f"Approved {approved_count} of {len(claim_ids)} claims"
+    }
+
+
+@router.post("/claims/bulk-reject", summary="Bulk reject claims")
+def bulk_reject_claims(
+    claim_ids: List[int],
+    reason: str,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Reject multiple claims at once.
+
+    Args:
+        claim_ids: List of claim IDs to reject
+        reason: Rejection reason
+
+    Returns:
+        Count of rejected claims
+    """
+    claims = db.query(Claim).filter(Claim.id.in_(claim_ids)).all()
+
+    rejected_count = 0
+    for claim in claims:
+        if claim.status in [ClaimStatus.PENDING, ClaimStatus.APPROVED]:
+            claim.status = ClaimStatus.REJECTED
+
+            # Add rejection reason to validation data
+            try:
+                validation = json.loads(claim.validation_data or "{}")
+                validation["rejection_reason"] = reason
+                validation["rejected_at"] = utcnow().isoformat()
+                validation["rejected_by"] = admin.email
+                claim.validation_data = json.dumps(validation)
+            except Exception:
+                pass
+
+            rejected_count += 1
+
+    db.commit()
+
+    return {
+        "rejected": rejected_count,
+        "total": len(claim_ids),
+        "message": f"Rejected {rejected_count} of {len(claim_ids)} claims"
+    }
+
+
+@router.get("/export/claims", summary="Export claims to CSV")
+def export_claims_csv(
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Export all claims to CSV file.
+
+    Returns:
+        StreamingResponse with CSV file download
+    """
+    claims = db.query(Claim).all()
+
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header row
+    writer.writerow([
+        "Claim ID",
+        "Policy ID",
+        "Trigger Event ID",
+        "Amount (Rs)",
+        "Status",
+        "Fraud Score",
+        "UPI Reference",
+        "Created At",
+        "Paid At"
+    ])
+
+    # Data rows
+    for claim in claims:
+        writer.writerow([
+            claim.id,
+            claim.policy_id,
+            claim.trigger_event_id,
+            claim.amount,
+            claim.status.value if hasattr(claim.status, 'value') else str(claim.status),
+            claim.fraud_score,
+            claim.upi_ref or "",
+            claim.created_at.isoformat() if claim.created_at else "",
+            claim.paid_at.isoformat() if claim.paid_at else ""
+        ])
+
+    # Convert to bytes
+    output.seek(0)
+    csv_bytes = io.BytesIO(output.getvalue().encode('utf-8'))
+
+    return StreamingResponse(
+        csv_bytes,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=rapidcover_claims_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        }
+    )

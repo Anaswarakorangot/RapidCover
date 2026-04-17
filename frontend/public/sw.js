@@ -27,6 +27,9 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (request.method !== 'GET') return;
 
+  // Skip chrome-extension and other non-http(s) schemes
+  if (!url.protocol.startsWith('http')) return;
+
   // During development, don't intercept API calls to avoid CORS/Cache issues
   if (url.port === '8000' || url.pathname.startsWith('/api/')) {
     event.respondWith(fetch(request));

@@ -74,6 +74,9 @@ function fmtShort(iso) {
 
 /* ─── Consensus Meter ─────────────────────────────────────────────────────── */
 function ConsensusMeter({ explanation }) {
+  // Calculate current timestamp once on mount
+  const [now] = useState(() => Date.now());
+
   if (!explanation) return null;
 
   // Calculate consensus score based on available evidence
@@ -82,7 +85,7 @@ function ConsensusMeter({ explanation }) {
     { label: 'Zone match', pass: explanation.zone_match },
     { label: 'Live data', pass: explanation.source_mode === 'live' },
     { label: 'Fresh', pass: explanation.trigger_started_at &&
-      (Date.now() - new Date(explanation.trigger_started_at).getTime()) < 3600000 }, // < 1 hour
+      (now - new Date(explanation.trigger_started_at).getTime()) < 3600000 }, // < 1 hour
   ];
 
   const passedChecks = checks.filter(c => c.pass).length;

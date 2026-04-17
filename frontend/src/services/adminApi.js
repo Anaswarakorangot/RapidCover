@@ -60,7 +60,7 @@ async function post(path, body = null) {
  * @param {string} url - Full URL or path
  * @param {object} options - Fetch options
  */
-export async function authenticatedFetch(url, options = {}) {
+export async function adminFetch(url, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
     ...jsonHeaders(),

@@ -3,6 +3,7 @@
 // Replaces/enhances the existing ClaimsQueue for the fraud-specific view
 
 import { useState, useEffect } from 'react';
+import { adminFetch } from '../../services/adminApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -44,9 +45,9 @@ export default function FraudQueuePanel() {
     setLoading(true);
     setError(false);
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/fraud-queue`);
+      const res = await adminFetch(`${API_BASE}/admin/panel/fraud-queue`);
       if (!res.ok) {
-        throw new Error('Failed to load fraud queue');
+        throw new Error(`HTTP ${res.status}`);
       }
       const data = await res.json();
       setQueue(Array.isArray(data) ? data : []);
@@ -85,7 +86,7 @@ export default function FraudQueuePanel() {
 
     const ids = [...selected];
     try {
-      const res = await fetch(`${API_BASE}/claims/bulk-${action}`, {
+      const res = await adminFetch(`${API_BASE}/claims/bulk-${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ claim_ids: ids }),

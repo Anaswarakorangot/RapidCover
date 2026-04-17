@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { adminFetch } from '../../services/adminApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -45,7 +46,7 @@ export default function TriggerPanel() {
   useEffect(() => {
     async function fetchEngineStatus() {
       try {
-        const res = await fetch(`${API_BASE}/admin/panel/engine-status`);
+        const res = await adminFetch(`${API_BASE}/admin/panel/engine-status`);
         if (res.ok) {
           setEngineStatus(await res.json());
         }
@@ -83,7 +84,7 @@ export default function TriggerPanel() {
     let streamWorked = false;
 
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/simulate-trigger`, {
+      const res = await adminFetch(`${API_BASE}/admin/panel/simulate-trigger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ triggerType: trigger.type, zone: trigger.zone }),

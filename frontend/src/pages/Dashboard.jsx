@@ -751,7 +751,7 @@ export function Dashboard() {
         api.getPartnerExperienceState().catch(() => null),
         api.getActivePolicy().catch(() => null),
         api.getClaimsSummary().catch(() => null),
-        api.getClaims({ limit: 5 }).catch(() => ({ claims: [] })),
+        api.getClaims({ page: 1, page_size: 5 }).catch(() => ({ claims: [] })),
         getMyReassignments().catch(() => ({ reassignments: [] })),
       ]);
 

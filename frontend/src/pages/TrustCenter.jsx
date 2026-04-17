@@ -33,37 +33,43 @@ const S = `
     font-family: 'DM Sans', sans-serif;
     color: var(--text-dark);
     animation: fadeIn 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 24px 16px 32px;
+    background: var(--gray-bg);
+    min-height: 100vh;
   }
 
   /* ── Hero banner ── */
   .tc-hero {
     background: linear-gradient(135deg, #1a2e1a 0%, #2a9e47 60%, #3DB85C 100%);
     border-radius: 20px;
-    padding: 24px 20px;
-    margin-bottom: 20px;
+    padding: 18px 18px 16px;
     position: relative;
     overflow: hidden;
   }
   .tc-hero::after {
     content: '🔍';
     position: absolute;
-    right: 20px;
+    right: 18px;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 52px;
-    opacity: 0.15;
+    font-size: 40px;
+    opacity: 0.12;
   }
   .tc-hero-title {
     font-family: 'Nunito', sans-serif;
     font-weight: 900;
-    font-size: 26px;
+    font-size: 24px;
     color: white;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
   .tc-hero-sub {
-    font-size: 13px;
-    color: rgba(255,255,255,0.8);
-    line-height: 1.5;
+    max-width: 84%;
+    font-size: 12px;
+    color: rgba(255,255,255,0.82);
+    line-height: 1.45;
   }
 
   /* ── Tab bar ── */
@@ -73,23 +79,22 @@ const S = `
     background: var(--white);
     border: 1.5px solid var(--border);
     border-radius: 16px;
-    padding: 5px;
-    margin-bottom: 20px;
+    padding: 4px;
   }
   .tc-tab {
     flex: 1;
-    padding: 10px 6px;
-    border-radius: 12px;
+    padding: 9px 4px;
+    border-radius: 11px;
     border: none;
     background: transparent;
     font-family: 'Nunito', sans-serif;
     font-weight: 700;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-light);
     cursor: pointer;
     transition: all 0.2s;
     text-align: center;
-    line-height: 1.3;
+    line-height: 1.2;
   }
   .tc-tab.active {
     background: var(--green-primary);
@@ -101,50 +106,49 @@ const S = `
   /* ── Generic card ── */
   .tc-card {
     background: var(--white);
-    border-radius: 20px;
+    border-radius: 18px;
     border: 1.5px solid var(--border);
     overflow: hidden;
-    margin-bottom: 14px;
     animation: fadeIn 0.25s ease;
   }
   .tc-card-header {
-    padding: 16px 18px 0;
+    padding: 14px 16px 0;
   }
   .tc-card-body {
-    padding: 14px 18px 18px;
+    padding: 12px 16px 16px;
   }
   .tc-card-title {
     font-family: 'Nunito', sans-serif;
     font-weight: 900;
-    font-size: 16px;
+    font-size: 15px;
     color: var(--text-dark);
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
   .tc-card-sub {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-light);
   }
 
   /* ── Selector ── */
   .tc-selector-wrap {
-    margin-bottom: 14px;
+    margin-bottom: 2px;
   }
   .tc-selector-label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: var(--text-mid);
-    margin-bottom: 6px;
+    margin-bottom: 5px;
     text-transform: uppercase;
     letter-spacing: 0.4px;
   }
   .tc-selector {
     width: 100%;
-    padding: 11px 14px;
+    padding: 10px 14px;
     border-radius: 12px;
     border: 1.5px solid var(--border);
     background: var(--white);
     font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-dark);
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a9e8a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
@@ -159,9 +163,9 @@ const S = `
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 7px 0;
+    padding: 6px 0;
     border-bottom: 1px solid var(--border);
-    font-size: 13px;
+    font-size: 12px;
   }
   .tc-row:last-child { border-bottom: none; }
   .tc-row-key { color: var(--text-mid); }
@@ -171,19 +175,19 @@ const S = `
   .tc-stat-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 16px;
+    gap: 8px;
+    margin-bottom: 12px;
   }
   .tc-stat {
     border-radius: 14px;
-    padding: 12px 10px;
+    padding: 10px 8px;
     text-align: center;
   }
   .tc-stat.green  { background: var(--green-light); }
   .tc-stat.blue   { background: var(--blue-light); }
   .tc-stat.purple { background: var(--purple-light); }
-  .tc-stat-label { font-size: 11px; color: var(--text-light); margin-bottom: 4px; }
-  .tc-stat-val   { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 18px; }
+  .tc-stat-label { font-size: 10px; color: var(--text-light); margin-bottom: 3px; }
+  .tc-stat-val   { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 16px; }
   .tc-stat.green  .tc-stat-val { color: var(--green-dark); }
   .tc-stat.blue   .tc-stat-val { color: var(--blue); }
   .tc-stat.purple .tc-stat-val { color: var(--purple); }
@@ -193,8 +197,8 @@ const S = `
     background: var(--gray-bg);
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
   }
   .tc-evidence-top {
     display: flex;
@@ -225,8 +229,8 @@ const S = `
   .tc-payout-item {
     border: 1.5px solid var(--border);
     border-radius: 14px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
   }
   .tc-payout-top {
     display: flex;
@@ -311,11 +315,11 @@ const S = `
     background: var(--blue-light);
     border: 1px solid var(--blue-border);
     border-radius: 14px;
-    padding: 12px 14px;
-    font-size: 13px;
+    padding: 10px 12px;
+    font-size: 12px;
     color: #1e3a8a;
     line-height: 1.5;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
   }
 
   /* ── Consensus ── */
@@ -323,17 +327,17 @@ const S = `
     background: var(--green-light);
     border: 1.5px solid #bbf7d0;
     border-radius: 14px;
-    padding: 12px 16px;
+    padding: 10px 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 14px;
+    margin-top: 12px;
   }
   .tc-consensus-label { font-size: 13px; color: var(--text-mid); }
   .tc-consensus-val {
     font-family: 'Nunito', sans-serif;
     font-weight: 900;
-    font-size: 22px;
+    font-size: 20px;
     color: var(--green-dark);
   }
 
@@ -341,26 +345,25 @@ const S = `
   .tc-commitment {
     background: linear-gradient(135deg, var(--green-light) 0%, #e0f2fe 100%);
     border: 1.5px solid #bbf7d0;
-    border-radius: 20px;
-    padding: 20px;
-    margin-top: 6px;
+    border-radius: 18px;
+    padding: 14px 16px;
   }
   .tc-commitment-title {
     font-family: 'Nunito', sans-serif;
     font-weight: 900;
-    font-size: 16px;
+    font-size: 15px;
     color: var(--text-dark);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
-  .tc-commitment-items { display: flex; flex-direction: column; gap: 8px; }
+  .tc-commitment-items { display: flex; flex-direction: column; gap: 6px; }
   .tc-commitment-item {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    font-size: 13px;
+    gap: 8px;
+    font-size: 12px;
     color: var(--text-mid);
   }
-  .tc-commitment-icon { font-size: 16px; flex-shrink: 0; }
+  .tc-commitment-icon { font-size: 14px; flex-shrink: 0; }
 
   /* ── Empty / loading states ── */
   .tc-empty {
@@ -405,7 +408,7 @@ const S = `
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: 14px 16px;
+    padding: 12px 14px;
     background: var(--gray-bg);
     border-bottom: 1.5px solid var(--border);
   }
@@ -417,12 +420,11 @@ const S = `
   .tc-model-card {
     background: var(--white);
     border: 1.5px solid var(--border);
-    border-radius: 20px;
+    border-radius: 18px;
     overflow: hidden;
-    margin-bottom: 14px;
   }
   .tc-model-card-header {
-    padding: 14px 18px 12px;
+    padding: 12px 16px 10px;
     border-bottom: 1.5px solid var(--border);
     display: flex;
     align-items: center;
@@ -436,7 +438,7 @@ const S = `
     color: var(--text-dark);
   }
   .tc-model-card-sub { font-size: 11px; color: var(--text-light); margin-top: 1px; }
-  .tc-model-card-body { padding: 14px 18px 16px; }
+  .tc-model-card-body { padding: 12px 16px 14px; }
   .tc-model-row {
     display: flex;
     justify-content: space-between;
@@ -678,11 +680,32 @@ function ClaimExplainer({ claimId }) {
 
   useEffect(() => {
     if (!claimId) return;
+
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+
     api.getClaimExplanation(claimId)
-      .then(d => { setData(d); setError(null); })
-      .catch(e => setError(e.message || 'Failed to load explanation'))
-      .finally(() => setLoading(false));
+      .then(d => {
+        if (!cancelled) {
+          setData(d);
+          setError(null);
+        }
+      })
+      .catch(e => {
+        if (!cancelled) {
+          setError(e.message || 'Failed to load explanation');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [claimId]);
 
   if (!claimId) return (
@@ -816,11 +839,19 @@ function EvidenceViewer({ zoneId }) {
 
   useEffect(() => {
     if (!zoneId) return;
+
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+
     api.getZoneTriggerEvidence(zoneId)
-      .then(d => { setData(d); setError(null); })
-      .catch(e => setError(e.message || 'Failed to load evidence'))
-      .finally(() => setLoading(false));
+      .then(d => !cancelled && (setData(d), setError(null)))
+      .catch(e => !cancelled && setError(e.message || 'Failed to load evidence'))
+      .finally(() => !cancelled && setLoading(false));
+
+    return () => {
+      cancelled = true;
+    };
   }, [zoneId]);
 
   if (!zoneId) return (
@@ -902,11 +933,19 @@ function LedgerDisplay({ zoneId }) {
 
   useEffect(() => {
     if (!zoneId) return;
+
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+
     api.getZonePayoutLedger(zoneId)
-      .then(d => { setData(d); setError(null); })
-      .catch(e => setError(e.message || 'Failed to load ledger'))
-      .finally(() => setLoading(false));
+      .then(d => !cancelled && (setData(d), setError(null)))
+      .catch(e => !cancelled && setError(e.message || 'Failed to load ledger'))
+      .finally(() => !cancelled && setLoading(false));
+
+    return () => {
+      cancelled = true;
+    };
   }, [zoneId]);
 
   if (!zoneId) return (
@@ -997,7 +1036,8 @@ export default function TrustCenter() {
 
   useEffect(() => {
     api.getClaims().then(d => {
-      const list = Array.isArray(d) ? d : [];
+      // Backend returns {claims, total, page, page_size}, not a plain array
+      const list = d?.claims || (Array.isArray(d) ? d : []);
       setRecentClaims(list.slice(0, 5));
       if (list.length > 0) setSelectedClaimId(list[0].id);
     }).catch(() => {});
@@ -1118,7 +1158,7 @@ export default function TrustCenter() {
 
         {/* Commitment card — always visible */}
         <div className="tc-commitment">
-          <p className="tc-commitment-title">Our Commitment to Transparency</p>
+          <p className="tc-commitment-title">Why You Can Trust This</p>
           <div className="tc-commitment-items">
             <div className="tc-commitment-item">
               <span className="tc-commitment-icon">📡</span>

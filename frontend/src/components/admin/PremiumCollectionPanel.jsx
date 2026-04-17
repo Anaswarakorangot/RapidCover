@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { adminFetch } from '../../services/adminApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -16,7 +17,7 @@ export default function PremiumCollectionPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/premium-collection`);
+      const res = await adminFetch(`${API_BASE}/admin/panel/premium-collection`);
       if (!res.ok) throw new Error('Failed to load premium collection data');
       setData(await res.json());
     } catch (err) {

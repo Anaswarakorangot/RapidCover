@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminFetch } from '../../services/adminApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -21,7 +22,7 @@ export function SettingsPanel() {
 
   async function fetchSettings() {
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/settings`);
+      const res = await adminFetch(`${API_BASE}/admin/panel/settings`);
       const data = await res.json();
       setSettings(data);
     } catch (err) {
@@ -35,7 +36,7 @@ export function SettingsPanel() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/settings`, {
+      const res = await adminFetch(`${API_BASE}/admin/panel/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings })

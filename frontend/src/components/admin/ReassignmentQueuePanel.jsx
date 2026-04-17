@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { AdminLoader, AdminError, AdminEmpty, ProofCard } from './AdminProofShared';
+import { adminFetch } from '../../services/adminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -21,8 +22,10 @@ export default function ReassignmentQueuePanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/admin/panel/proof/reassignments`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await adminFetch(`${API}/admin/panel/proof/reassignments`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       setData(await res.json());
     } catch (e) {
       setError(e.message);
@@ -38,7 +41,7 @@ export default function ReassignmentQueuePanel() {
     setActionLoading(true);
     setActionMsg(null);
     try {
-      const res = await fetch(`${API}/zones/reassignments/propose`, {
+      const res = await adminFetch(`${API}/zones/reassignments/propose`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -49,7 +52,7 @@ export default function ReassignmentQueuePanel() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.detail || `HTTP ${res.status}`);
       setActionMsg({ type: 'success', text: `Proposal initialized successfully for Partner ID ${partnerId}!` });
-      load(); // refresh metrics
+      await load(); // refresh metrics
       setPartnerId('');
       setTargetZone('');
     } catch (err) {
