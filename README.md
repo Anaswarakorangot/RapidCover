@@ -13,6 +13,18 @@
 
 <br/>
 
+### 🔗 Live Demo
+
+| Service | Link |
+|---------|------|
+| **Frontend** | [https://rapidcover-frontend.onrender.com](https://rapidcover-frontend.onrender.com) |
+| **Backend API** | [https://rapidcover-backend.onrender.com](https://rapidcover-backend.onrender.com) |
+| **Admin Panel** | [https://rapidcover-frontend.onrender.com/admin](https://rapidcover-frontend.onrender.com/admin) |
+
+> **Admin Access:** Use `/admin` route. Default credentials configured via environment variables (`DEFAULT_ADMIN_EMAIL`, `DEFAULT_ADMIN_PASSWORD`).
+
+<br/>
+
 > *"Last month, a flash flood hit my dark store zone at 6 PM — peak hour. Zepto suspended the entire zone. I sat outside for 3 hours. Zero runs. Zero income. Nobody compensated. I just went home."*
 >
 > — **Manoj, 24**, Zepto Delivery Partner, Bellandur, Bangalore
