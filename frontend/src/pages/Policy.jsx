@@ -166,13 +166,12 @@ const S = `
   /* ── Exclusions modal ── */
   .excl-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.55);
-    display: flex; align-items: flex-end; justify-content: center; z-index: 100;
+    display: flex; align-items: center; justify-content: center; z-index: 100;
   }
   .excl-sheet {
     background: var(--white); width: 100%; max-width: 480px;
-    border-radius: 24px 24px 0 0; max-height: 78vh;
+    border-radius: 24px; max-height: 78vh;
     display: flex; flex-direction: column;
-    margin-bottom: 64px;
   }
   .excl-header { padding: 20px 20px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .excl-title  { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px; color: var(--text-dark); }
@@ -278,6 +277,14 @@ const TIER_LIMITS = {
 /* ─── ExclusionsScreen ────────────────────────────────────────────────── */
 function ExclusionsScreen({ onAccept }) {
   const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   return (
     <div className="excl-overlay">
       <div className="excl-sheet">
