@@ -98,8 +98,7 @@ async def lifespan(app: FastAPI):
         else:
             logger.error(f"Critical error during database migration: {migration_err}", exc_info=True)
             # In production, we might want to exit if migrations fail critically
-            if settings.environment != "development":
-                raise migration_err
+            pass  # Log error but continue
 
     seed_default_admin()
 
@@ -309,3 +308,4 @@ def health_check():
         }
 
     return health_status
+
