@@ -63,6 +63,18 @@ async def lifespan(app: FastAPI):
     init_db()
     logger.info("Database tables created")
 
+    # Run Alembic migrations
+    try:
+        from alembic.config import Config
+        from alembic import command
+        from pathlib import Path
+        alembic_cfg = Config(str(Path(__file__).parent.parent / "alembic.ini"))
+        alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations applied")
+    except Exception as migration_err:
+        logger.warning(f"Migration execution skipped: {migration_err}")
+
     # Seed default admin (automatic on startup if no admins exist)
     seed_default_admin()
 
