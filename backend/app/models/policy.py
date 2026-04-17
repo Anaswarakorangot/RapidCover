@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Enum, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -45,8 +45,8 @@ class Policy(Base):
     __tablename__ = "policies"
 
     id = Column(Integer, primary_key=True, index=True)
-    partner_id = Column(Integer, ForeignKey("partners.id"), nullable=False)
-    tier = Column(Enum(PolicyTier), nullable=False)
+    partner_id = Column(Integer, ForeignKey("partners.id"), nullable=False, index=True)
+    tier = Column(Enum(PolicyTier), nullable=False, index=True)
 
     # Premium and payout limits (may differ from tier defaults due to dynamic pricing)
     weekly_premium = Column(Float, nullable=False)
@@ -61,7 +61,7 @@ class Policy(Base):
     auto_renew = Column(Boolean, default=True)
 
     # Policy lifecycle status
-    status = Column(Enum(PolicyStatus), default=PolicyStatus.ACTIVE)
+    status = Column(Enum(PolicyStatus), default=PolicyStatus.ACTIVE, index=True)
     grace_ends_at = Column(DateTime(timezone=True), nullable=True)
 
     # Renewal chain tracking
@@ -78,3 +78,10 @@ class Policy(Base):
     partner = relationship("Partner", back_populates="policies")
     claims = relationship("Claim", back_populates="policy")
     renewed_from = relationship("Policy", remote_side="Policy.id", backref="renewed_to")
+
+    # Composite indexes for common query patterns
+    __table_args__ = (
+        Index('ix_policy_partner_status', 'partner_id', 'status'),  # Active policies per partner
+        Index('ix_policy_expires_at', 'expires_at'),  # Expiring policies
+        Index('ix_policy_tier_status', 'tier', 'status'),  # Policies by tier and status
+    )
