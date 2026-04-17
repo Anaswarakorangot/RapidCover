@@ -439,29 +439,59 @@ class FraudModel:
 # SINGLETONS - import these everywhere
 # ------------------------------------------------------------------------------
 
-# Try to load trained models, fall back to manual if not available
+
+# --------------------------------------------------------------------------
+# SINGLETONS - import these everywhere
+# -----------------------------------------------------------------------------
+# Loading strategy:
+#   1. Check for model_metadata.json in ml_models/
+#   2. If found, load trained XGBoost/sklearn models (pricing_mode = "trained_ml")
+#   3. If missing or import fails, use manually calibrated models (pricing_mode = "fallback_rule_based")
+#
+# IMPORTANT: ml_service_trained._manual_predict() imports from ml_service_manual
+# directly — never back through this module — to prevent circular import recursion.
+# --------------------------------------------------------------------------
+
 try:
-    from pathlib import Path
-    import joblib
+    from pathlib import Path as _Path
+    import importlib as _importlib
 
-    ML_MODELS_DIR = Path(__file__).parent.parent.parent / "ml_models"
-    metadata_path = ML_MODELS_DIR / "model_metadata.json"
+    _ML_MODELS_DIR = _Path(__file__).parent.parent.parent / "ml_models"
+    _metadata_path = _ML_MODELS_DIR / "model_metadata.json"
 
-    if metadata_path.exists():
-        print("[ML] Trained models detected - loading ML service with trained models")
+    if _metadata_path.exists():
+        print("[ML] ─────────────────────────────────────────────────────────")
+        print(f"[ML] model_metadata.json found at: {_metadata_path}")
+        print("[ML] Loading TRAINED XGBoost/sklearn models (pricing_mode=trained_ml)")
         from app.services.ml_service_trained import (
             zone_risk_model,
             premium_model,
-            fraud_model
+            fraud_model,
         )
+        print("[ML] ✓ zone_risk_model  → TrainedZoneRiskModel")
+        print("[ML] ✓ premium_model    → TrainedPremiumModel")
+        print("[ML] ✓ fraud_model      → TrainedFraudModel")
+        print("[ML] ─────────────────────────────────────────────────────────")
     else:
-        print("[ML] No trained models found - using manual calibrated models")
+        print("[ML] ─────────────────────────────────────────────────────────")
+        print(f"[ML] No model_metadata.json at {_metadata_path}")
+        print("[ML] Loading MANUAL calibrated models (pricing_mode=fallback_rule_based)")
         zone_risk_model = ZoneRiskModel()
         premium_model   = PremiumModel()
         fraud_model     = FraudModel()
-except ImportError as e:
-    print(f"[ML] Could not load trained models: {e}")
-    print("[ML] Using manual calibrated models")
+        print("[ML] ✓ zone_risk_model  → ZoneRiskModel (manual weights)")
+        print("[ML] ✓ premium_model    → PremiumModel (manual formula)")
+        print("[ML] ✓ fraud_model      → FraudModel (7-factor manual)")
+        print("[ML] ─────────────────────────────────────────────────────────")
+
+except ImportError as _e:
+    print("[ML] ─────────────────────────────────────────────────────────")
+    print(f"[ML] ImportError while loading trained models: {_e}")
+    print("[ML] Falling back to MANUAL calibrated models")
     zone_risk_model = ZoneRiskModel()
     premium_model   = PremiumModel()
     fraud_model     = FraudModel()
+    print("[ML] ✓ zone_risk_model  → ZoneRiskModel (manual weights)")
+    print("[ML] ✓ premium_model    → PremiumModel (manual formula)")
+    print("[ML] ✓ fraud_model      → FraudModel (7-factor manual)")
+    print("[ML] ─────────────────────────────────────────────────────────")
