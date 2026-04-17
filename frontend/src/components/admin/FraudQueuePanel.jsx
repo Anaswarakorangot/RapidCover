@@ -85,20 +85,26 @@ export default function FraudQueuePanel() {
 
     const ids = [...selected];
     try {
-      await fetch(`${API_BASE}/claims/bulk-${action}`, {
+      const res = await fetch(`${API_BASE}/claims/bulk-${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ claim_ids: ids }),
       });
-    } catch { /* backend not yet wired */ }
-
-    // Optimistic update
-    setQueue(prev => prev.filter(c => !selected.has(c.id)));
-    setActionLog(prev => [
-      { action, ids, count: ids.length, time: new Date().toLocaleTimeString('en-IN') },
-      ...prev.slice(0, 4),
-    ]);
-    setSelected(new Set());
+      
+      if (res.ok) {
+        setQueue(prev => prev.filter(c => !selected.has(c.id)));
+        setActionLog(prev => [
+          { action, ids, count: ids.length, time: new Date().toLocaleTimeString('en-IN') },
+          ...prev.slice(0, 4),
+        ]);
+        setSelected(new Set());
+      } else {
+        console.error("Bulk action failed:", await res.text());
+      }
+    } catch (err) {
+      console.error("Bulk action error:", err);
+    }
+    
     setLoading(false);
   }
 
