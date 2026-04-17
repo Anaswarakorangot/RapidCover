@@ -19,7 +19,7 @@
 
 <br/>
 
-[📊 Pitch Deck](https://drive.google.com/file/d/1GGulslqDDAer2gFGl240MeIDa-fxa-Xx/view?usp=sharing) &nbsp;|&nbsp; [🎬 Demo Video](https://youtu.be/EYyQ2fW9NLc)
+[📊 Pitch Deck](https://drive.google.com/file/d/1GGulslqDDAer2gFGl240MeIDa-fxa-Xx/view?usp=sharing) &nbsp;|&nbsp; [🎬 Demo Video](https://youtu.be/EYyQ2fW9NLc) &nbsp;|&nbsp; [🕸️ Knowledge Graph](https://anaswarakorangot.github.io/RapidCover/assets/knowledge-graph.html)
 
 </div>
 
@@ -257,7 +257,7 @@ Three production ML models are trained on synthetic but domain-realistic data, w
 | Note | Deterministic price floor, IRDAI cap, and loyalty adjustments applied post-prediction |
 
 <div align="center">
-<img src="./assets/mode12 randomforest_disruption_classifier.svg" width="100%" alt="Model 2 — XGBoost Dynamic Premium Engine: features to weekly premium"/>
+<img src="./assets/model2_randomforest_disruption_classifier.svg" width="100%" alt="Model 2 — XGBoost Dynamic Premium Engine: features to weekly premium"/>
 </div>
 
 ---
