@@ -321,10 +321,12 @@ def get_zones(db: Session = Depends(get_db)):
 # --- GET /admin/panel/bcr ----------------------------------------------------
 
 @router.get("/bcr")
-@cache(expire=60)
 def get_bcr(db: Session = Depends(get_db)):
     """Return BCR (Burning Cost Rate) stats grouped by city."""
-    cities = db.query(Zone.city, Zone.code).group_by(Zone.city).all()
+    try:
+        cities = db.query(Zone.city, Zone.code).group_by(Zone.city).all()
+    except Exception:
+        return {"cities": []}
     city_stats = []
 
     for city_name, city_prefix in cities:

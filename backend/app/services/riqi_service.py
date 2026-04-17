@@ -31,7 +31,7 @@ def _ensure_zone_risk_profiles_table(db: Session) -> None:
     """Create the zone_risk_profiles table if it doesn't exist."""
     db.execute(text("""
         CREATE TABLE IF NOT EXISTS zone_risk_profiles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             zone_id INTEGER UNIQUE NOT NULL,
             riqi_score REAL NOT NULL DEFAULT 55.0,
             riqi_band VARCHAR(20) NOT NULL DEFAULT 'urban_fringe',

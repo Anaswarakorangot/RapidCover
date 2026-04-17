@@ -893,6 +893,20 @@ export function Dashboard() {
     </div>
   );
 
+  /* ── error state with retry ── */
+  if (error && !expState && !policy) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 240, gap: 16 }}>
+      <span style={{ fontSize: 48 }}>⚠️</span>
+      <p style={{ fontFamily: 'Nunito', fontWeight: 700, color: '#991b1b' }}>Failed to load dashboard</p>
+      <button
+        onClick={() => { setLoading(true); setError(null); fetchAll(true); }}
+        style={{ background: '#3DB85C', color: 'white', border: 'none', borderRadius: 12, padding: '10px 24px', fontWeight: 600, cursor: 'pointer' }}
+      >
+        Retry
+      </button>
+    </div>
+  );
+
   return (
     <>
       <style>{S}</style>
