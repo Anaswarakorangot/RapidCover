@@ -752,14 +752,12 @@ RapidCover is a **parametric income protection product** with strictly defined s
 
 ## 👥 Team
 
-RapidCover was built by a passionate team at Guidewire DEVTrails 2026:
+RapidCover was built by the team at Guidewire DEVTrails 2026:
 
-| # | Name | Role |
-|---|------|------|
-| 1 | **Anaswara K** | Full-Stack Product Lead |
-| 2 | **Venkata Kanna Bhava** | Backend & ML Engineer |
-| 3 | **Yuva Hasini Duddekunta** | Frontend & PWA Developer |
-| 4 | **Amritha** | QA & Testing Lead |
+- **Anaswara K**
+- **Venkata Kanna Bhava**
+- **Yuva Hasini Duddekunta**
+- **Amritha**
 
 ---
 
