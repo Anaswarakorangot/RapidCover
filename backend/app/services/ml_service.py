@@ -1,24 +1,42 @@
 """
 ml_service.py
 -----------------------------------------------------------------------------
-RapidCover ML Service - Three models wrapped as ML-shaped interfaces.
-Source: RapidCover Phase 2 Team Guide, Guidewire DEVTrails 2026.
+RapidCover ML Service - Unified inference layer for three production models.
+
+ARCHITECTURE BOUNDARY (what is learned vs deterministic)
+---------------------------------------------------------
+LEARNED by ML:
+  - Zone risk score (0-100): XGBoost trained on city-parameterized event
+    frequency/severity data with independent noise injection.
+  - Expected weekly payout pressure (Rs.): XGBoost trained on independent
+    economic signal (E[payout] = trigger_freq x severity x exposure x load).
+    NOT the pricing formula itself.
+  - Fraud triage score (0-1): RandomForestClassifier trained on
+    policy-grounded independent labels (NOT the weighted scoring formula).
+
+ALWAYS DETERMINISTIC (never overridden by ML):
+  - IRDAI 3x microinsurance premium cap
+  - Tier floor prices (Flex Rs.22, Standard Rs.33, Pro Rs.45)
+  - GPS velocity hard-stop: >60 km/h = automatic fraud reject
+  - Run-count hard-stop: any run during suspension = automatic reject
+  - Zone suspension hard-gate: unconfirmed zone = automatic reject
+
+ML NEVER DECIDES ALONE:
+  - Final claim approval/rejection always passes through deterministic gates
+  - ML fraud score informs triage; deterministic hard-stops always override
+  - Premium ML output is clamped by actuarial and regulatory floors/caps
 
 Model 1 - Zone Risk Scorer
-  Algorithm : XGBoost Classifier (manually calibrated weights)
+  Algorithm : XGBoost Regressor (trained on independent target v2.0)
   Interface : zone_risk_model.predict(zone_features) -> score 0-100
 
 Model 2 - Dynamic Premium Engine
-  Algorithm : Gradient Boosted Regression (manually calibrated)
+  Algorithm : XGBoost Regressor (trained on expected payout pressure v2.0)
   Interface : premium_model.predict(partner_features) -> weekly premium Rs.
 
 Model 3 - Fraud Anomaly Detector
-  Algorithm : Isolation Forest (manually calibrated 7-factor scorer)
+  Algorithm : RandomForestClassifier (supervised, independent labels v2.0)
   Interface : fraud_model.score(claim_features) -> fraud score 0-1
-
-IMPORTANT: Weights are manually calibrated for hackathon demo.
-In production, replace with trained scikit-learn/XGBoost models.
-Interfaces are drop-in replaceable with real models.
 -----------------------------------------------------------------------------
 """
 

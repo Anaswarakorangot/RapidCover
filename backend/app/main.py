@@ -106,6 +106,86 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+# Custom OpenAPI schema with enhanced documentation
+def custom_openapi():
+    """Generate custom OpenAPI schema with detailed documentation."""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    from fastapi.openapi.utils import get_openapi
+
+    openapi_schema = get_openapi(
+        title="RapidCover API",
+        version="1.0.0",
+        description="""
+## Zero-Touch Parametric Insurance API
+
+RapidCover provides automated income protection for India's gig economy workers.
+
+### 🎯 Key Features
+- 🤖 **ML-Powered Risk Scoring** - XGBoost zone risk, Gradient Boosting premium, Isolation Forest fraud detection
+- ⚡ **Zero-Touch Automation** - Auto-claim generation, GPS-based zone detection, partner ID validation
+- 🔍 **7-Factor Fraud Detection** - GPS coherence, activity paradox, claim frequency, duplicate detection
+- 📊 **Real-Time Monitoring** - MLOps dashboard, performance metrics, fallback tracking
+- 🔔 **Push Notifications** - PWA-enabled instant claim alerts
+- 🎯 **5 Parametric Triggers** - Rain, Heat, AQI, Shutdown, Dark Store Closure
+
+### 📡 Live Data Sources
+- OpenWeatherMap API (rain, temperature)
+- OpenAQ API (air quality)
+- Platform APIs (partner validation, activity tracking)
+
+### 🔐 Authentication
+- **Partners**: OTP-based login with JWT tokens (`POST /partners/login` → `POST /partners/verify`)
+- **Admins**: Email/password login with JWT tokens (`POST /admin/auth/login`)
+
+### 📈 Coverage
+- **Cities**: Bangalore, Mumbai, Delhi
+- **Zones**: 11 dark store zones with GPS detection
+- **Tiers**: Flex (₹22/week), Standard (₹33/week), Pro (₹45/week)
+
+### 🚀 Quick Start
+1. Register partner: `POST /partners/register`
+2. Detect zone: `GET /zones/nearest?lat=X&lng=Y`
+3. Get quotes: `GET /partners/quotes?city=bangalore`
+4. Create policy: `POST /policies`
+5. Trigger event simulation: `POST /admin/simulate/weather`
+
+### 📊 Monitoring
+- ML Stats: `GET /admin/ml-stats`
+- Health Check: `GET /health`
+- API Docs: `GET /docs`
+
+---
+🤖 Built with **FastAPI**, **XGBoost**, **PostgreSQL**, **Redis**, and **React PWA**
+        """,
+        routes=app.routes,
+    )
+
+    openapi_schema["info"]["x-logo"] = {
+        "url": "https://rapidcover.in/logo.png",
+        "altText": "RapidCover Logo"
+    }
+
+    # Add tags metadata for better organization
+    openapi_schema["tags"] = [
+        {"name": "partners", "description": "Partner authentication, registration, and profile management"},
+        {"name": "policies", "description": "Policy quotes, creation, and management"},
+        {"name": "claims", "description": "Claims processing and status tracking"},
+        {"name": "zones", "description": "Zone listing and GPS-based detection"},
+        {"name": "triggers", "description": "Active trigger events"},
+        {"name": "admin", "description": "Admin operations and simulation"},
+        {"name": "admin-monitoring", "description": "ML model performance monitoring"},
+        {"name": "notifications", "description": "Push notification subscriptions"},
+    ]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
+
 # Rate limiting (Phase 4)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

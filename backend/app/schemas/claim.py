@@ -26,6 +26,7 @@ class ClaimResponse(BaseModel):
     status: ClaimStatus
     fraud_score: float
     upi_ref: Optional[str] = None
+    device_fingerprint: Optional[str] = None  # Device fingerprint for fraud detection
     created_at: datetime
     paid_at: Optional[datetime] = None
 

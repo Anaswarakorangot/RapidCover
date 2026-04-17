@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, JSON, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -28,9 +28,9 @@ class Partner(Base):
     phone = Column(String(15), unique=True, nullable=False, index=True)
     name = Column(String(100), nullable=False)
     aadhaar_hash = Column(String(64), nullable=True)  # SHA-256 hash of Aadhaar
-    platform = Column(Enum(Platform), nullable=False)
-    partner_id = Column(String(50), nullable=True)  # Platform-specific ID
-    zone_id = Column(Integer, ForeignKey("zones.id"), nullable=True)
+    platform = Column(Enum(Platform), nullable=False, index=True)
+    partner_id = Column(String(50), nullable=True, index=True)  # Platform-specific ID
+    zone_id = Column(Integer, ForeignKey("zones.id"), nullable=True, index=True)
     language_pref = Column(Enum(Language), default=Language.ENGLISH)
     is_active = Column(Boolean, default=True)
     # Shift preferences
@@ -45,6 +45,9 @@ class Partner(Base):
     bank_name = Column(String(100), nullable=True)
     account_number = Column(String(30), nullable=True)
     ifsc_code = Column(String(20), nullable=True)
+
+    # Device fingerprinting for fraud detection
+    device_fingerprint = Column(String(16), nullable=True)  # SHA-256 hash prefix (16 chars)
 
     # Social Security Code compliance (90/120-day rule)
     platform_engagement_days = Column(Integer, default=0)  # Total days worked on platform
@@ -65,3 +68,9 @@ class Partner(Base):
         "pan_number":     None,
         "kyc_status":     "skipped",
     })
+
+    # Composite indexes for common query patterns
+    __table_args__ = (
+        Index('ix_partner_zone_active', 'zone_id', 'is_active'),  # Active partners per zone
+        Index('ix_partner_platform_active', 'platform', 'is_active'),  # Active partners per platform
+    )

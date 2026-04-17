@@ -8,6 +8,7 @@ Implements rule-based scoring for detecting suspicious claim patterns:
 - Duplicate event detection
 - Zone boundary gaming
 - Collusion ring detection (basic)
+- Device fingerprinting consistency
 """
 
 import json
@@ -22,6 +23,7 @@ from app.models.policy import Policy
 from app.models.claim import Claim, ClaimStatus
 from app.models.trigger_event import TriggerEvent
 from app.models.zone import Zone
+from app.services.device_fingerprinting import verify_device_consistency
 
 
 # Fraud thresholds
@@ -39,6 +41,7 @@ SCORE_WEIGHTS = {
     "duplicate_claim": 0.35,
     "new_account": 0.10,
     "zone_boundary": 0.15,
+    "device_mismatch": 0.20,  # Device fingerprint inconsistency
 }
 
 
@@ -209,6 +212,40 @@ def check_zone_boundary_gaming(
     return 0.0
 
 
+def check_device_consistency(
+    partner: Partner,
+    current_fingerprint: Optional[str] = None,
+) -> float:
+    """
+    Check if current device matches partner's registration device.
+
+    Returns a score 0-1 where higher = more suspicious.
+
+    Fraud Indicators:
+    - Different device from registration → 0.5 (moderate risk)
+    - No fingerprint data → 0.1 (slight penalty for missing data)
+    - Same device → 0.0 (low risk)
+    """
+    if not current_fingerprint:
+        # No fingerprint provided - slight penalty
+        return 0.1
+
+    if not partner.device_fingerprint:
+        # No baseline to compare (first claim from this partner)
+        return 0.0
+
+    is_consistent, _ = verify_device_consistency(
+        current_fingerprint,
+        partner.device_fingerprint
+    )
+
+    if is_consistent:
+        return 0.0  # Same device - low risk
+
+    # Different device - moderate risk (could be legitimate device change)
+    return 0.5
+
+
 def calculate_fraud_score(
     partner: Partner,
     trigger_event: TriggerEvent,
@@ -216,6 +253,7 @@ def calculate_fraud_score(
     partner_lat: Optional[float] = None,
     partner_lng: Optional[float] = None,
     had_deliveries_during: bool = False,
+    device_fingerprint: Optional[str] = None,
 ) -> dict:
     """
     Calculate overall fraud score for a claim.
@@ -232,6 +270,7 @@ def calculate_fraud_score(
         "duplicate_claim": check_duplicate_claim(partner, trigger_event, db),
         "account_age": check_account_age(partner),
         "zone_boundary": check_zone_boundary_gaming(partner, db),
+        "device_consistency": check_device_consistency(partner, device_fingerprint),
     }
 
     # If duplicate claim detected, immediately flag
@@ -250,6 +289,7 @@ def calculate_fraud_score(
         + factors["claim_frequency"] * SCORE_WEIGHTS["high_frequency"]
         + factors["account_age"] * SCORE_WEIGHTS["new_account"]
         + factors["zone_boundary"] * SCORE_WEIGHTS["zone_boundary"]
+        + factors["device_consistency"] * SCORE_WEIGHTS["device_mismatch"]
     )
 
     # Normalize to 0-1 range
