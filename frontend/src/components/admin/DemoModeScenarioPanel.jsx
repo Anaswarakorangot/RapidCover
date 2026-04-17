@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { authenticatedFetch } from '../../services/adminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -68,8 +69,8 @@ export default function DemoModeScenarioPanel() {
     setLoading(true);
     try {
       const [statusRes, scenariosRes] = await Promise.all([
-        fetch(`${API}/admin/panel/demo-mode/status`),
-        fetch(`${API}/admin/panel/demo-mode/scenarios`),
+        authenticatedFetch(`${API}/admin/panel/demo-mode/status`),
+        authenticatedFetch(`${API}/admin/panel/demo-mode/scenarios`),
       ]);
       const statusData = await statusRes.json();
       const scenarioData = await scenariosRes.json();
@@ -92,7 +93,7 @@ export default function DemoModeScenarioPanel() {
     if (!demoStatus) return;
     setToggling(true);
     try {
-      const res = await fetch(`${API}/admin/panel/demo-mode/toggle?enabled=${!demoStatus.enabled}`, { method: 'POST' });
+      const res = await authenticatedFetch(`${API}/admin/panel/demo-mode/toggle?enabled=${!demoStatus.enabled}`, { method: 'POST' });
       const data = await res.json();
       setDemoStatus(data);
     } catch (error) {
@@ -129,7 +130,7 @@ export default function DemoModeScenarioPanel() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API}/admin/panel/demo-mode/run`, {
+      const res = await authenticatedFetch(`${API}/admin/panel/demo-mode/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(toPayload(form)),
@@ -148,7 +149,7 @@ export default function DemoModeScenarioPanel() {
 
   async function handleSelectRun(runId) {
     try {
-      const res = await fetch(`${API}/admin/panel/demo-mode/run/${runId}`);
+      const res = await authenticatedFetch(`${API}/admin/panel/demo-mode/run/${runId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to load run');
       setSelectedRun(data);
@@ -161,7 +162,7 @@ export default function DemoModeScenarioPanel() {
   async function handleCleanup(runId) {
     setCleaningRunId(runId);
     try {
-      const res = await fetch(`${API}/admin/panel/demo-mode/run/${runId}/cleanup`, { method: 'POST' });
+      const res = await authenticatedFetch(`${API}/admin/panel/demo-mode/run/${runId}/cleanup`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to clean up run');
       setSelectedRun(data);

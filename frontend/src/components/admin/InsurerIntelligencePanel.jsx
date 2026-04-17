@@ -3,6 +3,7 @@
 // Shows zone predictions, city risk profiles, and recommendations
 
 import { useState, useEffect } from 'react';
+import { authenticatedFetch } from '../../services/adminApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -59,9 +60,9 @@ export default function InsurerIntelligencePanel() {
     setError(null);
     try {
       const [summaryRes, profilesRes, predictionsRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/intelligence/summary`),
-        fetch(`${API_BASE}/admin/intelligence/risk-profiles`),
-        fetch(`${API_BASE}/admin/intelligence/predictions`),
+        authenticatedFetch(`${API_BASE}/admin/intelligence/summary`),
+        authenticatedFetch(`${API_BASE}/admin/intelligence/risk-profiles`),
+        authenticatedFetch(`${API_BASE}/admin/intelligence/predictions`),
       ]);
 
       if (summaryRes.ok) setSummary(await summaryRes.json());
@@ -77,7 +78,7 @@ export default function InsurerIntelligencePanel() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/intelligence/refresh`, { method: 'POST' });
+      const res = await authenticatedFetch(`${API_BASE}/admin/intelligence/refresh`, { method: 'POST' });
       if (res.ok) {
         await fetchData();
       }
@@ -244,9 +245,9 @@ export default function InsurerIntelligencePanel() {
                 Cities Requiring Attention
               </h3>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {summary.at_risk_cities.map(city => (
+                {summary.at_risk_cities.map((city, index) => (
                   <span
-                    key={city}
+                    key={`${city}-${index}`}
                     style={{
                       padding: '0.4rem 0.75rem',
                       borderRadius: '8px',
@@ -283,11 +284,11 @@ export default function InsurerIntelligencePanel() {
               <p style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Click "Refresh Predictions" to generate them</p>
             </div>
           ) : (
-            profiles.map(profile => {
+            profiles.map((profile, index) => {
               const badge = actionBadge(profile.recommendation?.action);
               return (
                 <div
-                  key={profile.city}
+                  key={`${profile.city}-${profile.zone_count || index}`}
                   style={{
                     background: 'var(--white)',
                     borderRadius: '24px',
