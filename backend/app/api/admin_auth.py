@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import jwt
+import logging
 
 from app.config import get_settings
 from app.database import get_db
@@ -21,6 +22,8 @@ from app.models.admin import Admin
 from app.schemas.admin import AdminRegister, AdminLogin, AdminToken, AdminResponse
 from app.core.admin_deps import get_current_admin
 from app.utils.time_utils import utcnow
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 router = APIRouter(prefix="/admin/auth", tags=["admin-auth"])
@@ -99,35 +102,58 @@ def login_admin(data: AdminLogin, db: Session = Depends(get_db)):
         401: Invalid credentials
         403: Account inactive
     """
-    # Find admin by email
-    admin = db.query(Admin).filter(Admin.email == data.email.lower()).first()
+    email = data.email.lower().strip()
 
-    # Verify credentials
-    if not admin or not pwd_context.verify(data.password, admin.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+    try:
+        # Find admin by email
+        admin = db.query(Admin).filter(Admin.email == email).first()
+
+        # Verify credentials
+        if not admin:
+            logger.warning(f"Login attempt with non-existent email: {email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+
+        if not pwd_context.verify(data.password, admin.hashed_password):
+            logger.warning(f"Failed login attempt for admin: {email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+
+        # Check if account is active
+        if not admin.is_active:
+            logger.warning(f"Login attempt with inactive account: {email}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is inactive - contact administrator"
+            )
+
+        # Update last login timestamp
+        admin.last_login = utcnow()
+        db.commit()
+        db.refresh(admin)
+
+        logger.info(f"Admin login successful: {email}")
+
+        # Generate token
+        token = create_admin_token(admin.id)
+
+        return AdminToken(
+            access_token=token,
+            admin=AdminResponse.model_validate(admin)
         )
 
-    # Check if account is active
-    if not admin.is_active:
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during admin login: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive - contact administrator"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication service temporarily unavailable"
         )
-
-    # Update last login timestamp
-    admin.last_login = utcnow()
-    db.commit()
-    db.refresh(admin)
-
-    # Generate token
-    token = create_admin_token(admin.id)
-
-    return AdminToken(
-        access_token=token,
-        admin=AdminResponse.model_validate(admin)
-    )
 
 
 @router.get("/me", response_model=AdminResponse)

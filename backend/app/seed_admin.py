@@ -8,8 +8,10 @@ from app.models.admin import Admin
 from app.database import get_db, engine, Base
 from passlib.context import CryptContext
 import os
+import logging
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = logging.getLogger(__name__)
 
 DEFAULT_ADMIN_EMAIL = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@rapidcover.in")
 DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin123")
@@ -32,7 +34,7 @@ def seed_default_admin():
             hashed_password = pwd_context.hash(DEFAULT_ADMIN_PASSWORD)
 
             admin = Admin(
-                email=DEFAULT_ADMIN_EMAIL,
+                email=DEFAULT_ADMIN_EMAIL.lower().strip(),
                 hashed_password=hashed_password,
                 full_name=DEFAULT_ADMIN_NAME,
                 is_active=True,
@@ -43,17 +45,22 @@ def seed_default_admin():
             db.commit()
             db.refresh(admin)
 
-            print("\n" + "=" * 70)
-            print("🔐 DEFAULT ADMIN CREATED")
-            print("=" * 70)
-            print(f"  Email:    {DEFAULT_ADMIN_EMAIL}")
-            print(f"  Password: {DEFAULT_ADMIN_PASSWORD}")
-            print(f"  Name:     {DEFAULT_ADMIN_NAME}")
-            print("=" * 70)
-            print("⚠️  IMPORTANT: Change the default password after first login!")
-            print("=" * 70 + "\n")
+            msg = (
+                "\n" + "=" * 70 + "\n"
+                "🔐 DEFAULT ADMIN CREATED\n"
+                "=" * 70 + "\n"
+                f"  Email:    {DEFAULT_ADMIN_EMAIL}\n"
+                f"  Password: {DEFAULT_ADMIN_PASSWORD}\n"
+                f"  Name:     {DEFAULT_ADMIN_NAME}\n"
+                "=" * 70 + "\n"
+                "⚠️  IMPORTANT: Change the default password after first login!\n"
+                "=" * 70 + "\n"
+            )
+            print(msg)
+            logger.info(f"Created default admin: {DEFAULT_ADMIN_EMAIL}")
         else:
-            print(f"[Admin] Found {admin_count} admin(s) in database. Skipping default admin creation.")
+            logger.info(f"Found {admin_count} admin(s) in database. Skipping default admin creation.")
 
     except Exception as e:
-        print(f"[Admin] Error seeding default admin: {e}")
+        logger.error(f"Error seeding default admin: {str(e)}", exc_info=True)
+        raise
