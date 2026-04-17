@@ -5,7 +5,7 @@ const navItems = [
   { path: '/', label: 'Home', icon: '🏠' },
   { path: '/policy', label: 'Policy', icon: '📋' },
   { path: '/claims', label: 'Claims', icon: '💰' },
-  { path: '/trust-center', label: 'Trust', icon: '🔍' },
+  { path: '/trust-center', label: 'Trust', icon: '🔍', badge: true },
   { path: '/profile', label: 'Profile', icon: '👤' },
   { path: '/admin', label: 'Admin', icon: '⚙️' },
 ];
@@ -106,6 +106,21 @@ const styles = `
     width: 100%;
     background: #f7f9f7;
   }
+
+  /* ── Nav badge ── */
+  .rc-nav__item-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
+  .rc-nav__badge {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    width: 7px;
+    height: 7px;
+    background: #3DB85C;
+    border-radius: 50%;
+    border: 1.5px solid white;
+    animation: navPulse 1.8s infinite;
+  }
+  @keyframes navPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.3); } }
 `;
 
 export function Layout({ children }) {
@@ -147,8 +162,10 @@ export function Layout({ children }) {
                     key={item.path}
                     to={item.path}
                     className={`rc-nav__item ${isActive ? 'rc-nav__item--active' : ''}`}
+                    style={{ position: 'relative' }}
                   >
                     <span className="rc-nav__icon">{item.icon}</span>
+                    {item.badge && <span className="rc-nav__badge" />}
                     <span className="rc-nav__label">{item.label}</span>
                   </Link>
                 );
