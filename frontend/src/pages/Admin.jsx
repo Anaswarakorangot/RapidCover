@@ -38,6 +38,7 @@ export function Admin() {
   const [statsError, setStatsError] = useState(false);
   const [activeTab, setActiveTab]   = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const drillZoneSelectRef = useRef(null);
 
   useEffect(() => {
@@ -138,25 +139,40 @@ export function Admin() {
           RapidCover
         </div>
         <div className="sidebar-menu">
-          {MENU_GROUPS.map(group => (
-            <div key={group.label} className="menu-section">
-              <span className="menu-label">{group.label}</span>
-              {group.items.map(tabId => {
-                const tab = TABS.find(t => t.id === tabId);
-                if (!tab) return null;
-                return (
-                  <button
-                    key={tabId}
-                    className={`menu-item ${activeTab === tabId ? 'menu-item--active' : ''}`}
-                    onClick={() => setActiveTab(tabId)}
-                  >
-                    <span className="menu-item__icon">{tab.label.split(' ')[0]}</span>
-                    {tab.label.split(' ').slice(1).join(' ') || tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+          {MENU_GROUPS.map(group => {
+            const filteredItems = group.items.filter(tabId => {
+              if (!searchQuery) return true;
+              const tab = TABS.find(t => t.id === tabId);
+              if (!tab) return false;
+              const term = searchQuery.toLowerCase();
+              return tab.label.toLowerCase().includes(term) || tabId.toLowerCase().includes(term) || group.label.toLowerCase().includes(term);
+            });
+
+            if (filteredItems.length === 0) return null;
+
+            return (
+              <div key={group.label} className="menu-section">
+                <span className="menu-label">{group.label}</span>
+                {filteredItems.map(tabId => {
+                  const tab = TABS.find(t => t.id === tabId);
+                  if (!tab) return null;
+                  return (
+                    <button
+                      key={tabId}
+                      className={`menu-item ${activeTab === tabId ? 'menu-item--active' : ''}`}
+                      onClick={() => {
+                        setActiveTab(tabId);
+                        if (window.innerWidth <= 768) setIsSidebarOpen(false);
+                      }}
+                    >
+                      <span className="menu-item__icon">{tab.label.split(' ')[0]}</span>
+                      {tab.label.split(' ').slice(1).join(' ') || tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </aside>
 
@@ -170,7 +186,13 @@ export function Admin() {
             >
               ☰
             </button>
-            <input type="text" className="topnav-search" placeholder="Search for stats, workers, or claims..." />
+            <input 
+              type="text" 
+              className="topnav-search" 
+              placeholder="Search for dashboards, panels, tools..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
             <button 
               className={`demo-top-toggle ${activeTab === 'demo' ? 'demo-top-toggle--active' : ''}`}
               onClick={() => setActiveTab('demo')}
