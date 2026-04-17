@@ -207,59 +207,59 @@ def train_premium_model(data_path, output_dir):
 
 
 def train_fraud_model(data_path, output_dir):
-    """Train Fraud Detector using XGBoost Classifier."""
+    """Train Fraud Detector using Isolation Forest (unsupervised anomaly detection)."""
     print("\n" + "="*80)
-    print("Training Model 3: Fraud Anomaly Detector")
+    print("Training Model 3: Fraud Anomaly Detector (Isolation Forest)")
     print("="*80)
 
     # Load data
     df = pd.read_csv(data_path)
     print(f"Loaded {len(df)} samples")
 
-    # Features and target
+    # Features (no target needed for Isolation Forest - unsupervised)
     feature_cols = [
         'gps_in_zone', 'run_count_during_event', 'zone_polygon_match',
         'claims_last_30_days', 'device_consistent', 'traffic_disrupted',
         'centroid_drift_km', 'max_gps_velocity_kmh', 'zone_suspended'
     ]
     X = df[feature_cols]
-    y = df['is_fraud']
+    y = df['is_fraud']  # For evaluation only
 
     # Train/test split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Train model
-    if HAS_XGBOOST:
-        model = xgb.XGBClassifier(
-            n_estimators=100,
-            max_depth=6,
-            learning_rate=0.1,
-            random_state=42,
-            eval_metric='logloss',
-            use_label_encoder=False
-        )
-        print("Using XGBoost Classifier")
-    else:
-        from sklearn.ensemble import GradientBoostingClassifier
-        model = GradientBoostingClassifier(
-            n_estimators=100,
-            max_depth=6,
-            learning_rate=0.1,
-            random_state=42
-        )
-        print("Using GradientBoosting Classifier")
+    # Train Isolation Forest (unsupervised - only uses X_train)
+    from sklearn.ensemble import IsolationForest
+    model = IsolationForest(
+        n_estimators=100,
+        max_samples='auto',
+        contamination=0.1,  # Assume 10% fraud rate
+        random_state=42,
+        n_jobs=-1
+    )
+    print("Using Isolation Forest (unsupervised anomaly detection)")
 
-    model.fit(X_train, y_train)
+    model.fit(X_train)
 
-    # Evaluate
-    y_pred = model.predict(X_test)
-    y_prob = model.predict_proba(X_test)[:, 1]
+    # Evaluate using anomaly scores
+    # Isolation Forest returns -1 for outliers (fraud), +1 for inliers (normal)
+    y_pred_if = model.predict(X_test)
+    y_pred = (y_pred_if == -1).astype(int)  # Convert to binary
 
+    # Get anomaly scores (more negative = more anomalous)
+    y_scores = -model.score_samples(X_test)  # Negate so higher = more fraudulent
+
+    # Metrics
     accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred)
-    recall = recall_score(y_test, y_pred)
-    f1 = f1_score(y_test, y_pred)
-    auc = roc_auc_score(y_test, y_prob)
+    precision = precision_score(y_test, y_pred, zero_division=0)
+    recall = recall_score(y_test, y_pred, zero_division=0)
+    f1 = f1_score(y_test, y_pred, zero_division=0)
+
+    # For AUC, use anomaly scores
+    try:
+        auc = roc_auc_score(y_test, y_scores)
+    except:
+        auc = 0.5  # Fallback if calculation fails
 
     print(f"\nModel Performance:")
     print(f"  Accuracy:  {accuracy:.4f}")
@@ -267,10 +267,7 @@ def train_fraud_model(data_path, output_dir):
     print(f"  Recall:    {recall:.4f}")
     print(f"  F1 Score:  {f1:.4f}")
     print(f"  ROC AUC:   {auc:.4f}")
-
-    # Cross-validation
-    cv_scores = cross_val_score(model, X, y, cv=5, scoring='roc_auc')
-    print(f"  CV AUC (5-fold): {cv_scores.mean():.4f} (+/- {cv_scores.std():.4f})")
+    print(f"  Note: Isolation Forest is unsupervised - metrics show correlation with labeled data")
 
     # Save model
     model_path = output_dir / "fraud_model.pkl"
@@ -279,7 +276,7 @@ def train_fraud_model(data_path, output_dir):
     print(f"\n[OK] Model saved to {model_path}")
 
     return {
-        "model_type": "XGBClassifier" if HAS_XGBOOST else "GradientBoostingClassifier",
+        "model_type": "IsolationForest",
         "n_features": len(feature_cols),
         "train_samples": len(X_train),
         "test_samples": len(X_test),
@@ -288,8 +285,8 @@ def train_fraud_model(data_path, output_dir):
         "recall": float(recall),
         "f1_score": float(f1),
         "roc_auc": float(auc),
-        "cv_auc_mean": float(cv_scores.mean()),
-        "cv_auc_std": float(cv_scores.std()),
+        "contamination": 0.1,
+        "note": "Unsupervised anomaly detection - trained without labels",
         "feature_names": feature_cols
     }
 
