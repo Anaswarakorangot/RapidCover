@@ -1241,110 +1241,121 @@ def get_payout_ledger(
     PRIVACY: Partner IDs are one-way hashed — never exposed raw.
     Caller cannot reverse-engineer which partner received which payout.
     """
-    from app.models.trigger_event import TriggerEvent
+    try:
+        from app.models.trigger_event import TriggerEvent
 
-    zone = db.query(Zone).filter(Zone.id == zone_id).first()
-    if not zone:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zone not found")
+        zone = db.query(Zone).filter(Zone.id == zone_id).first()
+        if not zone:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zone not found")
 
-    now = utcnow()
-    period_start = now - timedelta(days=days)
+        now = utcnow()
+        period_start = now - timedelta(days=days)
 
-    # Get all partners in this zone
-    partner_ids = [
-        p[0] for p in db.query(Partner.id).filter(Partner.zone_id == zone_id).all()
-    ]
-
-    total_paid = 0.0
-    total_claims = 0
-    affected_partner_ids: set[int] = set()
-    last_successful_payout_at = None
-    recent_payouts: list[AnonymizedPayout] = []
-    payout_times: list[float] = []
-
-    if partner_ids:
-        # Get policy ids for these partners
-        policy_ids = [
-            p[0] for p in
-            db.query(Policy.id).filter(Policy.partner_id.in_(partner_ids)).all()
+        # Get all partners in this zone
+        partner_ids = [
+            p[0] for p in db.query(Partner.id).filter(Partner.zone_id == zone_id).all()
         ]
 
-        if policy_ids:
-            paid_claims = (
-                db.query(Claim, Policy)
-                .join(Policy, Claim.policy_id == Policy.id)
-                .filter(
-                    Claim.policy_id.in_(policy_ids),
-                    Claim.status == ClaimStatus.PAID,
-                    Claim.paid_at >= period_start,
+        total_paid = 0.0
+        total_claims = 0
+        affected_partner_ids: set[int] = set()
+        last_successful_payout_at = None
+        recent_payouts: list[AnonymizedPayout] = []
+        payout_times: list[float] = []
+
+        if partner_ids:
+            # Get policy ids for these partners
+            policy_ids = [
+                p[0] for p in
+                db.query(Policy.id).filter(Policy.partner_id.in_(partner_ids)).all()
+            ]
+
+            if policy_ids:
+                paid_claims = (
+                    db.query(Claim, Policy)
+                    .join(Policy, Claim.policy_id == Policy.id)
+                    .filter(
+                        Claim.policy_id.in_(policy_ids),
+                        Claim.status == ClaimStatus.PAID,
+                        Claim.paid_at >= period_start,
+                    )
+                    .order_by(Claim.paid_at.desc())
+                    .all()
                 )
-                .order_by(Claim.paid_at.desc())
-                .all()
+
+                for claim, policy in paid_claims:
+                    total_paid += claim.amount or 0.0
+                    total_claims += 1
+                    affected_partner_ids.add(policy.partner_id)
+
+                    if last_successful_payout_at is None and claim.paid_at:
+                        last_successful_payout_at = claim.paid_at
+
+                    # Payout time
+                    if claim.paid_at and claim.created_at:
+                        hours = (claim.paid_at - claim.created_at).total_seconds() / 3600
+                        payout_times.append(hours)
+
+                    # Recent payout records (anonymized, max 10)
+                    if len(recent_payouts) < 10 and claim.paid_at:
+                        # Get trigger type from trigger event
+                        t_type = "unknown"
+                        trigger = db.query(TriggerEvent).filter(
+                            TriggerEvent.id == claim.trigger_event_id
+                        ).first()
+                        if trigger:
+                            t_type = trigger.trigger_type.value if hasattr(trigger.trigger_type, "value") else str(trigger.trigger_type)
+
+                        recent_payouts.append(AnonymizedPayout(
+                            anonymized_id=_anonymize_partner_id(policy.partner_id),
+                            amount=round(claim.amount, 2),
+                            trigger_type=t_type,
+                            paid_at=claim.paid_at,
+                        ))
+
+        # Median payout time
+        median_payout_hours = None
+        if payout_times:
+            payout_times.sort()
+            mid = len(payout_times) // 2
+            median_payout_hours = round(payout_times[mid], 1)
+
+        # Miss-rate: trigger windows in period vs those with ≥1 paid claim
+        trigger_windows = (
+            db.query(TriggerEvent)
+            .filter(
+                TriggerEvent.zone_id == zone_id,
+                TriggerEvent.started_at >= period_start,
             )
-
-            for claim, policy in paid_claims:
-                total_paid += claim.amount or 0.0
-                total_claims += 1
-                affected_partner_ids.add(policy.partner_id)
-
-                if last_successful_payout_at is None and claim.paid_at:
-                    last_successful_payout_at = claim.paid_at
-
-                # Payout time
-                if claim.paid_at and claim.created_at:
-                    hours = (claim.paid_at - claim.created_at).total_seconds() / 3600
-                    payout_times.append(hours)
-
-                # Recent payout records (anonymized, max 10)
-                if len(recent_payouts) < 10 and claim.paid_at:
-                    # Get trigger type from trigger event
-                    t_type = "unknown"
-                    trigger = db.query(TriggerEvent).filter(
-                        TriggerEvent.id == claim.trigger_event_id
-                    ).first()
-                    if trigger:
-                        t_type = trigger.trigger_type.value if hasattr(trigger.trigger_type, "value") else str(trigger.trigger_type)
-
-                    recent_payouts.append(AnonymizedPayout(
-                        anonymized_id=_anonymize_partner_id(policy.partner_id),
-                        amount=round(claim.amount, 2),
-                        trigger_type=t_type,
-                        paid_at=claim.paid_at,
-                    ))
-
-    # Median payout time
-    median_payout_hours = None
-    if payout_times:
-        payout_times.sort()
-        mid = len(payout_times) // 2
-        median_payout_hours = round(payout_times[mid], 1)
-
-    # Miss-rate: trigger windows in period vs those with ≥1 paid claim
-    trigger_windows = (
-        db.query(TriggerEvent)
-        .filter(
-            TriggerEvent.zone_id == zone_id,
-            TriggerEvent.started_at >= period_start,
+            .count()
         )
-        .count()
-    )
-    windows_with_payout = min(total_claims, trigger_windows)  # conservative estimate
-    if trigger_windows > 0:
-        miss_rate_pct = round(
-            100.0 * (trigger_windows - windows_with_payout) / trigger_windows, 1
-        )
-    else:
-        miss_rate_pct = 0.0
+        windows_with_payout = min(total_claims, trigger_windows)  # conservative estimate
+        if trigger_windows > 0:
+            miss_rate_pct = round(
+                100.0 * (trigger_windows - windows_with_payout) / trigger_windows, 1
+            )
+        else:
+            miss_rate_pct = 0.0
 
-    return PayoutLedgerResponse(
-        zone_id=zone_id,
-        zone_name=zone.name,
-        period_days=days,
-        total_paid=round(total_paid, 2),
-        total_claims=total_claims,
-        affected_partners_count=len(affected_partner_ids),
-        median_payout_time_hours=median_payout_hours,
-        last_successful_payout_at=last_successful_payout_at,
-        miss_rate_pct=miss_rate_pct,
-        recent_payouts=recent_payouts,
-    )
+        return PayoutLedgerResponse(
+            zone_id=zone_id,
+            zone_name=zone.name,
+            period_days=days,
+            total_paid=round(total_paid, 2),
+            total_claims=total_claims,
+            affected_partners_count=len(affected_partner_ids),
+            median_payout_time_hours=median_payout_hours,
+            last_successful_payout_at=last_successful_payout_at,
+            miss_rate_pct=miss_rate_pct,
+            recent_payouts=recent_payouts,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching payout ledger for zone {zone_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load ledger data. Please try again."
+        )
