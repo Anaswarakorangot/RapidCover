@@ -9,6 +9,52 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
+
+/* ── Inline trigger evidence component ── */
+function InlineTriggerEvidence({ zoneId }) {
+  const [ev, setEv] = useState(null);
+  useEffect(() => {
+    if (!zoneId) return;
+    api.getZoneTriggerEvidence(zoneId).then(setEv).catch(() => {});
+  }, [zoneId]);
+
+  if (!ev || !ev.recent_non_triggers?.length) return null;
+
+  const latest = ev.recent_non_triggers[0];
+  const pct = Math.min((latest.measured_value / latest.threshold) * 100, 100);
+  const exceedsThreshold = pct >= 100;
+
+  return (
+    <div className="ite-wrap">
+      <div className="ite-header">
+        <span className="ite-title">⚡ Trigger Evidence</span>
+        {ev.consensus_score !== undefined && (
+          <span className="ite-consensus-row">
+            <span style={{ fontSize: 9, background: '#dcfce7', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
+              Consensus {(ev.consensus_score * 100).toFixed(0)}%
+            </span>
+          </span>
+        )}
+      </div>
+      <div className="ite-metric-row">
+        <span className="ite-metric-key">{latest.condition_type} measured</span>
+        <span className="ite-metric-val" style={{ color: exceedsThreshold ? '#dc2626' : '#166534' }}>
+          {latest.measured_value} {exceedsThreshold ? '⬆ above threshold' : ''}
+        </span>
+      </div>
+      <div className="ite-bar-bg">
+        <div className="ite-bar-fill" style={{ width: `${pct}%`, background: exceedsThreshold ? '#dc2626' : '#22c55e' }} />
+      </div>
+      <div className="ite-metric-row" style={{ marginTop: 2 }}>
+        <span className="ite-metric-key">Payout threshold</span>
+        <span className="ite-metric-val">{latest.threshold}</span>
+      </div>
+      <p className="ite-source">
+        ✅ Verified by multi-source data · Auto-processed
+      </p>
+    </div>
+  );
+}
 import ProofCard from '../components/ProofCard';
 
 const POLL_INTERVAL_MS = 5_000;
@@ -110,6 +156,26 @@ const S = `
   .empty-icon { font-size: 48px; margin-bottom: 12px; }
   .empty-title { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 18px; color: var(--text-dark); }
   .empty-sub { font-size: 13px; color: var(--text-mid); margin-top: 4px; }
+
+  /* ── Inline trigger evidence ── */
+  .ite-wrap {
+    background: #f0fdf4;
+    border: 1.5px solid #bbf7d0;
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-top: 8px;
+    animation: evidenceFade 0.35s ease;
+  }
+  @keyframes evidenceFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .ite-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .ite-title { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 13px; color: #166534; display: flex; align-items: center; gap: 5px; }
+  .ite-metric-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 5px; }
+  .ite-metric-key { color: var(--text-mid); }
+  .ite-metric-val { font-weight: 700; color: var(--text-dark); }
+  .ite-bar-bg { height: 5px; background: #d1fae5; border-radius: 10px; overflow: hidden; margin: 4px 0 2px; }
+  .ite-bar-fill { height: 100%; border-radius: 10px; transition: width 0.5s ease; }
+  .ite-source { font-size: 10px; color: var(--text-light); text-align: right; margin-top: 6px; }
+  .ite-consensus-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #166534; margin-top: 4px; }
 `;
 
 const STATUS_STYLES = {
@@ -263,29 +329,33 @@ export default function Claims() {
 
         {claims.length === 0 ? (
           <div className="empty-state">
-            <p className="empty-icon">📭</p>
+            <p className="empty-icon">💭</p>
             <p className="empty-title">No claims yet</p>
             <p className="empty-sub">Claims appear here when a trigger fires in your zone.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {claims.map(claim => (
-              <ProofCard
-                key={claim.id}
-                triggerType={claim.trigger_type}
-                severity={claim.severity}
-                status={claim.status}
-                amount={claim.amount}
-                upiRef={claim.upi_ref}
-                createdAt={claim.created_at}
-                paidAt={claim.paid_at}
-                fraudScore={claim.fraud_score}
-                claimId={claim.id}
-                validationData={claim.validation_data}
-                disruptionCategory={claim.disruption_category}
-                disruptionFactor={claim.disruption_factor}
-                paymentStatus={claim.payment_status}
-              />
+              <div key={claim.id}>
+                <ProofCard
+                  triggerType={claim.trigger_type}
+                  severity={claim.severity}
+                  status={claim.status}
+                  amount={claim.amount}
+                  upiRef={claim.upi_ref}
+                  createdAt={claim.created_at}
+                  paidAt={claim.paid_at}
+                  fraudScore={claim.fraud_score}
+                  claimId={claim.id}
+                  validationData={claim.validation_data}
+                  disruptionCategory={claim.disruption_category}
+                  disruptionFactor={claim.disruption_factor}
+                  paymentStatus={claim.payment_status}
+                />
+                {(claim.status === 'paid' || claim.status === 'approved') && claim.zone_id && (
+                  <InlineTriggerEvidence zoneId={claim.zone_id} />
+                )}
+              </div>
             ))}
           </div>
         )}

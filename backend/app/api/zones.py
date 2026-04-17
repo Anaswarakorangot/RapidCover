@@ -336,19 +336,23 @@ def _get_zone_ledger_summary(zone_id: int, db: Session, period_days: int = 30) -
     partner_ids = [
         p[0] for p in db.query(Partner.id).filter(Partner.zone_id == zone_id).all()
     ]
-    policy_ids_q = db.query(Policy.id).filter(
-        Policy.partner_id.in_(partner_ids)
-    ).subquery() if partner_ids else None
+    
+    # Execute immediately to get the list of IDs instead of passing a subquery AST node
+    policy_ids = []
+    if partner_ids:
+        policy_ids = [
+            p[0] for p in db.query(Policy.id).filter(Policy.partner_id.in_(partner_ids)).all()
+        ]
 
     total_paid = 0.0
     last_payout_at = None
     total_claims = 0
 
-    if policy_ids_q is not None:
+    if policy_ids:
         total_paid = (
             db.query(func.sum(Claim.amount))
             .filter(
-                Claim.policy_id.in_(policy_ids_q),
+                Claim.policy_id.in_(policy_ids),
                 Claim.status == ClaimStatus.PAID,
                 Claim.paid_at >= period_start,
             )
@@ -358,7 +362,7 @@ def _get_zone_ledger_summary(zone_id: int, db: Session, period_days: int = 30) -
         last_row = (
             db.query(Claim.paid_at)
             .filter(
-                Claim.policy_id.in_(policy_ids_q),
+                Claim.policy_id.in_(policy_ids),
                 Claim.status == ClaimStatus.PAID,
             )
             .order_by(Claim.paid_at.desc())
@@ -369,7 +373,7 @@ def _get_zone_ledger_summary(zone_id: int, db: Session, period_days: int = 30) -
         total_claims = (
             db.query(func.count(Claim.id))
             .filter(
-                Claim.policy_id.in_(policy_ids_q),
+                Claim.policy_id.in_(policy_ids),
                 Claim.status == ClaimStatus.PAID,
                 Claim.paid_at >= period_start,
             )
@@ -378,11 +382,11 @@ def _get_zone_ledger_summary(zone_id: int, db: Session, period_days: int = 30) -
 
     # Median payout time (created_at → paid_at for paid claims)
     paid_claims = []
-    if partner_ids:
+    if policy_ids:
         paid_claims = (
             db.query(Claim.created_at, Claim.paid_at)
             .filter(
-                Claim.policy_id.in_(policy_ids_q),
+                Claim.policy_id.in_(policy_ids),
                 Claim.status == ClaimStatus.PAID,
                 Claim.paid_at.isnot(None),
                 Claim.paid_at >= period_start,

@@ -346,19 +346,49 @@ export default function ProofCard({
             {/* Consensus Meter */}
             <ConsensusMeter explanation={explanation} />
 
-            {/* Fraud Evidence Detail */}
-            {explanation?.fraud_reasons && explanation.fraud_reasons.length > 0 && (
-              <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 12, padding: 12 }}>
-                <p style={{ fontSize: 11, fontWeight: 700, color: '#92400e', marginBottom: 6, textTransform: 'uppercase' }}>
-                  Fraud Detection Factors
-                </p>
-                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: '#78350f' }}>
-                  {explanation.fraud_reasons.map((reason, idx) => (
-                    <li key={idx} style={{ marginBottom: 4 }}>{reason}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {/* Fraud Decision Breakdown — split hard-stop vs ML triage */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Model type label */}
+              {explanation?.model_type && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#6b7280' }}>
+                  <span style={{ background: '#f3f4f6', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>
+                    🤖 {explanation.model_type === 'isolation_forest' ? 'Anomaly Detection Model (Isolation Forest)'
+                       : explanation.model_type === 'manual' ? 'Rule-Based Fallback Engine'
+                       : explanation.model_type}
+                  </span>
+                </div>
+              )}
+
+              {/* Hard-stop reasons — deterministic rule violations */}
+              {explanation?.hard_reject_reasons && explanation.hard_reject_reasons.length > 0 && (
+                <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 12, padding: 12 }}>
+                  <p style={{ fontSize: 11, fontWeight: 800, color: '#991b1b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                    🚫 Auto-Rejected by Rule Engine
+                  </p>
+                  <p style={{ fontSize: 10, color: '#b91c1c', marginBottom: 6, fontStyle: 'italic' }}>These are deterministic hard stops — ML is not involved</p>
+                  <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: '#7f1d1d' }}>
+                    {explanation.hard_reject_reasons.map((reason, idx) => (
+                      <li key={idx} style={{ marginBottom: 4 }}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* ML triage signals — anomaly detection flags */}
+              {explanation?.fraud_reasons && explanation.fraud_reasons.length > 0 && (
+                <div style={{ background: '#fef3c7', border: '1.5px solid #fcd34d', borderRadius: 12, padding: 12 }}>
+                  <p style={{ fontSize: 11, fontWeight: 800, color: '#92400e', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                    ⚠️ ML Triage Signals
+                  </p>
+                  <p style={{ fontSize: 10, color: '#b45309', marginBottom: 6, fontStyle: 'italic' }}>Anomaly detection flags — reviewed by insurer before final action</p>
+                  <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: '#78350f' }}>
+                    {explanation.fraud_reasons.map((reason, idx) => (
+                      <li key={idx} style={{ marginBottom: 4 }}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
 
             {cityCap && (
               <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 10 }}>
@@ -419,18 +449,19 @@ export default function ProofCard({
           </p>
         )}
 
-        {/* Fraud warning */}
-        {fraudScore != null && fraudScore > 0.5 && !expanded && (
-          <p style={{
-            fontSize: 11,
-            color: '#b45309',
-            background: '#fffbeb',
-            padding: '4px 10px',
-            borderRadius: 8,
-            margin: 0,
-          }}>
-            Manual review status (score: {fraudScore.toFixed(2)})
-          </p>
+        {/* Fraud score pill — always visible when score is notable */}
+        {fraudScore != null && !expanded && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700,
+              background: fraudScore > 0.75 ? '#fee2e2' : fraudScore > 0.5 ? '#fffbeb' : '#f0fdf4',
+              color: fraudScore > 0.75 ? '#991b1b' : fraudScore > 0.5 ? '#b45309' : '#166534',
+              border: `1px solid ${fraudScore > 0.75 ? '#fecaca' : fraudScore > 0.5 ? '#fde68a' : '#bbf7d0'}`,
+              padding: '3px 10px', borderRadius: 20,
+            }}>
+              {fraudScore > 0.75 ? '🚫 High Risk' : fraudScore > 0.5 ? '⚠️ Under Review' : '✅ Low Risk'} · Score {fraudScore.toFixed(2)}
+            </span>
+          </div>
         )}
       </div>
     </div>

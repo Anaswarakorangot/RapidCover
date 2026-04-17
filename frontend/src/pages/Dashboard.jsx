@@ -195,6 +195,61 @@ const S = `
   .breakdown-total-key { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 14px; color: var(--text-dark); }
   .breakdown-total-val { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 16px; color: var(--green-dark); }
 
+  /* ── Quote Drivers Card ── */
+  .qd-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+    border-radius: 20px;
+    border: 1.5px solid #bbf7d0;
+    padding: 16px 18px;
+    animation: fadeIn 0.3s ease;
+  }
+  .qd-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .qd-title {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 14px;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .qd-chips { display: flex; flex-direction: column; gap: 7px; }
+  .qd-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    border-radius: 12px;
+    font-size: 12.5px;
+  }
+  .qd-chip.up   { background: #fff7ed; border: 1px solid #fed7aa; }
+  .qd-chip.down { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .qd-chip.neutral { background: var(--gray-bg); border: 1px solid var(--border); }
+  .qd-chip-label { color: var(--text-mid); display: flex; align-items: center; gap: 5px; }
+  .qd-chip-val.up   { font-weight: 700; color: #c2410c; }
+  .qd-chip-val.down { font-weight: 700; color: #16a34a; }
+  .qd-chip-val.neutral { font-weight: 700; color: var(--text-dark); }
+  .qd-ml-note {
+    margin-top: 12px;
+    font-size: 11.5px;
+    color: #166534;
+    background: #dcfce7;
+    border-radius: 10px;
+    padding: 7px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .qd-tc-link {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--green-dark);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0); } }
+
   /* ── Trigger chips ── */
   .trigger-chip {
     display: flex; align-items: center; justify-content: space-between;
@@ -508,6 +563,71 @@ function StreakProgressBar({ loyalty }) {
             Keep your policy active every week to unlock loyalty discounts.
           </p>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Shows top 3 premium drivers computed by the ML engine */
+export function PremiumDriversCard({ breakdown, policy }) {
+  if (!breakdown || !policy) return null;
+
+  // Derive top drivers from breakdown fields
+  const drivers = [];
+
+  const zoneRisk = Number(breakdown.zone_risk || 0);
+  if (zoneRisk > 2) {
+    drivers.push({ icon: '📍', label: 'Zone risk surcharge', val: `+₹${zoneRisk}`, dir: 'up', reason: 'ML zone risk model scored your area high' });
+  } else if (zoneRisk > 0) {
+    drivers.push({ icon: '📍', label: 'Zone risk (low-risk area)', val: `+₹${zoneRisk}`, dir: 'neutral', reason: 'ML zone risk model scored your area low' });
+  }
+
+  const seasonal = Number(breakdown.seasonal_index || 1);
+  if (seasonal > 1.1) {
+    drivers.push({ icon: '🌧️', label: `Seasonal uplift (${breakdown.city || 'your city'})`, val: `×${seasonal.toFixed(2)}`, dir: 'up', reason: 'Monsoon / high-risk season active' });
+  } else if (seasonal < 0.95) {
+    drivers.push({ icon: '☀️', label: 'Off-peak seasonal credit', val: `×${seasonal.toFixed(2)}`, dir: 'down', reason: 'Low disruption probability this season' });
+  }
+
+  const riqi = Number(breakdown.riqi_adjustment || 1);
+  if (riqi > 1.05) {
+    drivers.push({ icon: '🌡️', label: `RIQI index (${breakdown.riqi_band || 'elevated'})`, val: `×${riqi.toFixed(2)}`, dir: 'up', reason: 'Real-time disruption index is elevated' });
+  }
+
+  const loyalty = Number(breakdown.loyalty_discount || 1);
+  if (loyalty < 0.97) {
+    drivers.push({ icon: '🏆', label: `Loyalty streak (${breakdown.loyalty_weeks || '?'} wks)`, val: `×${loyalty.toFixed(2)}`, dir: 'down', reason: 'Streak discount applied automatically' });
+  }
+
+  const activity = Number(breakdown.activity_factor || 1);
+  if (activity !== 1.0) {
+    drivers.push({ icon: '⚡', label: `Activity factor (${policy.tier})`, val: `×${activity.toFixed(2)}`, dir: activity < 1 ? 'down' : 'up', reason: 'Based on your delivery tier and activity level' });
+  }
+
+  // Take top 3
+  const top = drivers.slice(0, 3);
+  if (top.length === 0) return null;
+
+  return (
+    <div className="qd-card">
+      <div className="qd-header">
+        <span className="qd-title">⚙️ What drove your premium</span>
+        <span style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 600 }}>ML-calculated</span>
+      </div>
+      <div className="qd-chips">
+        {top.map((d, i) => (
+          <div className={`qd-chip ${d.dir}`} key={i}>
+            <span className="qd-chip-label">
+              <span>{d.icon}</span>
+              <span>{d.label}</span>
+            </span>
+            <span className={`qd-chip-val ${d.dir}`}>{d.val}</span>
+          </div>
+        ))}
+      </div>
+      <div className="qd-ml-note">
+        <span>🤖 Computed by the RapidCover ML pricing engine — not a flat rate</span>
+        <Link to="/trust-center" className="qd-tc-link">ML details →</Link>
       </div>
     </div>
   );
@@ -960,6 +1080,9 @@ export function Dashboard() {
 
         {/* ── 6.5 Trigger Evidence (Explainability) ── */}
         <TriggerEvidencePanel evidence={evidence} />
+
+        {/* ── 6.8 Premium Drivers (ML explanation) ── */}
+        <PremiumDriversCard breakdown={premiumBreakdown} policy={policy} />
 
         {/* ── 7. Weekly Premium Breakdown ── */}
         <WeeklyPremiumBreakdown breakdown={premiumBreakdown} policy={policy} />
