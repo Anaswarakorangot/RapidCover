@@ -203,14 +203,14 @@ class TrainedPremiumModel:
             tier = features.tier.lower()
             base = base_prices.get(tier, 33)
             cap = base * 3.0
-            premium = np.clip(premium, base, cap)
+            premium = float(np.clip(premium, base, cap))
 
             return {
                 "weekly_premium": int(round(premium)),
                 "base_price": base,
                 "tier": tier,
                 "cap_value": int(cap),
-                "cap_applied": premium >= cap,
+                "cap_applied": bool(premium >= cap),
                 "model_type": "trained_ml",
                 "breakdown": {
                     "ml_predicted_premium": float(premium),
@@ -233,7 +233,7 @@ class TrainedPremiumModel:
 
 
 class TrainedFraudModel:
-    """XGBoost/GradientBoosting Classifier for fraud detection."""
+    """Isolation Forest for fraud anomaly detection (unsupervised)."""
 
     # Thresholds from original model
     VELOCITY_SPOOF_KMH = 60.0
@@ -244,13 +244,14 @@ class TrainedFraudModel:
         self._load_model()
 
     def _load_model(self):
-        """Load trained model."""
+        """Load trained Isolation Forest model."""
         try:
             model_path = ML_MODELS_DIR / "fraud_model.pkl"
 
             if model_path.exists():
                 self.model = joblib.load(model_path)
-                print(f"[ML] Loaded trained Fraud model from {model_path}")
+                model_type = type(self.model).__name__
+                print(f"[ML] Loaded trained Fraud model ({model_type}) from {model_path}")
             else:
                 print(f"[ML] Trained model not found at {model_path}")
                 print("[ML] Falling back to manual fraud model")
@@ -294,9 +295,18 @@ class TrainedFraudModel:
                 int(features.zone_suspended)
             ]])
 
-            # Predict fraud probability
-            fraud_prob = self.model.predict_proba(X)[0][1]  # Probability of fraud (class 1)
-            fraud_score = round(float(np.clip(fraud_prob, 0, 1)), 4)
+            # Get anomaly score from Isolation Forest
+            # Isolation Forest returns negative scores (more negative = more anomalous)
+            anomaly_score = -self.model.score_samples(X)[0]
+
+            # Convert anomaly score to fraud probability (0-1 scale)
+            # Based on observed training data range: [-0.69, -0.35] (negated: [0.35, 0.69])
+            # Map this to [0, 1] where higher anomaly = higher fraud score
+            MIN_ANOMALY = 0.35  # Most normal samples
+            MAX_ANOMALY = 0.70  # Most anomalous samples
+            fraud_score = (anomaly_score - MIN_ANOMALY) / (MAX_ANOMALY - MIN_ANOMALY)
+            fraud_score = float(np.clip(fraud_score, 0, 1))
+            fraud_score = round(fraud_score, 4)
 
             # Decision thresholds (same as original)
             if hard_reject_reasons:
@@ -312,23 +322,24 @@ class TrainedFraudModel:
                 decision = "auto_reject"
 
             return {
-                "fraud_score": fraud_score,
+                "fraud_score": float(fraud_score),
                 "decision": decision,
-                "model_type": "trained_ml",
+                "model_type": "isolation_forest",
+                "anomaly_score": float(anomaly_score),
                 "factors": {
-                    "gps_in_zone": features.gps_in_zone,
-                    "run_count_during_event": features.run_count_during_event,
-                    "zone_polygon_match": features.zone_polygon_match,
-                    "claims_last_30_days": features.claims_last_30_days,
-                    "device_consistent": features.device_consistent,
-                    "traffic_disrupted": features.traffic_disrupted,
-                    "centroid_drift_km": features.centroid_drift_km
+                    "gps_in_zone": bool(features.gps_in_zone),
+                    "run_count_during_event": int(features.run_count_during_event),
+                    "zone_polygon_match": bool(features.zone_polygon_match),
+                    "claims_last_30_days": int(features.claims_last_30_days),
+                    "device_consistent": bool(features.device_consistent),
+                    "traffic_disrupted": bool(features.traffic_disrupted),
+                    "centroid_drift_km": float(features.centroid_drift_km)
                 },
                 "hard_reject_reasons": hard_reject_reasons
             }
 
         except Exception as e:
-            print(f"[ML] Error scoring fraud: {e}")
+            print(f"[ML] Error scoring fraud: {e} — using manual fallback")
             return self._manual_score(features)
 
     def _manual_score(self, features: ClaimFeatures) -> dict:
