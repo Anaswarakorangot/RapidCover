@@ -107,12 +107,13 @@ RAPIDCOVER PARAMETRIC:
 - **Dynamic Premium Engine** — XGBoost Regressor, 8 features, R² = 0.66
 - **Fraud Detector** — RandomForest Classifier, 9 features, F1 = 0.96, ROC-AUC = 0.995
 
-### Fraud Prevention (Isolation Forest + 7-Factor Model)
+### Fraud Prevention (Isolation Forest + Collusion Detection)
 - **Isolation Forest** for anomaly detection across multivariate GPS, activity, and device patterns
+- **Collusion Detection** — Device fingerprinting, IP clustering, timing correlation analysis
 - GPS coherence & velocity physics check (>60 km/h = spoof)
 - Activity paradox detection (runs during disruption = hard reject)
 - 30-day GPS centroid drift tracking (>15 km = auto-flag)
-- Device fingerprinting & IP clustering for collusion rings
+- Device fingerprinting & IP clustering for fraud rings
 - Cryptographic duplicate event rejection
 
 ### Partner Experience (PWA)
@@ -132,14 +133,17 @@ RAPIDCOVER PARAMETRIC:
 - Live API data feeds, RIQI provenance, notification preview, payment reconciliation
 - Demo mode scenario simulation & instant replay
 
-### Infrastructure
+### Infrastructure & Compliance
 - **Background scheduler** (APScheduler) polling trigger engine every 45 seconds
-- **Payment state machine** with reconciliation job for failed/stuck payouts
+- **Payment state machine** with auto-reconciliation for failed/stuck payouts
+- **Zone reassignment state machine** — 24-hour countdown for partner zone transfers
+- **Policy lifecycle management** — Auto-renewal, adverse selection gates, SS Code 2020 compliance
+- **Social Security Code (SS Code) compliance** — 90/120-day engagement gates per platform mix
 - **Rate limiting** (SlowAPI) and global exception handling
 - **Sentry integration** for error tracking (optional)
 - **Redis caching** (FastAPICache) with InMemory fallback
 - **Structured JSON logging** with configurable levels
-- **WebSocket support** for real-time admin updates
+- **WebSocket real-time streaming** for admin claim/trigger updates
 - **Alembic migrations** for database schema management
 
 ---
@@ -262,13 +266,12 @@ Three production ML models are trained on synthetic but domain-realistic data, w
 
 | Attribute | Value |
 |-----------|-------|
-| Algorithm | RandomForest Classifier |
+| Algorithm | Isolation Forest + 7-Factor Weighted Scoring |
 | Features | 9 (GPS in zone, run count, zone polygon match, claim frequency, device consistency, traffic disrupted, centroid drift, GPS velocity, zone suspended) |
-| Training Split | 1500 train / 500 val / 500 test |
-| Test Accuracy | 97.4% |
-| Test F1 | 0.9595 |
-| ROC-AUC | 0.9951 |
-| Architecture | Deterministic hard-stops always override ML. Model assists triage in grey areas. |
+| Weight Distribution | GPS 0.25 + Run Count 0.25 + Zone Polygon 0.15 + Claim Frequency 0.15 + Device FP 0.10 + Traffic 0.05 + Centroid Drift 0.05 |
+| Hard Rejects | GPS velocity >60 km/h, zone not suspended, activity paradox, centroid drift >15 km |
+| Thresholds | <0.50 auto-approve | 0.50-0.75 enhanced | 0.75-0.90 manual | >0.90 auto-reject |
+| Architecture | Isolation Forest detects multivariate anomalies. Deterministic hard-stops override scoring. 7-factor model assists triage in grey areas. |
 
 ### Training Pipeline
 
@@ -451,9 +454,15 @@ The admin panel is a full-screen dark-themed dashboard with **15+ tabs** for ins
 | 🔔 Notifications | `NotificationPreviewPanel.jsx` | Multilingual notification preview + test |
 | 🔮 Social Oracle | `SocialOraclePanel.jsx` | NLP verification engine (paste text → real API cross-check) |
 | 💰 Payments | `PaymentReconciliationPanel.jsx` | Payment reconciliation + premium collection |
-| 🧠 Intelligence | `InsurerIntelligencePanel.jsx` | Insurer intelligence & analytics |
+| 🧠 Intelligence | `InsurerIntelligencePanel.jsx` | Disruption predictions, risk profiles, trends |
+| 📊 Aggregation | `AggregationPanel.jsx` | Multi-trigger event resolution & overlap handling |
 | 🎬 Demo Mode | `DemoModeScenarioPanel.jsx` | Scenario-based simulation with instant replay |
-| ⚙️ Settings | `SettingsPanel.jsx` | System configuration |
+| ⏱️ Instant Replay | `InstantReplayPanel.jsx` | Replay historical scenarios (monsoon, AQI crisis, fraud) |
+| 📈 Impact Analysis | `ImpactPanel.jsx` | Drill impact metrics (claims, payouts, engagement) |
+| 🔧 System Settings | `SettingsPanel.jsx` | Runtime configuration & feature toggles |
+| 🛂 Zone Reassignments | `ReassignmentQueuePanel.jsx` | 24-hour countdown zone transfer state machine |
+| 📉 Partial Disruption | `PartialDisruptionPanel.jsx` | Simulate disruptions affecting zone subsets |
+| 💳 Premium Collection | `PremiumCollectionPanel.jsx` | Premium revenue & collection analytics |
 
 ---
 
@@ -504,9 +513,14 @@ All endpoints are versioned under `/api/v1`. The backend exposes **18 route modu
 | **Admin Monitoring** | `/admin/monitoring` | ML model performance metrics |
 | **Notifications** | `/notifications` | Push subscription management, test notifications |
 | **Social Oracle** | `/oracle` | Text verification pipeline |
-| **AI Chat** | `/ai` | Groq-powered conversational assistant |
-| **Intelligence** | `/intelligence` | Insurer analytics and predictions |
-| **WebSocket** | `/ws` | Real-time admin event streaming |
+| **AI Chat** | `/ai` | Groq-powered conversational assistant (RapidBot) |
+| **Intelligence** | `/intelligence` | Disruption predictions, risk profiles, analytics |
+| **Experience** | `/partners/experience` | Partner dashboard state, premium breakdown, eligibility |
+| **WebSocket** | `/ws/claims/{partner_id}` | Real-time claim/trigger updates for admin |
+| **Zone Activity** | `/zones/partners/{id}/activity` | Partner platform activity (shifts, runs, location) |
+| **Drill Impact** | `/drills/{id}/impact` | Drill outcome metrics (payouts, engagement) |
+| **Reconciliation** | `/payments/reconciliation` | Payment state monitoring & retry logic |
+| **Collusion Check** | `/admin/fraud-queue/collusion-check` | Device fingerprint & IP clustering analysis |
 
 ### Health & Monitoring
 
@@ -754,10 +768,10 @@ RapidCover is a **parametric income protection product** with strictly defined s
 
 RapidCover was built by the team at Guidewire DEVTrails 2026:
 
-- **Anaswara K**
-- **Venkata Kanna Bhava**
-- **Yuva Hasini Duddekunta**
-- **Amritha**
+- **[Anaswara K](https://github.com/Anaswarakorangot)**
+- **[Venakta Kanna BhAvan Surya Adapa](https://github.com/avkbsurya119)**
+- **[Yuva Hasini Duddekunta](https://github.com/Yuvahasini)**
+- **[Amritha](https://github.com/amrithasnidhi)**
 
 ---
 
