@@ -7,7 +7,7 @@ export default function DemoModeBanner() {
 
   const checkDemoMode = async () => {
     try {
-      const res = await fetch(`${API}/admin/panel/demo-mode/status`);
+      const res = await authenticatedFetch(`${API}/admin/panel/demo-mode/status`);
       if (res.ok) {
         const data = await res.json();
         setDemoMode(data.enabled || data.demo_mode); // Support both new and old format
