@@ -238,6 +238,23 @@ class PremiumModel:
         base = self.BASE_PRICES.get(tier, self.BASE_PRICES["standard"])
         city = features.city.lower()
 
+        if tier not in self.ACTIVITY_TIER_FACTOR:
+            import warnings
+            warnings.warn(
+                f"[ML] Unknown tier '{features.tier}' in manual premium model "
+                f"— defaulting to 'standard' factors",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        if tier not in self.BASE_PRICES:
+            import warnings
+            warnings.warn(
+                f"[ML] Unknown tier '{features.tier}' has no base price "
+                f"— defaulting to Rs.33 (standard)",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
         # Base component: trigger_probability x avg_income_lost x days_exposed
         trigger_probability     = 0.09    # ~1 claim per 11 weeks baseline
         avg_income_lost_per_day = 500.0   # Rs.500 midpoint (range Rs.420-Rs.720 from doc)
@@ -247,7 +264,7 @@ class PremiumModel:
         city_peril            = self.CITY_PERIL.get(city, 1.0)
         zone_risk_multiplier  = 0.8 + (features.zone_risk_score / 100.0) * 0.6  # 0.8-1.4
         seasonal_index        = self._seasonal(city, features.month)
-        activity_tier_factor  = self.ACTIVITY_TIER_FACTOR[tier]
+        activity_tier_factor  = self.ACTIVITY_TIER_FACTOR.get(tier, self.ACTIVITY_TIER_FACTOR["standard"])
         riqi_band             = self._riqi_band(features.riqi_score)
         riqi_adjustment       = self.RIQI_ADJUSTMENT[riqi_band]
         loyalty_discount      = self._loyalty(features.loyalty_weeks)
