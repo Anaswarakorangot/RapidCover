@@ -59,6 +59,8 @@ export default function PayoutLedger({ zoneId }) {
         .then(setData)
         .catch(err => console.error("Failed to fetch ledger:", err))
         .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
   }, [zoneId]);
 
@@ -77,11 +79,11 @@ export default function PayoutLedger({ zoneId }) {
         <div className="ledger-stats">
           <div>
             <p className="l-stat-lbl">Median Speed</p>
-            <p className="l-stat-val">{data.median_payout_time_mins} mins</p>
+            <p className="l-stat-val">{data.median_payout_time_mins || 0} mins</p>
           </div>
           <div>
             <p className="l-stat-lbl">Paid this Week</p>
-            <p className="l-stat-val">₹{data.total_paid_this_week.toLocaleString()}</p>
+            <p className="l-stat-val">₹{(data.total_paid_this_week || 0).toLocaleString()}</p>
           </div>
         </div>
 
