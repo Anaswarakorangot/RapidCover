@@ -13,7 +13,7 @@ const termsStyles = `
     -webkit-backdrop-filter: blur(4px);
     z-index: 1000;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
     animation: tm-fade-in 0.2s ease;
   }
@@ -28,17 +28,17 @@ const termsStyles = `
     max-width: 480px;
     max-height: 92vh;
     background: #ffffff;
-    border-radius: 28px 28px 0 0;
+    border-radius: 24px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: tm-slide-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 -12px 60px rgba(0,0,0,0.18);
+    animation: tm-scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 12px 60px rgba(0,0,0,0.25);
   }
 
-  @keyframes tm-slide-up {
-    from { transform: translateY(100%); opacity: 0.6; }
-    to   { transform: translateY(0);   opacity: 1; }
+  @keyframes tm-scale-in {
+    from { transform: scale(0.92); opacity: 0.6; }
+    to   { transform: scale(1);   opacity: 1; }
   }
 
   .tm-header {
@@ -526,6 +526,13 @@ export function TermsModal({ onAccept, onDecline }) {
   const [scrollProgress, setScrollProgress] = React.useState(0);
   const [hasScrolledToBottom, setHasScrolledToBottom] = React.useState(false);
   const bodyRef = React.useRef(null);
+
+  React.useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   function handleScroll() {
     const el = bodyRef.current;
