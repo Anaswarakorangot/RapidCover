@@ -30,7 +30,6 @@ def upgrade() -> None:
             WHEN duplicate_object THEN null;
         END $$;
     """))
-    conn.commit()
 
     op.create_table('sustained_events',
     sa.Column('id', sa.Integer(), nullable=False),
