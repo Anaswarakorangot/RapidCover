@@ -93,3 +93,9 @@ class DrillHistoryItem(BaseModel):
 class DrillHistoryResponse(BaseModel):
     drills: list[DrillHistoryItem]
     total: int
+
+
+class InstantReplayRequest(BaseModel):
+    scenario_name: str
+    target_zone_code: Optional[str] = None
+

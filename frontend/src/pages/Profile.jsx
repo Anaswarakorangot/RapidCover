@@ -854,7 +854,7 @@ export function Profile() {
                   <>
                     <div className="legal-section">
                       <h3 className="legal-h3">1. Coverage Scope</h3>
-                      <p>RapidCover provides parametric insurance for gig delivery partners. Payouts are triggered automatically based on hyper-local weather and civic data.</p>
+                      <p>RapidCover provides parametric insurance for Q-Commerce delivery partners. Payouts are triggered automatically based on hyper-local weather and civic data.</p>
                     </div>
                     <div className="legal-section">
                       <h3 className="legal-h3">2. Payout Eligibility</h3>

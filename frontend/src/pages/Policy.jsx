@@ -175,7 +175,7 @@ const S = `
   }
   .excl-header { padding: 20px 20px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .excl-title  { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 20px; color: var(--text-dark); }
-  .excl-sub    { font-size: 13px; color: var(--text-mid); margin-top: 3px; }
+  .excl-sub    { font-size: 13px; color: var(--text-mid); margin-top: 3px; font-weight: 500; }
   .excl-list   { overflow-y: auto; flex: 1; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
   .excl-item   { display: flex; gap: 12px; padding: 12px 14px; background: var(--gray-bg); border: 1px solid var(--border); border-radius: 14px; }
   .excl-item-title { font-size: 13px; font-weight: 700; color: var(--text-dark); }
@@ -254,7 +254,7 @@ const EXCLUSIONS = [
   { icon: '🦠', title: 'Pandemic / epidemic declaration', desc: 'Disruptions due to a government-declared pandemic or epidemic.' },
   { icon: '☢️', title: 'Nuclear and radioactive events', desc: 'Any loss caused by nuclear, radioactive, or radiation hazard.' },
   { icon: '🏛️', title: 'Government policy or regulatory changes', desc: 'Policy changes, bans, or regulatory decisions by any authority.' },
-  { icon: '⚙️', title: 'Platform operational decisions', desc: 'Planned maintenance, algorithm changes, or app updates by Zepto.' },
+  { icon: '⚙️', title: 'Platform operational decisions', desc: 'Planned maintenance, algorithm changes, or app updates by delivery platform partners.' },
   { icon: '🙋', title: 'Self-inflicted / voluntary offline', desc: 'Choosing to go offline or voluntarily skipping shifts.' },
   { icon: '🏥', title: 'Health, accident, life', desc: 'Personal health events, accidents, or life insurance claims.' },
   { icon: '🔧', title: 'Vehicle damage and repair', desc: 'Downtime due to vehicle breakdown, servicing, or repair.' },
@@ -605,8 +605,8 @@ export default function Policy() {
 
         {/* Header */}
         <div style={{ marginBottom: 16 }}>
-          <h1 className="pol-page-title">Insurance Plans</h1>
-          <p className="pol-page-sub">Choose coverage that fits your activity level</p>
+          <h1 className="pol-page-title">Warrior Protection</h1>
+          <p className="pol-page-sub">The RapidCover Parametric Engine — Dark Store Last-Mile Edition</p>
         </div>
 
         {error && (

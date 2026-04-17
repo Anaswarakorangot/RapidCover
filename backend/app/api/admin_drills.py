@@ -32,6 +32,7 @@ from app.schemas.drill import (
     DrillHistoryResponse,
     VerificationResponse,
     VerificationCheck,
+    InstantReplayRequest,
 )
 from app.services.drill_service import (
     create_drill_session,
@@ -43,6 +44,8 @@ from app.services.drill_service import (
 )
 from app.services.trigger_detector import inject_sustained_event_history
 from app.models.trigger_event import TriggerType
+from app.services.replay_service import get_replay_scenarios_list, trigger_replay_scenario
+
 
 router = APIRouter(prefix="/admin/panel", tags=["admin-drills"])
 
@@ -155,6 +158,38 @@ def get_drill_presets():
             "conditions": config["conditions"],
         })
     return {"presets": presets}
+
+
+# --- GET /admin/panel/drills/instant-replay/scenarios --------------------------
+
+@router.get("/drills/instant-replay/scenarios")
+def get_replay_scenarios():
+    """Get list of available historical replay scenarios."""
+    return {"scenarios": get_replay_scenarios_list()}
+
+
+# --- POST /admin/panel/drills/instant-replay -----------------------------------
+
+@router.post("/drills/instant-replay")
+def run_instant_replay(
+    req: InstantReplayRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Execute a scripted historical replay. 
+    This is different from a 'drill' as it bypasses detector stages 
+    to show end-to-end impact immediately.
+    """
+    try:
+        result = trigger_replay_scenario(
+            scenario_name=req.scenario_name,
+            db=db,
+            target_zone_code=req.target_zone_code
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 
 # --- GET /admin/panel/drills/{drill_id} --------------------------------------

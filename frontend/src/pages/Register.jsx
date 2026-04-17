@@ -63,9 +63,10 @@ const styles = `
   .reg-logo-sub {
     font-size: 11px;
     color: var(--text-light);
-    font-weight: 500;
-    letter-spacing: 0.4px;
+    font-weight: 700;
+    letter-spacing: 1px;
     margin-top: 3px;
+    text-transform: uppercase;
   }
 
   .reg-card {

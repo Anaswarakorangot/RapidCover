@@ -7,7 +7,7 @@
 ---
 
 # 🛵 RapidCover
-### *Parametric Income Intelligence for India's Q-Commerce Last-Mile Warriors*
+### *The Parametric Engine for India's Dark Store Last-Mile Warriors*
 
 [🚀 Live Demo (Render/Railway)](https://rapidcover.onrender.com) &nbsp; | &nbsp; [📽️ Pitch Video](https://youtube.com/rapidcover) &nbsp; | &nbsp; [📘 Phase 2 Features](./PHASE2_README.md)
 
@@ -98,7 +98,8 @@ No bank product covers this. No platform compensates for it. **RapidCover does �
 
 ## 🛡️ What RapidCover Is
 
-RapidCover is a **weekly parametric income insurance platform** built exclusively for Zepto and Blinkit delivery partners.
+RapidCover is a **weekly parametric income insurance platform** built exclusively for Zepto and Blinkit delivery partners (the Dark Store warriors).
+
 
 **Strictly covers income loss only.** No health. No vehicle. No accidents. No life insurance.
 
