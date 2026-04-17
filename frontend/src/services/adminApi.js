@@ -200,16 +200,6 @@ export async function checkTriggerEligibility(partnerId, zoneId, triggerType = '
   });
 }
 
-// ── Zone Reassignment (admin-side) ────────────────────────────────────────────
-
-export async function proposeReassignment(partnerId, newZoneId) {
-  const res = await fetch(`/api/v1/admin/reassignments`, {
-    method: 'POST',
-    headers: jsonHeaders(),
-    body: JSON.stringify({ partner_id: partnerId, new_zone_id: newZoneId }),
-  });
-  return handleResponse(res);
-}
 
 // ── Multi-Trigger Aggregation ─────────────────────────────────────────────────
 
@@ -288,7 +278,6 @@ const adminApi = {
   previewNotification,
   listNotificationTemplates,
   checkTriggerEligibility,
-  proposeReassignment,
   // Multi-trigger aggregation
   getAggregationStats,
   getClaimAggregation,
