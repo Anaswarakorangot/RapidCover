@@ -27,31 +27,19 @@
 
 ## 📌 Table of Contents
 
-| # | Section |
-|---|---------|
-| 1 | [Problem Statement](#-the-problem) |
-| 2 | [What RapidCover Is](#-what-rapidcover-is) |
-| 3 | [Key Features](#-key-features) |
-| 4 | [System Architecture](#-system-architecture) |
-| 5 | [Tech Stack](#-tech-stack) |
-| 6 | [ML Models & Training](#-ml-models--training-pipeline) |
-| 7 | [Parametric Triggers](#-parametric-triggers) |
-| 8 | [Fraud Detection (Isolation Forest)](#-fraud-detection-architecture) |
-| 9 | [Zero-Touch Claim Flow](#-zero-touch-claim-flow) |
-| 10 | [Weekly Premium Model](#-weekly-premium-model) |
-| 11 | [Admin Dashboard (15+ Tabs)](#-admin-dashboard) |
-| 12 | [Partner Experience](#-partner-experience) |
-| 13 | [API Reference](#-api-reference) |
-| 14 | [Installation & Setup](#-installation--setup) |
-| 15 | [Environment Variables](#-environment-variables) |
-| 16 | [Running the Demo](#-running-the-demo) |
-| 17 | [Testing](#-testing) |
-| 18 | [Actuarial Model](#-actuarial-model) |
-| 19 | [Exclusions](#-exclusions) |
-| 20 | [Business Viability](#-business-viability) |
-| 21 | [Team](#-team) |
-| 22 | [Contributing](#-contributing) |
-| 23 | [License](#-license) |
+| # | Section | # | Section |
+|---|---------|---|---------|
+| 1 | [Problem Statement](#-the-problem) | 2 | [What RapidCover Is](#-what-rapidcover-is) |
+| 3 | [Key Features](#-key-features) | 4 | [System Architecture](#-system-architecture) |
+| 5 | [Tech Stack](#-tech-stack) | 6 | [ML Models & Training](#-ml-models--training-pipeline) |
+| 7 | [Parametric Triggers](#-parametric-triggers) | 8 | [Fraud Detection](#-fraud-detection-architecture) |
+| 9 | [Zero-Touch Claim Flow](#-zero-touch-claim-flow) | 10 | [Weekly Premium Model](#-weekly-premium-model) |
+| 11 | [Admin Dashboard](#-admin-dashboard) | 12 | [Partner Experience](#-partner-experience) |
+| 13 | [API Reference](#-api-reference) | 14 | [Installation & Setup](#-installation--setup) |
+| 15 | [Environment Variables](#-environment-variables) | 16 | [Running the Demo](#-running-the-demo) |
+| 17 | [Testing](#-testing) | 18 | [Actuarial Model](#-actuarial-model) |
+| 19 | [Exclusions](#-exclusions) | 20 | [Business Viability](#-business-viability) |
+| 21 | [Team](#-team) | 22 | [Contributing](#-contributing) |
 
 ---
 
@@ -102,10 +90,10 @@ RAPIDCOVER PARAMETRIC:
 - **Sustained event protocol** — 14-day monsoon mode with 70% payout to preserve reserves
 
 ### ML-Powered Intelligence
-- **3 trained XGBoost/RandomForest models** with serialized `.pkl` artifacts and full model metadata
+- **3 trained models** with serialized `.pkl` artifacts and full model metadata
 - **Zone Risk Scorer** — XGBoost Regressor, 10 features, R² = 0.57
 - **Dynamic Premium Engine** — XGBoost Regressor, 8 features, R² = 0.66
-- **Fraud Detector** — RandomForest Classifier, 9 features, F1 = 0.96, ROC-AUC = 0.995
+- **Fraud Detector** — Isolation Forest + 7-Factor Weighted Scoring, F1 = 0.96, ROC-AUC = 0.995
 
 ### Fraud Prevention (Isolation Forest + Collusion Detection)
 - **Isolation Forest** for anomaly detection across multivariate GPS, activity, and device patterns
@@ -235,7 +223,7 @@ RAPIDCOVER PARAMETRIC:
 
 ## 🧠 ML Models & Training Pipeline
 
-Three production ML models are trained on synthetic but domain-realistic data, with full provenance tracking:
+Three production ML models are trained on synthetic but domain-realistic data, with full provenance tracking.
 
 ### Model 1 — Zone Risk Scorer
 
@@ -248,6 +236,12 @@ Three production ML models are trained on synthetic but domain-realistic data, w
 | Test MAE | 6.43 |
 | Cross-Val R² | 0.5703 ± 0.066 |
 | Top Feature | `road_flood_prone` (21.9% importance) |
+
+<div align="center">
+<img src="./assets/model1_xgboost_zone_risk_scorer.svg" width="100%" alt="Model 1 — XGBoost Zone Risk Scorer: feature provenance to risk score"/>
+</div>
+
+---
 
 ### Model 2 — Dynamic Premium Engine
 
@@ -262,16 +256,30 @@ Three production ML models are trained on synthetic but domain-realistic data, w
 | Cross-Val R² | 0.6881 ± 0.033 |
 | Note | Deterministic price floor, IRDAI cap, and loyalty adjustments applied post-prediction |
 
+<div align="center">
+<img src="./assets/mode12 randomforest_disruption_classifier.svg" width="100%" alt="Model 2 — XGBoost Dynamic Premium Engine: features to weekly premium"/>
+</div>
+
+---
+
 ### Model 3 — Fraud Detector
 
 | Attribute | Value |
 |-----------|-------|
-| Algorithm | Isolation Forest + 7-Factor Weighted Scoring |
+| Algorithm | **Isolation Forest** + 7-Factor Weighted Scoring |
 | Features | 9 (GPS in zone, run count, zone polygon match, claim frequency, device consistency, traffic disrupted, centroid drift, GPS velocity, zone suspended) |
 | Weight Distribution | GPS 0.25 + Run Count 0.25 + Zone Polygon 0.15 + Claim Frequency 0.15 + Device FP 0.10 + Traffic 0.05 + Centroid Drift 0.05 |
 | Hard Rejects | GPS velocity >60 km/h, zone not suspended, activity paradox, centroid drift >15 km |
-| Thresholds | <0.50 auto-approve | 0.50-0.75 enhanced | 0.75-0.90 manual | >0.90 auto-reject |
+| Thresholds | <0.50 auto-approve \| 0.50–0.75 enhanced \| 0.75–0.90 manual \| >0.90 auto-reject |
 | Architecture | Isolation Forest detects multivariate anomalies. Deterministic hard-stops override scoring. 7-factor model assists triage in grey areas. |
+
+> ⚠️ **Note:** Model 3 uses **Isolation Forest** (unsupervised anomaly detection), not Random Forest. The two are distinct algorithms — Isolation Forest isolates anomalies by random feature splitting, making it ideal for fraud detection where labelled fraud samples are scarce.
+
+<div align="center">
+<img src="./assets/model3_isolation_forest_fraud_detector.svg" width="100%" alt="Model 3 — Isolation Forest Fraud Anomaly Detector: behavioral signals to fraud verdict"/>
+</div>
+
+---
 
 ### Training Pipeline
 
@@ -285,7 +293,7 @@ backend/ml_training/
 backend/ml_models/
 ├── zone_risk_model.pkl         # Serialized zone risk model
 ├── premium_model.pkl           # Serialized premium model
-├── fraud_model.pkl             # Serialized fraud model
+├── fraud_model.pkl             # Serialized fraud model (Isolation Forest)
 ├── *_encoder.pkl               # Label encoders (city, tier)
 └── model_metadata.json         # Full provenance, metrics, feature importances
 ```
@@ -358,6 +366,10 @@ anomaly_flag = IsolationForest(GPS_patterns, device_patterns, activity_patterns)
 ---
 
 ## 🔄 Zero-Touch Claim Flow
+
+<div align="center">
+<img src="./assets/zero_touch_claim.png" width="100%" alt="Zero-Touch Claim Flow — Parametric Trigger Pipeline showing 11 steps from disruption detection to UPI payout in ~49 seconds"/>
+</div>
 
 The end-to-end flow from disruption to payout with zero partner intervention:
 
@@ -436,6 +448,10 @@ PERSONALIZED WEEKLY PREMIUM =
 
 ## 📊 Admin Dashboard
 
+<div align="center">
+<img src="./assets/admin_oversight.png" width="100%" alt="Admin Dashboard — 15+ tabs showing data harvesting, core analytics engine with 3 ML models, and risk protocols including the Bornhuetter-Ferguson actuarial engine"/>
+</div>
+
 The admin panel is a full-screen dark-themed dashboard with **15+ tabs** for insurer operations:
 
 | Tab | Component | Purpose |
@@ -460,7 +476,6 @@ The admin panel is a full-screen dark-themed dashboard with **15+ tabs** for ins
 | ⏱️ Instant Replay | `InstantReplayPanel.jsx` | Replay historical scenarios (monsoon, AQI crisis, fraud) |
 | 📈 Impact Analysis | `ImpactPanel.jsx` | Drill impact metrics (claims, payouts, engagement) |
 | 🔧 System Settings | `SettingsPanel.jsx` | Runtime configuration & feature toggles |
-| 🛂 Zone Reassignments | `ReassignmentQueuePanel.jsx` | 24-hour countdown zone transfer state machine |
 | 📉 Partial Disruption | `PartialDisruptionPanel.jsx` | Simulate disruptions affecting zone subsets |
 | 💳 Premium Collection | `PremiumCollectionPanel.jsx` | Premium revenue & collection analytics |
 
@@ -769,7 +784,7 @@ RapidCover is a **parametric income protection product** with strictly defined s
 RapidCover was built by the team at Guidewire DEVTrails 2026:
 
 - **[Anaswara K](https://github.com/Anaswarakorangot)**
-- **[Venakta Kanna BhAvan Surya Adapa](https://github.com/avkbsurya119)**
+- **[Venakta Kanna Bhavan Surya Adapa](https://github.com/avkbsurya119)**
 - **[Yuva Hasini Duddekunta](https://github.com/Yuvahasini)**
 - **[Amritha](https://github.com/amrithasnidhi)**
 
