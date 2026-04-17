@@ -5,13 +5,6 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 export default function DemoModeBanner() {
   const [demoMode, setDemoMode] = useState(false);
 
-  useEffect(() => {
-    checkDemoMode();
-    // Check every 10 seconds
-    const interval = setInterval(checkDemoMode, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
   const checkDemoMode = async () => {
     try {
       const res = await fetch(`${API}/admin/panel/demo-mode/status`);
@@ -23,6 +16,13 @@ export default function DemoModeBanner() {
       // Silently fail
     }
   };
+
+  useEffect(() => {
+    checkDemoMode(); // eslint-disable-line react-hooks/set-state-in-effect
+    // Check every 10 seconds
+    const interval = setInterval(checkDemoMode, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (!demoMode) return null;
 

@@ -46,7 +46,7 @@ export function SettingsPanel() {
       } else {
         throw new Error("Save failed");
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: 'error', text: 'Failed to update system configuration' });
     } finally {
       setSaving(false);

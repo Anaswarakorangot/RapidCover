@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 export default function AdminStats({ stats }) {
-  const [zones, setZones] = useState([]);
+// Unused zones state removed
   const [selectedZone, setSelectedZone] = useState(0); // index into zoneLossRatios
   const [selectedLiveZone, setSelectedLiveZone] = useState('');
 
@@ -25,7 +25,7 @@ export default function AdminStats({ stats }) {
         const res = await fetch(`${API_BASE}/zones`);
         if (res.ok) {
           const list = await res.json();
-          setZones(list);
+
           if (list.length > 0) {
             setSelectedLiveZone(list[0].code);
             fetchLiveData(list[0].code);
