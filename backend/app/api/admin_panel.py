@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from fastapi_cache.decorator import cache
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -145,6 +146,7 @@ class UpdateSettingsRequest(BaseModel):
 # --- GET /admin/panel/stats --------------------------------------------------
 
 @router.get("/stats", response_model=PanelStats)
+@cache(expire=60)
 def get_panel_stats(db: Session = Depends(get_db)):
     """Return the seven key financial health numbers for the admin panel."""
 
@@ -258,6 +260,7 @@ def get_panel_stats(db: Session = Depends(get_db)):
 # --- GET /admin/panel/zones --------------------------------------------------
 
 @router.get("/zones", response_model=list[ZoneDetail])
+@cache(expire=60)
 def get_zones(db: Session = Depends(get_db)):
     """Return live status of all zones for the map and overview."""
     zones = db.query(Zone).all()
@@ -316,6 +319,7 @@ def get_zones(db: Session = Depends(get_db)):
 # --- GET /admin/panel/bcr ----------------------------------------------------
 
 @router.get("/bcr")
+@cache(expire=60)
 def get_bcr(db: Session = Depends(get_db)):
     """Return BCR (Burning Cost Rate) stats grouped by city."""
     cities = db.query(Zone.city, Zone.code).group_by(Zone.city).all()

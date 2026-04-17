@@ -10,6 +10,10 @@ alembic>=1.13.1
 # Redis
 redis>=5.0.1
 
+# API Response Caching
+fastapi-cache2[redis]>=0.2.1
+jinja2>=3.1.0  # required by fastapi-cache2 via starlette.templating
+
 # Configuration
 pydantic-settings>=2.1.0
 

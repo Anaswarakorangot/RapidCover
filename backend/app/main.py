@@ -1,6 +1,8 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -73,6 +75,24 @@ async def lifespan(app: FastAPI):
     # Start background trigger polling (every 45s)
     start_scheduler()
     logger.info("Background trigger scheduler started")
+
+    # Initialize API response cache (Redis preferred, InMemory fallback)
+    from fastapi_cache import FastAPICache
+    from fastapi_cache.backends.inmemory import InMemoryBackend
+    try:
+        import redis.asyncio as aioredis
+        from fastapi_cache.backends.redis import RedisBackend
+        redis_url = getenv("REDIS_URL", "redis://localhost:6379")
+        redis_client = aioredis.from_url(redis_url, encoding="utf8", decode_responses=True)
+        await redis_client.ping()
+        FastAPICache.init(RedisBackend(redis_client), prefix="rapidcover-cache")
+        logger.info("FastAPICache initialized with Redis backend")
+    except Exception as cache_err:
+        logger.warning(
+            f"Redis unavailable ({cache_err}) — using InMemoryBackend for caching"
+        )
+        FastAPICache.init(InMemoryBackend(), prefix="rapidcover-cache")
+
     yield
     # Shutdown
     stop_scheduler()
@@ -89,6 +109,32 @@ app = FastAPI(
 # Rate limiting (Phase 4)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+_error_logger = logging.getLogger("rapidcover.errors")
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Global fallback exception handler.
+
+    Logs the full traceback internally for debugging while returning a clean,
+    standardised JSON error body to the client — preventing verbose stack
+    traces or internal details from leaking into API responses.
+    """
+    _error_logger.error(
+        "Unhandled exception on %s %s",
+        request.method,
+        request.url.path,
+        exc_info=exc,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_server_error",
+            "message": "An unexpected error occurred. Our team has been notified.",
+        },
+    )
 
 # CORS configuration
 app.add_middleware(
