@@ -10,7 +10,6 @@
 [![Insurance](https://img.shields.io/badge/Insurance-Parametric%20Income%20Protection-00B894?style=for-the-badge)](/)
 [![ML Models](https://img.shields.io/badge/ML-3%20Trained%20Models-3498DB?style=for-the-badge)](/)
 [![Tests](https://img.shields.io/badge/Tests-24%20Suites-27AE60?style=for-the-badge)](/)
-[![Phase](https://img.shields.io/badge/Phase-2%20Complete-00B894?style=for-the-badge)](/)
 
 <br/>
 
@@ -20,7 +19,7 @@
 
 <br/>
 
-[📊 Pitch Deck](https://drive.google.com/file/d/1GGulslqDDAer2gFGl240MeIDa-fxa-Xx/view?usp=sharing) &nbsp;|&nbsp; [🎬 Demo Video](https://youtu.be/EYyQ2fW9NLc) &nbsp;|&nbsp; [📘 Phase 2 Docs](./PHASE2_README.md)
+[📊 Pitch Deck](https://drive.google.com/file/d/1GGulslqDDAer2gFGl240MeIDa-fxa-Xx/view?usp=sharing) &nbsp;|&nbsp; [🎬 Demo Video](https://youtu.be/EYyQ2fW9NLc)
 
 </div>
 
@@ -50,8 +49,9 @@
 | 18 | [Actuarial Model](#-actuarial-model) |
 | 19 | [Exclusions](#-exclusions) |
 | 20 | [Business Viability](#-business-viability) |
-| 21 | [Contributing](#-contributing) |
-| 22 | [License](#-license) |
+| 21 | [Team](#-team) |
+| 22 | [Contributing](#-contributing) |
+| 23 | [License](#-license) |
 
 ---
 
@@ -747,6 +747,19 @@ RapidCover is a **parametric income protection product** with strictly defined s
 **Strategic Moat:** RapidCover generates India's first structured dark-store-zone disruption dataset — suspension frequency, duration, road conditions, zone-level risk scores. Data that Zepto and Blinkit don't have. That is the B2B licensing opportunity that outlasts the insurance product.
 
 **Distribution:** One B2B integration with Zepto's partner app → 100,000+ workers onboarded via a single WhatsApp link. Marginal CAC = ₹0.
+
+---
+
+## 👥 Team
+
+RapidCover was built by a passionate team at Guidewire DEVTrails 2026:
+
+| # | Name | Role |
+|---|------|------|
+| 1 | **Anaswara K** | Full-Stack Product Lead |
+| 2 | **Venkata Kanna Bhava** | Backend & ML Engineer |
+| 3 | **Yuva Hasini Duddekunta** | Frontend & PWA Developer |
+| 4 | **Amritha** | QA & Testing Lead |
 
 ---
 
