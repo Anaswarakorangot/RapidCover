@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AdminLoader, AdminError, AdminEmpty, ProofCard, SourceBadge } from './AdminProofShared';
+import { adminFetch } from '../../services/adminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -34,7 +35,7 @@ export default function RiqiProvenancePanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/admin/panel/riqi`);
+      const res = await adminFetch(`${API}/admin/panel/riqi`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
     } catch (e) {
@@ -47,7 +48,7 @@ export default function RiqiProvenancePanel() {
   async function seedProfiles() {
     setSeeding(true);
     try {
-      const res = await fetch(`${API}/admin/panel/riqi/seed`, { method: 'POST' });
+      const res = await adminFetch(`${API}/admin/panel/riqi/seed`, { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await load(); // Reload data
     } catch (e) {
@@ -60,7 +61,7 @@ export default function RiqiProvenancePanel() {
   async function recompute(zoneCode) {
     setRecomputing(zoneCode);
     try {
-      const res = await fetch(`${API}/admin/panel/riqi/${zoneCode}/recompute`, { method: 'POST' });
+      const res = await adminFetch(`${API}/admin/panel/riqi/${zoneCode}/recompute`, { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await load(); // Reload data
     } catch (e) {

@@ -12,6 +12,7 @@ from app.database import init_db, SessionLocal
 from app.api.router import api_router
 from app.data.seed_zones import seed_zones
 from app.data.seed_partner import seed_partners
+from app.seed_admin import seed_default_admin
 # Import ALL models so they register with SQLAlchemy Base (tables will be created by init_db)
 from app.models import (
     Partner, Zone, Policy, TriggerEvent, Claim,
@@ -61,6 +62,10 @@ async def lifespan(app: FastAPI):
 
     init_db()
     logger.info("Database tables created")
+
+    # Seed default admin (automatic on startup if no admins exist)
+    seed_default_admin()
+
     # Seed zones on every startup (idempotent - skips existing)
     db = SessionLocal()
     try:

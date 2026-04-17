@@ -19,6 +19,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.admin_deps import get_current_admin
+from app.models.admin import Admin
 from app.utils.time_utils import utcnow
 from app.models.zone import Zone
 from app.models.drill_session import DrillSession, DrillType, DrillStatus
@@ -55,7 +57,7 @@ router = APIRouter(prefix="/admin/panel", tags=["admin-drills"])
 @router.post("/drills/run", response_model=DrillStartResponse)
 def run_drill(
     req: DrillRunRequest,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """
     Start a structured drill execution.
@@ -173,7 +175,7 @@ def get_replay_scenarios():
 @router.post("/drills/instant-replay")
 def run_instant_replay(
     req: InstantReplayRequest,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """
     Execute a scripted historical replay. 
@@ -197,7 +199,7 @@ def run_instant_replay(
 @router.get("/drills/{drill_id}", response_model=DrillStatusResponse)
 def get_drill_status(
     drill_id: str,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """Get current status of a drill."""
     drill = db.query(DrillSession).filter(DrillSession.drill_id == drill_id).first()
@@ -255,7 +257,7 @@ async def stream_drill_events(
 @router.get("/drills/{drill_id}/impact", response_model=DrillImpactResponse)
 def get_drill_impact_endpoint(
     drill_id: str,
-    db: Session = Depends(get_db),
+    admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     """Get impact metrics for a completed drill."""
     impact = get_drill_impact(drill_id, db)
@@ -267,7 +269,7 @@ def get_drill_impact_endpoint(
 # --- POST /admin/panel/verification/run ---------------------------------------
 
 @router.post("/verification/run", response_model=VerificationResponse)
-def run_verification(db: Session = Depends(get_db)):
+def run_verification(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Run system health verification checks.
 

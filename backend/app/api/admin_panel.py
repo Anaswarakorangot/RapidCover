@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
+from app.core.admin_deps import get_current_admin
+from app.models.admin import Admin
 from app.utils.time_utils import utcnow
 from app.models.partner import Partner
 from app.models.policy import Policy
@@ -368,7 +370,7 @@ def get_bcr(db: Session = Depends(get_db)):
 # --- POST /admin/panel/bcr/suspend -------------------------------------------
 
 @router.post("/bcr/suspend")
-def suspend_city(req: SuspendCityRequest, db: Session = Depends(get_db)):
+def suspend_city(req: SuspendCityRequest, admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Batch toggle suspension for all zones in a city."""
     # Find zones where code starts with req.city_code (e.g. BLR)
     db.query(Zone).filter(Zone.code.like(f"{req.city_code}%")).update(
@@ -382,7 +384,7 @@ def suspend_city(req: SuspendCityRequest, db: Session = Depends(get_db)):
 # --- GET /admin/panel/fraud-queue --------------------------------------------
 
 @router.get("/fraud-queue", response_model=list[FraudClaim])
-def get_fraud_queue(db: Session = Depends(get_db)):
+def get_fraud_queue(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Return pending claims with high fraud scores."""
     from app.services.collusion_detector import detect_all_collusion_rings
 
@@ -452,7 +454,7 @@ def get_fraud_queue(db: Session = Depends(get_db)):
 # --- POST /admin/fraud-queue/collusion-check ----------------------------------
 
 @router.post("/fraud-queue/collusion-check")
-def check_collusion_rings(db: Session = Depends(get_db)):
+def check_collusion_rings(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Detect and analyze collusion rings among pending claims.
 
@@ -923,7 +925,7 @@ async def create_manual_trigger(
 # --- GET /admin/panel/premium-collection -------------------------------------
 
 @router.get("/premium-collection")
-def get_premium_collection(db: Session = Depends(get_db)):
+def get_premium_collection(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """
     Return premium collection data for the admin panel.
 
@@ -1040,7 +1042,7 @@ def get_premium_collection(db: Session = Depends(get_db)):
 # --- GET /admin/panel/settings -----------------------------------------------
 
 @router.get("/settings", response_model=list[SystemSettingSchema])
-def get_admin_settings(db: Session = Depends(get_db)):
+def get_admin_settings(admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Return all system configurations grouped by category."""
     from app.models.system_setting import SystemSetting
     
@@ -1064,7 +1066,7 @@ def get_admin_settings(db: Session = Depends(get_db)):
 # --- POST /admin/panel/settings ----------------------------------------------
 
 @router.post("/settings")
-def update_admin_settings(req: UpdateSettingsRequest, db: Session = Depends(get_db)):
+def update_admin_settings(req: UpdateSettingsRequest, admin: Admin = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Batch update system configuration keys."""
     from app.models.system_setting import SystemSetting
     

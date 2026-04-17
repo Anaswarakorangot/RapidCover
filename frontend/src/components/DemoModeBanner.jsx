@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { adminFetch } from '../services/adminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -7,7 +8,7 @@ export default function DemoModeBanner() {
 
   const checkDemoMode = async () => {
     try {
-      const res = await authenticatedFetch(`${API}/admin/panel/demo-mode/status`);
+      const res = await adminFetch(`${API}/admin/panel/demo-mode/status`);
       if (res.ok) {
         const data = await res.json();
         setDemoMode(data.enabled || data.demo_mode); // Support both new and old format

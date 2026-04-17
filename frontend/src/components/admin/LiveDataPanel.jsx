@@ -2,6 +2,7 @@
 // Oracle Reliability Engine + Live API Data + Platform Activity Fleet View
 
 import { useState, useEffect } from 'react';
+import { adminFetch } from '../../services/adminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -35,7 +36,7 @@ export default function LiveDataPanel() {
 
   const fetchZones = async () => {
     try {
-      const res = await fetch(`${API}/zones`);
+      const res = await adminFetch(`${API}/zones`);
       if (res.ok) {
         const list = await res.json();
         setZones(list);
@@ -47,7 +48,7 @@ export default function LiveDataPanel() {
   const fetchLiveData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/admin/panel/live-data`);
+      const res = await adminFetch(`${API}/admin/panel/live-data`);
       if (res.ok) { setLiveData(await res.json()); setLastFetch(new Date()); }
     } catch (_err) { console.error('live-data:', _err); }
     setLoading(false);
@@ -55,7 +56,7 @@ export default function LiveDataPanel() {
 
   const fetchOracle = async () => {
     try {
-      const res = await fetch(`${API}/admin/panel/oracle-reliability`);
+      const res = await adminFetch(`${API}/admin/panel/oracle-reliability`);
       if (res.ok) setOracle(await res.json());
     } catch (_err) { console.error('oracle:', _err); }
   };
@@ -73,7 +74,7 @@ export default function LiveDataPanel() {
     const loadZoneData = async () => {
       if (!selectedZone) return;
       try {
-        const res = await fetch(`${API}/admin/panel/live-data?zone_code=${selectedZone}`);
+        const res = await adminFetch(`${API}/admin/panel/live-data?zone_code=${selectedZone}`);
         if (res.ok) setZoneData(await res.json());
       } catch (_err) { console.error('zone data:', _err); }
     };

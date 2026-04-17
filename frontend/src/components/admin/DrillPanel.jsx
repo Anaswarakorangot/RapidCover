@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import DrillTimeline from './DrillTimeline';
 import ImpactPanel from './ImpactPanel';
+import { adminFetch } from '../../services/adminApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -49,7 +50,7 @@ export default function DrillPanel({ onZoneSelect }) {
 
   const fetchZones = async () => {
     try {
-      const res = await fetch(`${API_BASE}/zones`);
+      const res = await adminFetch(`${API_BASE}/zones`);
       if (res.ok) {
         const data = await res.json();
         setZones(data);
@@ -70,7 +71,7 @@ export default function DrillPanel({ onZoneSelect }) {
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/drills/history?limit=10`);
+      const res = await adminFetch(`${API_BASE}/admin/panel/drills/history?limit=10`);
       if (res.ok) {
         const data = await res.json();
         setHistory(data.drills || []);
@@ -89,7 +90,7 @@ export default function DrillPanel({ onZoneSelect }) {
     setImpactData(null);
 
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/drills/run`, {
+      const res = await adminFetch(`${API_BASE}/admin/panel/drills/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -120,7 +121,7 @@ export default function DrillPanel({ onZoneSelect }) {
 
   const streamDrillEvents = async (id) => {
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/drills/${id}/stream`);
+      const res = await adminFetch(`${API_BASE}/admin/panel/drills/${id}/stream`);
       if (!res.ok || !res.body) return;
 
       const reader = res.body.getReader();
@@ -153,7 +154,7 @@ export default function DrillPanel({ onZoneSelect }) {
 
   const fetchImpact = async (id) => {
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/drills/${id}/impact`);
+      const res = await adminFetch(`${API_BASE}/admin/panel/drills/${id}/impact`);
       if (res.ok) {
         const data = await res.json();
         setImpactData(data);

@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { AdminLoader, AdminError, ProofCard, SourceBadge, PassFailBadge } from './AdminProofShared';
+import { adminFetch } from '../../services/adminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -28,7 +29,7 @@ export default function DemoChecklist() {
       await Promise.all(
         PROOF_ENDPOINTS.map(async (ep) => {
           try {
-            const res = await fetch(`${API}${ep.endpoint}`);
+            const res = await adminFetch(`${API}${ep.endpoint}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             newResults[ep.id] = { status: 'ok', data: await res.json() };
           } catch (e) {

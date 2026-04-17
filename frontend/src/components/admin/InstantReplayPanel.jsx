@@ -1,5 +1,6 @@
 // frontend/src/components/admin/InstantReplayPanel.jsx
 import { useState, useEffect } from 'react';
+import { adminFetch } from '../../services/adminApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -16,7 +17,7 @@ export default function InstantReplayPanel() {
 
   async function fetchScenarios() {
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/drills/instant-replay/scenarios`);
+      const res = await adminFetch(`${API_BASE}/admin/panel/drills/instant-replay/scenarios`);
       const data = await res.json();
       setScenarios(data.scenarios || []);
       if (data.scenarios?.length > 0) {
@@ -36,7 +37,7 @@ export default function InstantReplayPanel() {
     setError(null);
 
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/drills/instant-replay`, {
+      const res = await adminFetch(`${API_BASE}/admin/panel/drills/instant-replay`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

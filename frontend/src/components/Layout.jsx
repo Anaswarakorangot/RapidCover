@@ -7,7 +7,6 @@ const navItems = [
   { path: '/claims', label: 'Claims', icon: '💰' },
   { path: '/trust-center', label: 'Trust', icon: '🔍', badge: true },
   { path: '/profile', label: 'Profile', icon: '👤' },
-  { path: '/admin', label: 'Admin', icon: '⚙️' },
 ];
 
 const styles = `

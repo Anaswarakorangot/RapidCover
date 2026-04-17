@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { AdminAuthProvider } from './context/AdminAuthContext';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { Layout } from './components/Layout';
-import { Login, Register, Dashboard, Policy, Claims, Profile, Admin, TrustCenter } from './pages';
+import { Login, Register, Dashboard, Policy, Claims, Profile, AdminDashboard, TrustCenter } from './pages';
 import RapidCoverOnboarding from './components/ui/RapidCoverOnboarding.jsx';
 import OnboardingFlow from './components/ui/OnboardingFlow';
 
@@ -30,10 +31,15 @@ function ProtectedRoute({ children }) {
 // Public Route
 function PublicRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
+  const search = new URLSearchParams(location.search);
+  const allowAdminLogin =
+    location.pathname === '/admin-login' ||
+    (location.pathname === '/login' && search.get('admin') === '1');
 
   if (loading) return <Loader />;
 
-  if (isAuthenticated) {
+  if (isAuthenticated && !allowAdminLogin) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -63,7 +69,7 @@ function OnboardingRoute() {
 function AdminRoute() {
   const { loading } = useAuth();
   if (loading) return <Loader />;
-  return <Admin />;
+  return <AdminDashboard />;
 }
 
 // Root Route
@@ -81,6 +87,7 @@ function AppRoutes() {
       <Route path="/onboarding" element={<OnboardingRoute />} />
 
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/admin-login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
       <Route path="/" element={<RootRoute />} />
@@ -115,22 +122,24 @@ function useOnlineStatus() {
 // App
 export default function App() {
   const isOnline = useOnlineStatus();
-  
+
   return (
     <BrowserRouter>
       <AuthProvider>
-        <NotificationProvider>
-          {!isOnline && (
-            <div style={{
-              background: '#1a2e1a', color: '#fff', fontSize: 12, padding: '8px 16px',
-              textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, zIndex: 10000,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-            }}>
-              Offline Mode - Syncing locally to RapidCover Edge
-            </div>
-          )}
-          <AppRoutes />
-        </NotificationProvider>
+        <AdminAuthProvider>
+          <NotificationProvider>
+            {!isOnline && (
+              <div style={{
+                background: '#1a2e1a', color: '#fff', fontSize: 12, padding: '8px 16px',
+                textAlign: 'center', fontWeight: 600, position: 'sticky', top: 0, zIndex: 10000,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+              }}>
+                Offline Mode - Syncing locally to RapidCover Edge
+              </div>
+            )}
+            <AppRoutes />
+          </NotificationProvider>
+        </AdminAuthProvider>
       </AuthProvider>
     </BrowserRouter>
   );
