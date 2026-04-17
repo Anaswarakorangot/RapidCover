@@ -8,6 +8,10 @@ import { useAuth } from '../context/AuthContext';
 const S = `
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap');
 
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
   :root {
     --green-primary: #3DB85C;
     --green-dark:    #2a9e47;
@@ -309,39 +313,75 @@ function ExclusionsScreen({ onAccept }) {
 function PremiumBreakdown({ breakdown }) {
   if (!breakdown) return null;
 
+  // Map backend field names to display values
+  const base = breakdown.base || breakdown.base_premium || 0;
+  const zoneRisk = Number(breakdown.zone_risk || 1.0);
+  const seasonal = Number(breakdown.seasonal_index || 1.0);
+  const riqi = Number(breakdown.riqi_adjustment || 1.0);
+  const activity = Number(breakdown.activity_factor || breakdown.activity_multiplier || 1.0);
+  const loyalty = Number(breakdown.loyalty_discount || 1.0);
+  const total = breakdown.total || 0;
+  const city = breakdown.city || 'N/A';
+  const riqiBand = breakdown.riqi_band || 'N/A';
+
   return (
     <div style={{ background: '#eff6ff', borderRadius: 14, padding: 14, border: '1px solid #bfdbfe', marginTop: 12 }}>
       <p style={{ fontFamily: 'Nunito, sans-serif', fontWeight: 800, fontSize: 12, color: '#1e40af', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
         Premium Breakdown (Next Week)
       </p>
-      
+
       <div className="breakdown-modal-row">
-        <span className="breakdown-modal-key">Base Premium</span>
-        <span className="breakdown-modal-val">₹{breakdown.base_premium}</span>
+        <span className="breakdown-modal-key">Base Premium ({breakdown.tier || 'standard'})</span>
+        <span className="breakdown-modal-val">₹{base}</span>
       </div>
-      
-      {breakdown.activity_multiplier !== 1.0 && (
+
+      <div className="breakdown-modal-row">
+        <span className="breakdown-modal-key">City ({city})</span>
+        <span className="breakdown-modal-val text-gray-600">—</span>
+      </div>
+
+      {zoneRisk !== 1.0 && (
         <div className="breakdown-modal-row">
-          <span className="breakdown-modal-key">Activity Tier</span>
-          <span className="breakdown-modal-val text-blue-600">×{breakdown.activity_multiplier}</span>
+          <span className="breakdown-modal-key">Zone Risk Factor</span>
+          <span className="breakdown-modal-val" style={{ color: zoneRisk > 1.0 ? '#dc2626' : '#16a34a' }}>
+            ×{zoneRisk.toFixed(2)}
+          </span>
         </div>
       )}
-      {breakdown.zone_risk_adjustment !== 0 && (
+
+      {seasonal !== 1.0 && (
         <div className="breakdown-modal-row">
-          <span className="breakdown-modal-key">Zone Factor</span>
-          <span className="breakdown-modal-val text-red-600">+{breakdown.zone_risk_adjustment}</span>
+          <span className="breakdown-modal-key">Seasonal Factor</span>
+          <span className="breakdown-modal-val text-orange-600">×{seasonal.toFixed(2)}</span>
         </div>
       )}
-      {breakdown.loyalty_discount !== 0 && (
+
+      {riqi !== 1.0 && (
+        <div className="breakdown-modal-row">
+          <span className="breakdown-modal-key">RIQI ({riqiBand})</span>
+          <span className="breakdown-modal-val" style={{ color: riqi > 1.0 ? '#dc2626' : '#16a34a' }}>
+            ×{riqi.toFixed(2)}
+          </span>
+        </div>
+      )}
+
+      {activity !== 1.0 && (
+        <div className="breakdown-modal-row">
+          <span className="breakdown-modal-key">Activity Factor</span>
+          <span className="breakdown-modal-val text-blue-600">×{activity.toFixed(2)}</span>
+        </div>
+      )}
+
+      {loyalty !== 1.0 && (
         <div className="breakdown-modal-row">
           <span className="breakdown-modal-key">Loyalty Discount</span>
-          <span className="breakdown-modal-val text-green-600">-{breakdown.loyalty_discount}</span>
+          <span className="breakdown-modal-val text-green-600">×{loyalty.toFixed(2)}</span>
         </div>
       )}
 
       <div className="breakdown-modal-total">
         <span>Total</span>
-        <span className="val">₹{breakdown.total}/week</span>
+        <span className="val">₹{total}/week</span>
       </div>
     </div>
   );
@@ -540,9 +580,12 @@ export default function Policy() {
   }
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--gray-bg)' }}>
-      <div style={{ width: 32, height: 32, border: '3px solid var(--green-light)', borderTopColor: 'var(--green-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-    </div>
+    <>
+      <style>{S}</style>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', background: 'var(--gray-bg)' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid var(--green-light)', borderTopColor: 'var(--green-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      </div>
+    </>
   );
 
   const polSt = activePolicy?.status || 'active';
@@ -555,7 +598,7 @@ export default function Policy() {
   return (
     <>
       <style>{S}</style>
-      <div className="pol-wrap" style={{ padding: '24px 16px', background: 'var(--gray-bg)', minHeight: '100vh' }}>
+      <div className="pol-wrap" style={{ padding: '8px 0', background: 'var(--gray-bg)' }}>
 
         {/* Exclusions modal */}
         {showExclusions && <ExclusionsScreen onAccept={onExclusionsAccept} />}
