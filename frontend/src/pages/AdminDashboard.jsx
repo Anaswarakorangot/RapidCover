@@ -52,7 +52,7 @@ export function AdminDashboard() {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !admin) {
-      navigate('/login?admin=1&next=/admin', { replace: true });
+      navigate('/admin-login?next=/admin', { replace: true });
     }
   }, [admin, authLoading, navigate]);
 

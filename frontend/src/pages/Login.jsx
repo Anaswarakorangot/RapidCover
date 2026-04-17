@@ -1,7 +1,7 @@
 /**
- * Login.jsx  –  Partner login with OTP
+ * Login.jsx - Partner login with OTP
  *
- * Person 1 Phase 2 (Task 6 – demo UX cleanup):
+ * Person 1 Phase 2 (Task 6 - demo UX cleanup):
  *   - Dev OTP display is small, labelled "DEV ONLY", non-intrusive
  *   - Mock KYC note is secondary text only
  *   - Main user journey feels real even though OTP is mocked
@@ -279,26 +279,6 @@ const styles = `
     margin-top: 14px;
   }
 
-  .login-divider {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 20px 0;
-  }
-  .login-divider::before,
-  .login-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-  .login-divider-text {
-    font-size: 11px;
-    color: var(--text-light);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
 `;
 
 export default function Login() {
@@ -307,7 +287,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const adminMode = searchParams.get('admin') === '1';
+  const adminMode = location.pathname === '/admin-login' || searchParams.get('admin') === '1';
   const adminNext = searchParams.get('next') || '/admin';
 
   const [step, setStep] = useState('phone');
@@ -323,8 +303,11 @@ export default function Login() {
     e.preventDefault();
     setError('');
 
-    // Admin login if email is filled
-    if (email.trim()) {
+    if (adminMode) {
+      if (!email.trim()) {
+        setError('Please enter your admin email.');
+        return;
+      }
       if (!password.trim()) {
         setError('Please enter your admin password.');
         return;
@@ -341,14 +324,8 @@ export default function Login() {
       return;
     }
 
-    if (adminMode) {
-      setError('Enter your admin email and password to continue to the admin panel.');
-      return;
-    }
-
-    // Partner OTP login if phone is filled
     if (!phone.trim()) {
-      setError('Please enter your phone number or admin email.');
+      setError('Please enter your phone number.');
       return;
     }
     setLoading(true);
@@ -402,7 +379,7 @@ export default function Login() {
 
           {step === 'phone' ? (
             <form onSubmit={handleRequestOTP}>
-              <div className="login-title">Login</div>
+              <div className="login-title">{adminMode ? 'Admin Login' : 'Login'}</div>
               <div className="login-subtitle">
                 {adminMode
                   ? 'Admin access requires email and password.'
@@ -410,24 +387,18 @@ export default function Login() {
               </div>
 
               {!adminMode && (
-                <>
-                  <div className="login-field">
-                    <label className="login-label">Phone Number</label>
-                    <input
-                      className={`login-input${error && !email ? ' error' : ''}`}
-                      type="tel"
-                      inputMode="numeric"
-                      placeholder="+91 9876543210"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      autoFocus={!email}
-                    />
-                  </div>
-
-                  <div className="login-divider">
-                    <div className="login-divider-text">OR</div>
-                  </div>
-                </>
+                <div className="login-field">
+                  <label className="login-label">Phone Number</label>
+                  <input
+                    className={`login-input${error ? ' error' : ''}`}
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="+91 9876543210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    autoFocus
+                  />
+                </div>
               )}
 
               {adminMode && (
@@ -475,10 +446,12 @@ export default function Login() {
                 {adminMode ? 'Admin Login' : 'Get OTP'}
               </button>
 
-              <div className="login-footer">
-                New here?{' '}
-                <a href="/register">Register now</a>
-              </div>
+              {!adminMode && (
+                <div className="login-footer">
+                  New here?{' '}
+                  <a href="/register">Register now</a>
+                </div>
+              )}
             </form>
 
           ) : (
@@ -488,10 +461,10 @@ export default function Login() {
                 Sent to <strong>{phone}</strong>
               </div>
 
-              {/* Dev OTP – small, labelled, secondary – does NOT dominate the UI */}
+              {/* Dev OTP - small, labelled, secondary - does NOT dominate the UI */}
               {devOtp && (
                 <div className="dev-otp-box">
-                  <div className="dev-otp-label">DEV ONLY — Your OTP:</div>
+                  <div className="dev-otp-label">DEV ONLY - Your OTP:</div>
                   <div className="dev-otp-value">{devOtp}</div>
                 </div>
               )}
@@ -527,7 +500,7 @@ export default function Login() {
                 ← Change phone number
               </button>
 
-              {/* Mock KYC note – small, non-breaking, secondary */}
+              {/* Mock KYC note - small, non-breaking, secondary */}
               <p className="login-mock-note">
                 KYC verification is mocked for this demo.
               </p>

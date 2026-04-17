@@ -33,7 +33,9 @@ function PublicRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
   const search = new URLSearchParams(location.search);
-  const allowAdminLogin = location.pathname === '/login' && search.get('admin') === '1';
+  const allowAdminLogin =
+    location.pathname === '/admin-login' ||
+    (location.pathname === '/login' && search.get('admin') === '1');
 
   if (loading) return <Loader />;
 
@@ -85,6 +87,7 @@ function AppRoutes() {
       <Route path="/onboarding" element={<OnboardingRoute />} />
 
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/admin-login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
       <Route path="/" element={<RootRoute />} />
