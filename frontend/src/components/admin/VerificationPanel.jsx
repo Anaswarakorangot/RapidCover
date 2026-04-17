@@ -34,8 +34,9 @@ export default function VerificationPanel() {
   async function loadProof() {
     setLoadingProof(true); setError(null);
     try {
-      const data = await authenticatedFetch(`${API}/admin/panel/proof/validation-matrix`);
-      setProofData(data);
+      const res = await authenticatedFetch(`${API}/admin/panel/proof/validation-matrix`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setProofData(await res.json());
     } catch (e) { setError(e.message); }
     finally { setLoadingProof(false); }
   }
@@ -44,8 +45,9 @@ export default function VerificationPanel() {
     if (!claimId) return;
     setLoadingClaim(true); setClaimError(null);
     try {
-      const data = await authenticatedFetch(`${API}/admin/claims/${claimId}/validation-matrix`);
-      setClaimMatrix(data);
+      const res = await authenticatedFetch(`${API}/admin/claims/${claimId}/validation-matrix`);
+      if (!res.ok) throw new Error(`HTTP ${res.status} — claim not found`);
+      setClaimMatrix(await res.json());
     } catch (e) { setClaimError(e.message); setClaimMatrix(null); }
     finally { setLoadingClaim(false); }
   }

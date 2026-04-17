@@ -39,8 +39,9 @@ export default function StressProofPanel() {
     setLoading(true);
     setError(null);
     try {
-      const data = await authenticatedFetch(`${API}/admin/panel/stress-scenarios`);
-      setData(data);
+      const res = await authenticatedFetch(`${API}/admin/panel/stress-scenarios`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setData(await res.json());
     } catch (e) {
       setError(e.message);
     } finally {

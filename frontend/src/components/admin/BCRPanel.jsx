@@ -6,6 +6,7 @@
 // Loss Ratio > 100% -> reinsurance treaty activation alert
 
 import { useState, useEffect } from 'react';
+import { authenticatedFetch } from '../../services/adminApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -57,10 +58,9 @@ export default function BCRPanel() {
   async function fetchBCR() {
     setError(false);
     try {
-      const res = await fetch(`${API_BASE}/admin/panel/bcr`);
+      const res = await authenticatedFetch(`${API_BASE}/admin/panel/bcr`);
       if (res.ok) {
         const data = await res.json();
-        // Expect: { cities: [{city, code, premiums, claims, lr, suspended, pool_cap_pct}] }
         setCities(data.cities || []);
       } else {
         setCities([]);
@@ -91,7 +91,7 @@ export default function BCRPanel() {
 
     // Optimistically patch backend
     try {
-      await fetch(`${API_BASE}/admin/panel/bcr/suspend`, {
+      await authenticatedFetch(`${API_BASE}/admin/panel/bcr/suspend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ city_code: code, suspended: newVal }),
