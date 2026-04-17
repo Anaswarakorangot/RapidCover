@@ -56,6 +56,12 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Starting RapidCover API...", extra={"extra_fields": {"environment": settings.environment}})
 
+    # Only use init_db() for quick local dev if not using Alembic.
+    # In production (e.g. Render/Postgres), always rely on migrations.
+    if settings.environment == "development" and settings.database_url.startswith("sqlite"):
+        init_db()
+        logger.info("Database tables initialized (SQLite dev mode)")
+
     # Run Alembic migrations for all databases
     try:
         from alembic.config import Config
@@ -82,11 +88,18 @@ async def lifespan(app: FastAPI):
 
         # Run migrations to bring database to latest version
         command.upgrade(alembic_cfg, "head")
-        logger.info("Database migrations applied successfully")
+        logger.info("Database migrations successfully applied")
 
     except Exception as migration_err:
-        logger.error(f"Migration failed: {migration_err}", exc_info=True)
-        raise
+        # Check if it's a known non-critical error (like duplicate object if partially migrated)
+        err_str = str(migration_err).lower()
+        if "duplicate" in err_str or "already exists" in err_str:
+            logger.info(f"Database schema already up to date or partially applied: {migration_err}")
+        else:
+            logger.error(f"Critical error during database migration: {migration_err}", exc_info=True)
+            # In production, we might want to exit if migrations fail critically
+            if settings.environment != "development":
+                raise migration_err
 
     seed_default_admin()
 

@@ -30,3 +30,7 @@ graphify-output/
 graphify-out/
 .gemini/
 GEMINI.md
+
+# Postgres Client
+postgres_client/
+postgres_bin.zip
