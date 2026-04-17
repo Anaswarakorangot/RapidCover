@@ -664,6 +664,19 @@ export default function Policy() {
                     {renewalRisk.icon} {renewalRisk.label}
                   </span>
                 )}
+                {/* ML engine callout */}
+                {breakdown && (
+                  <div style={{
+                    marginTop: 8, padding: '6px 10px',
+                    background: 'rgba(61,184,92,0.12)', borderRadius: 10,
+                    fontSize: 11, color: '#166534', lineHeight: 1.4,
+                  }}>
+                    ⚙️ ML inputs: Zone risk ×{Number(breakdown.zone_risk || 1).toFixed(2)}
+                    {breakdown.city ? ` · ${breakdown.city}` : ''}
+                    {breakdown.riqi_band ? ` · RIQI ${breakdown.riqi_band}` : ''}
+                    {` · ${activePolicy.tier} tier`}
+                  </div>
+                )}
               </div>
               <span className={`apb-badge st-${polSt}`}>{ST_LABELS[polSt]}</span>
             </div>
