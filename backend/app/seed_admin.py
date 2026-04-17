@@ -21,6 +21,7 @@ DEFAULT_ADMIN_NAME = os.getenv("DEFAULT_ADMIN_NAME", "Admin User")
 def seed_default_admin():
     """Create default admin if no admins exist."""
     try:
+        Base.metadata.create_all(bind=engine)
         db = next(get_db())
 
         # Check if any admin exists
