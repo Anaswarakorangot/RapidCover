@@ -32,20 +32,7 @@ self.addEventListener('fetch', (event) => {
 
   // During development, don't intercept API calls to avoid CORS/Cache issues
   if (url.port === '8000' || url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(request));
-    return;
-  }
-
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(request).then(res => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(request, clone));
-        }
-        return res;
-      }).catch(() => caches.match(request))
-    );
+    // Don't intercept - let browser handle normally
     return;
   }
 
