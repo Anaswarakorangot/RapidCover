@@ -84,7 +84,7 @@ function MapBoundsUpdater({ mapData, riderPos, demoMode }) {
     } else if (mapData.center) {
       map.setView(mapData.center, mapData.zoom || 13);
     }
-  }, [mapData, riderPos, map, demoMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mapData, riderPos, map, demoMode]);
   return null;
 }
 
@@ -201,7 +201,7 @@ export default function ZoneMapPanel({ riderZoneId, activeTriggers = [], onZoneC
 
       const polygons = zones.map(z => {
         let coordinates = [];
-        if (z.polygon) { try { coordinates = JSON.parse(z.polygon); } catch {} }
+        if (z.polygon) { try { coordinates = JSON.parse(z.polygon); } catch { console.debug("Polygon parse error"); } }
         if (!coordinates.length && z.dark_store_lat && z.dark_store_lng) {
           const lat = z.dark_store_lat, lng = z.dark_store_lng;
           coordinates = [
@@ -280,8 +280,8 @@ export default function ZoneMapPanel({ riderZoneId, activeTriggers = [], onZoneC
   }, [demoMode, mapData]);
 
   // ── Derived: group zones by relationship to rider ───────────────────────
-  const { zoneClassMap, triggersByZone, polygonsWithRole } = useMemo(() => {
-    if (!mapData?.polygons) return { zoneClassMap: {}, triggersByZone: {}, polygonsWithRole: [] };
+  const { triggersByZone, polygonsWithRole } = useMemo(() => {
+    if (!mapData?.polygons) return { triggersByZone: {}, polygonsWithRole: [] };
 
     // In demo mode, if we don't have a rider zone, pick the zone nearest to demo rider pos
     let effectiveRiderZoneId = riderZoneId;

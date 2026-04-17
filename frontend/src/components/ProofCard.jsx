@@ -98,7 +98,7 @@ export default function ProofCard({
 
   useEffect(() => {
     if (expanded && !explanation && claimId) {
-      setLoadingExpl(true);
+      setLoadingExpl(true); // eslint-disable-line react-hooks/set-state-in-effect
       api.getClaimExplanation(claimId)
         .then(setExplanation)
         .catch(err => console.error("Failed to fetch explanation:", err))
