@@ -80,23 +80,24 @@ async def lifespan(app: FastAPI):
 
         # Check if migrations need stamping (schema exists but not recorded)
         from app.database import engine
+        current_rev = None
+        schema_exists = False
+
         with engine.connect() as conn:
             context = MigrationContext.configure(conn)
             current_rev = context.get_current_revision()
 
             if current_rev is None and not settings.database_url.startswith("sqlite"):
-                # Check if schema already exists (from previous init_db or partial migration)
                 schema_exists = conn.execute(text(
                     "SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'triggertype')"
                 )).scalar()
 
-                if schema_exists:
-                    logger.info("Schema exists but migration not recorded - stamping as applied")
-                    command.stamp(alembic_cfg, "head")
-                else:
-                    command.upgrade(alembic_cfg, "head")
-            else:
-                command.upgrade(alembic_cfg, "head")
+        # Run stamp/upgrade outside the connection block
+        if current_rev is None and schema_exists:
+            logger.info("Schema exists but migration not recorded - stamping as applied")
+            command.stamp(alembic_cfg, "head")
+        else:
+            command.upgrade(alembic_cfg, "head")
 
         logger.info("Database migrations applied successfully")
     except Exception as migration_err:

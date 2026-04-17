@@ -1,5 +1,5 @@
 {
-  "training_date": "2026-04-17T17:42:47.513863",
+  "training_date": "2026-04-18T14:10:35.877557",
   "version": "2.0.0",
   "provenance": {
     "premium_target": "expected_weekly_payout_pressure (independent of pricing formula)",
@@ -162,9 +162,9 @@
       "note": "Model predicts expected payout pressure, not the final premium. Price floor, IRDAI cap, and loyalty adjustments are applied deterministically after ML output."
     },
     "fraud": {
-      "model_type": "RandomForestClassifier",
-      "target": "is_fraud",
-      "target_description": "Binary label assigned by policy-grounded deterministic scenarios (GPS spoofing, activity paradox, frequency abuse, multi-signal anomaly). Labels are INDEPENDENT of the runtime weighted scoring formula.",
+      "model_type": "IsolationForest",
+      "target": "anomaly_detection",
+      "target_description": "Unsupervised anomaly detection using IsolationForest. Isolates anomalies by random feature splitting across GPS, device, and activity patterns. Deterministic hard-stops always override ML output.",
       "n_features": 9,
       "feature_names": [
         "gps_in_zone",
@@ -182,10 +182,7 @@
         "val": 500,
         "test": 500
       },
-      "class_distribution": {
-        "fraud_rate_pct": 30.92,
-        "legitimate_rate_pct": 69.08
-      },
+      "contamination": 0.3,
       "baseline": {
         "method": "rule_based_hard_stop_only",
         "description": "Flags fraud only when hard deterministic stops are hit",
@@ -195,57 +192,17 @@
         "test_recall": 1.0
       },
       "val_metrics": {
-        "accuracy": 0.974,
-        "f1": 0.9592
+        "accuracy": 0.864,
+        "f1": 0.7778
       },
       "test_metrics": {
-        "accuracy": 0.974,
-        "f1": 0.9595,
-        "precision": 0.9277,
-        "recall": 0.9935,
-        "roc_auc": 0.9951
+        "accuracy": 0.842,
+        "f1": 0.7358,
+        "precision": 0.7639,
+        "recall": 0.7097,
+        "roc_auc": 0.9146
       },
-      "cv_f1_mean": 0.9636,
-      "cv_f1_std": 0.0121,
-      "feature_importances": [
-        {
-          "feature": "gps_in_zone",
-          "importance": 0.320679
-        },
-        {
-          "feature": "centroid_drift_km",
-          "importance": 0.192729
-        },
-        {
-          "feature": "run_count_during_event",
-          "importance": 0.187917
-        },
-        {
-          "feature": "claims_last_30_days",
-          "importance": 0.125486
-        },
-        {
-          "feature": "max_gps_velocity_kmh",
-          "importance": 0.099183
-        },
-        {
-          "feature": "device_consistent",
-          "importance": 0.031635
-        },
-        {
-          "feature": "zone_polygon_match",
-          "importance": 0.030896
-        },
-        {
-          "feature": "zone_suspended",
-          "importance": 0.007598
-        },
-        {
-          "feature": "traffic_disrupted",
-          "importance": 0.003878
-        }
-      ],
-      "architecture_note": "Deterministic hard-stops (GPS velocity>60, run_count>0, zone_suspended=False) always override ML decision. ML assists triage and grey-area anomaly detection between the hard stops. The model never decides alone on high-stakes rejections."
+      "architecture_note": "IsolationForest detects multivariate anomalies by random feature splitting. Deterministic hard-stops (GPS velocity>60, run_count>0, zone_suspended=False) always override ML decision. The model assists triage in grey-area cases."
     }
   }
 }
