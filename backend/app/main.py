@@ -13,7 +13,6 @@ from app.api.router import api_router
 from app.data.seed_zones import seed_zones
 from app.data.seed_partner import seed_partners
 from app.seed_admin import seed_default_admin
-# Import ALL models so they register with SQLAlchemy Base (tables will be created by init_db)
 from app.models import (
     Partner, Zone, Policy, TriggerEvent, Claim,
     ZoneReassignment, ReassignmentStatus, ZoneRiskProfile,
@@ -39,20 +38,17 @@ allowed_origins = DEFAULT_CORS_ORIGINS + [o.strip() for o in extra_origins.split
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
-    # Startup
 
-    # Configure Sentry error tracking (Phase 4 - Optional)
     if settings.sentry_dsn:
         import sentry_sdk
         sentry_sdk.init(
             dsn=settings.sentry_dsn,
             environment=settings.environment,
-            traces_sample_rate=0.1,  # 10% performance monitoring
-            profiles_sample_rate=0.1,  # 10% profiling
+            traces_sample_rate=0.1,
+            profiles_sample_rate=0.1,
         )
         print(f"Sentry error tracking enabled for environment: {settings.environment}")
 
-    # Configure structured logging (Phase 4)
     from app.utils.logging_config import setup_logging
     logger = setup_logging(
         log_level=settings.log_level,
@@ -60,69 +56,55 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Starting RapidCover API...", extra={"extra_fields": {"environment": settings.environment}})
 
-    # Only use init_db() for SQLite (local dev). In production, Alembic handles schema.
     if settings.database_url.startswith("sqlite"):
         init_db()
         logger.info("Database tables created (SQLite)")
     else:
         logger.info("Skipping init_db() - using Alembic for schema management")
 
-    # Run Alembic migrations (production schema management)
+    # Run Alembic migrations
     try:
         from alembic.config import Config
         from alembic import command
         from alembic.runtime.migration import MigrationContext
         from pathlib import Path
-        from sqlalchemy import text
 
         alembic_cfg = Config(str(Path(__file__).parent.parent / "alembic.ini"))
         alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
 
-        # Check if migrations need stamping (schema exists but not recorded)
         from app.database import engine
-        current_rev = None
-        schema_exists = False
 
         with engine.connect() as conn:
             context = MigrationContext.configure(conn)
             current_rev = context.get_current_revision()
 
-            if current_rev is None and not settings.database_url.startswith("sqlite"):
-                schema_exists = conn.execute(text(
-                    "SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'triggertype')"
-                )).scalar()
-
-        # Run stamp/upgrade outside the connection block
-        if current_rev is None and schema_exists:
-            logger.info("Schema exists but migration not recorded - stamping as applied")
+        if current_rev is None and not settings.database_url.startswith("sqlite"):
+            # Schema may already exist (pre-Alembic deploy) — stamp it as at head
+            # so Alembic knows it's already applied, then run upgrade for any new ones
+            logger.info("No migration revision found — stamping head then upgrading")
             command.stamp(alembic_cfg, "head")
         else:
             command.upgrade(alembic_cfg, "head")
 
         logger.info("Database migrations applied successfully")
     except Exception as migration_err:
-        logger.error(f"Migration failed: {migration_err}")
-        raise  # Re-raise to prevent startup with broken schema
+        logger.error(f"Migration failed: {migration_err}", exc_info=True)
+        raise
 
-    # Seed default admin (automatic on startup if no admins exist)
     seed_default_admin()
 
-    # Seed zones on every startup (idempotent - skips existing)
     db = SessionLocal()
     try:
         created_zones = seed_zones(db)
         if created_zones:
             logger.info(f"Seeded {len(created_zones)} new zones")
-
-        # Seed test partners
         seed_partners(db)
     finally:
         db.close()
-    # Start background trigger polling (every 45s)
+
     start_scheduler()
     logger.info("Background trigger scheduler started")
 
-    # Initialize API response cache (Redis preferred, InMemory fallback)
     from fastapi_cache import FastAPICache
     from fastapi_cache.backends.inmemory import InMemoryBackend
     try:
@@ -134,13 +116,11 @@ async def lifespan(app: FastAPI):
         FastAPICache.init(RedisBackend(redis_client), prefix="rapidcover-cache")
         logger.info("FastAPICache initialized with Redis backend")
     except Exception as cache_err:
-        logger.warning(
-            f"Redis unavailable ({cache_err}) — using InMemoryBackend for caching"
-        )
+        logger.warning(f"Redis unavailable ({cache_err}) — using InMemoryBackend for caching")
         FastAPICache.init(InMemoryBackend(), prefix="rapidcover-cache")
 
     yield
-    # Shutdown
+
     stop_scheduler()
     logger.info("Shutting down RapidCover API")
 
@@ -153,9 +133,7 @@ app = FastAPI(
 )
 
 
-# Custom OpenAPI schema with enhanced documentation
 def custom_openapi():
-    """Generate custom OpenAPI schema with detailed documentation."""
     if app.openapi_schema:
         return app.openapi_schema
 
@@ -214,7 +192,6 @@ RapidCover provides automated income protection for India's gig economy workers.
         "altText": "RapidCover Logo"
     }
 
-    # Add tags metadata for better organization
     openapi_schema["tags"] = [
         {"name": "partners", "description": "Partner authentication, registration, and profile management"},
         {"name": "policies", "description": "Policy quotes, creation, and management"},
@@ -232,7 +209,6 @@ RapidCover provides automated income protection for India's gig economy workers.
 
 app.openapi = custom_openapi
 
-# Rate limiting (Phase 4)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -241,13 +217,6 @@ _error_logger = logging.getLogger("rapidcover.errors")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """
-    Global fallback exception handler.
-
-    Logs the full traceback internally for debugging while returning a clean,
-    standardised JSON error body to the client — preventing verbose stack
-    traces or internal details from leaking into API responses.
-    """
     _error_logger.error(
         "Unhandled exception on %s %s",
         request.method,
@@ -262,7 +231,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         },
     )
 
-# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -271,13 +239,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routes
 app.include_router(api_router)
 
 
 @app.get("/")
 def root():
-    """Root endpoint - health check."""
     return {
         "service": "RapidCover API",
         "version": "0.1.0",
@@ -287,17 +253,6 @@ def root():
 
 @app.get("/health")
 def health_check():
-    """
-    Enhanced health check endpoint (Phase 4).
-
-    Returns comprehensive system health including:
-    - Database connectivity
-    - External API status
-    - Demo mode state
-    - Timestamp
-
-    Use this for monitoring and load balancer health checks.
-    """
     from app.services.external_apis import get_source_health
     from app.utils.time_utils import utcnow
     from sqlalchemy import text
@@ -311,7 +266,6 @@ def health_check():
         "components": {}
     }
 
-    # Check database connectivity
     try:
         db = SessionLocal()
         db.execute(text("SELECT 1"))
@@ -327,7 +281,6 @@ def health_check():
             "message": f"Database error: {str(e)}"
         }
 
-    # Check external API health
     try:
         api_health = get_source_health()
         live_sources = sum(1 for s in api_health.values() if s["status"] == "live")
