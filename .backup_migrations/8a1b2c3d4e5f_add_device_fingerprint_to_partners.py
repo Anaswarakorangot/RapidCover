@@ -1,7 +1,7 @@
 """Add device_fingerprint to partners table
 
 Revision ID: 8a1b2c3d4e5f
-Revises:
+Revises: d463e8c4538b
 Create Date: 2026-04-18 01:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '8a1b2c3d4e5f'
-down_revision: Union[str, Sequence[str], None] = None
+down_revision: Union[str, Sequence[str], None] = 'd463e8c4538b'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
