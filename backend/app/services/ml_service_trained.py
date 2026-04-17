@@ -101,12 +101,15 @@ class TrainedZoneRiskModel:
     def predict(self, features: ZoneFeatures) -> float:
         """Returns risk score 0-100."""
         if self.model is None or self.city_encoder is None:
-            # Fallback to manual model
             return self._manual_predict(features)
 
         try:
-            # Encode city
-            city_encoded = self.city_encoder.transform([features.city.lower()])[0]
+            # Explicit unknown-city guard — encoder raises ValueError for unseen labels
+            try:
+                city_encoded = self.city_encoder.transform([features.city.lower()])[0]
+            except ValueError:
+                print(f"[ML] Unknown city '{features.city}' for zone risk encoder — using manual fallback")
+                return self._manual_predict(features)
 
             # Prepare features
             X = np.array([[
@@ -122,18 +125,21 @@ class TrainedZoneRiskModel:
                 features.month
             ]])
 
-            # Predict
             risk_score = self.model.predict(X)[0]
             return round(float(np.clip(risk_score, 0, 100)), 2)
 
         except Exception as e:
-            print(f"[ML] Error predicting zone risk: {e}")
+            print(f"[ML] Error predicting zone risk: {e} — using manual fallback")
             return self._manual_predict(features)
 
     def _manual_predict(self, features: ZoneFeatures) -> float:
-        """Fallback manual prediction (original logic)."""
-        from app.services.ml_service import zone_risk_model as manual_model
-        return manual_model.predict(features)
+        """
+        Fallback manual prediction.
+        Imports directly from ml_service_manual to avoid circular imports
+        and recursion through ml_service.py singletons.
+        """
+        from app.services.ml_service_manual import zone_risk_model as _manual
+        return _manual.predict(features)
 
 
 class TrainedPremiumModel:
@@ -167,13 +173,16 @@ class TrainedPremiumModel:
     def predict(self, features: PartnerFeatures) -> dict:
         """Returns weekly_premium + breakdown."""
         if self.model is None or self.city_encoder is None or self.tier_encoder is None:
-            # Fallback to manual model
             return self._manual_predict(features)
 
         try:
-            # Encode categoricals
-            city_encoded = self.city_encoder.transform([features.city.lower()])[0]
-            tier_encoded = self.tier_encoder.transform([features.tier.lower()])[0]
+            # Explicit unknown-label guard — encoders raise ValueError for unseen values
+            try:
+                city_encoded = self.city_encoder.transform([features.city.lower()])[0]
+                tier_encoded = self.tier_encoder.transform([features.tier.lower()])[0]
+            except ValueError as ve:
+                print(f"[ML] Unknown city/tier for premium encoder ('{ve}') — using manual fallback")
+                return self._manual_predict(features)
 
             # Prepare features
             X = np.array([[
@@ -187,7 +196,6 @@ class TrainedPremiumModel:
                 features.riqi_score
             ]])
 
-            # Predict
             premium = self.model.predict(X)[0]
 
             # Apply tier base and cap
@@ -195,7 +203,6 @@ class TrainedPremiumModel:
             tier = features.tier.lower()
             base = base_prices.get(tier, 33)
             cap = base * 3.0
-
             premium = np.clip(premium, base, cap)
 
             return {
@@ -212,13 +219,17 @@ class TrainedPremiumModel:
             }
 
         except Exception as e:
-            print(f"[ML] Error predicting premium: {e}")
+            print(f"[ML] Error predicting premium: {e} — using manual fallback")
             return self._manual_predict(features)
 
     def _manual_predict(self, features: PartnerFeatures) -> dict:
-        """Fallback manual prediction (original logic)."""
-        from app.services.ml_service import premium_model as manual_model
-        return manual_model.predict(features)
+        """
+        Fallback manual prediction.
+        Imports directly from ml_service_manual to avoid circular imports
+        and recursion through ml_service.py singletons.
+        """
+        from app.services.ml_service_manual import premium_model as _manual
+        return _manual.predict(features)
 
 
 class TrainedFraudModel:
@@ -321,9 +332,13 @@ class TrainedFraudModel:
             return self._manual_score(features)
 
     def _manual_score(self, features: ClaimFeatures) -> dict:
-        """Fallback manual scoring (original logic)."""
-        from app.services.ml_service import fraud_model as manual_model
-        return manual_model.score(features)
+        """
+        Fallback manual scoring.
+        Imports directly from ml_service_manual to avoid circular imports
+        and recursion through ml_service.py singletons.
+        """
+        from app.services.ml_service_manual import fraud_model as _manual
+        return _manual.score(features)
 
 
 # ------------------------------------------------------------------------------
