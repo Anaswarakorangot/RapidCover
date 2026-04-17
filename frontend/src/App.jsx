@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { Layout } from './components/Layout';
-import { Login, Register, Dashboard, Policy, Claims, Profile, Admin } from './pages';
+import { Login, Register, Dashboard, Policy, Claims, Profile, Admin, TrustCenter } from './pages';
 import RapidCoverOnboarding from './components/ui/RapidCoverOnboarding.jsx';
 import OnboardingFlow from './components/ui/OnboardingFlow';
 
@@ -87,6 +87,7 @@ function AppRoutes() {
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/policy" element={<ProtectedRoute><Policy /></ProtectedRoute>} />
       <Route path="/claims" element={<ProtectedRoute><Claims /></ProtectedRoute>} />
+      <Route path="/trust-center" element={<ProtectedRoute><TrustCenter /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/admin" element={<AdminRoute />} />
 

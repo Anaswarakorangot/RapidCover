@@ -5,6 +5,7 @@ const navItems = [
   { path: '/', label: 'Home', icon: '🏠' },
   { path: '/policy', label: 'Policy', icon: '📋' },
   { path: '/claims', label: 'Claims', icon: '💰' },
+  { path: '/trust-center', label: 'Trust', icon: '🔍' },
   { path: '/profile', label: 'Profile', icon: '👤' },
   { path: '/admin', label: 'Admin', icon: '⚙️' },
 ];

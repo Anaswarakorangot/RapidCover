@@ -5,3 +5,4 @@ export { default as Policy } from './Policy';
 export { default as Claims } from './Claims';
 export { default as Profile } from './Profile';
 export { Admin } from './Admin';
+export { default as TrustCenter } from './TrustCenter';
