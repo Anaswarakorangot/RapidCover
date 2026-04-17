@@ -796,6 +796,11 @@ def process_trigger_event(
         db.commit()
         for claim in created_claims:
             db.refresh(claim)
+
+            # Get partner_id for WebSocket notification
+            policy = db.query(Policy).filter(Policy.id == claim.policy_id).first()
+            partner_id = policy.partner_id if policy else None
+
             # Send push notifications based on claim status
             if claim.status == ClaimStatus.PAID:
                 notify_claim_paid(claim, db)
@@ -805,6 +810,37 @@ def process_trigger_event(
                 notify_claim_rejected(claim, db)
             else:
                 notify_claim_created(claim, db)
+
+            # Send WebSocket real-time updates
+            # Note: WebSocket methods are async, so we use asyncio.create_task in production
+            # For now, this is a sync function, so WebSocket integration is optional
+            if partner_id:
+                try:
+                    import asyncio
+                    from app.api.websocket import manager as ws_manager
+
+                    # Prepare claim data for WebSocket
+                    claim_data = {
+                        "claim_id": claim.id,
+                        "status": claim.status.value if hasattr(claim.status, 'value') else str(claim.status),
+                        "amount": claim.amount,
+                        "trigger_type": trigger_event.trigger_type.value if hasattr(trigger_event.trigger_type, 'value') else str(trigger_event.trigger_type),
+                        "updated_at": utcnow().isoformat(),
+                    }
+
+                    # Schedule WebSocket notification (non-blocking)
+                    # In production, use background task or make this function async
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            asyncio.create_task(ws_manager.send_claim_update(partner_id, claim_data))
+                    except RuntimeError:
+                        # No event loop running - skip WebSocket notification
+                        # This happens in sync context; WebSocket works fine in async endpoints
+                        pass
+                except Exception as e:
+                    # Don't fail claim creation if WebSocket fails
+                    print(f"[WebSocket] Failed to send claim update: {e}")
 
     return created_claims
 
