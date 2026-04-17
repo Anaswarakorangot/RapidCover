@@ -60,10 +60,14 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Starting RapidCover API...", extra={"extra_fields": {"environment": settings.environment}})
 
-    init_db()
-    logger.info("Database tables created")
+    # Only use init_db() for SQLite (local dev). In production, Alembic handles schema.
+    if settings.database_url.startswith("sqlite"):
+        init_db()
+        logger.info("Database tables created (SQLite)")
+    else:
+        logger.info("Skipping init_db() - using Alembic for schema management")
 
-    # Run Alembic migrations
+    # Run Alembic migrations (production schema management)
     try:
         from alembic.config import Config
         from alembic import command
@@ -71,9 +75,10 @@ async def lifespan(app: FastAPI):
         alembic_cfg = Config(str(Path(__file__).parent.parent / "alembic.ini"))
         alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
         command.upgrade(alembic_cfg, "head")
-        logger.info("Database migrations applied")
+        logger.info("Database migrations applied successfully")
     except Exception as migration_err:
-        logger.warning(f"Migration execution skipped: {migration_err}")
+        logger.error(f"Migration failed: {migration_err}")
+        raise  # Re-raise to prevent startup with broken schema
 
     # Seed default admin (automatic on startup if no admins exist)
     seed_default_admin()
