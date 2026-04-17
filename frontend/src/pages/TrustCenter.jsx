@@ -505,6 +505,7 @@ const S = `
     line-height: 1.6;
     border-top: 1px solid var(--border);
   }
+`;
 
 
 /* ─── MLEngineTab ────────────────────────────────────────────────── */
