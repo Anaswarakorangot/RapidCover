@@ -13,6 +13,9 @@ from pathlib import Path
 import joblib
 import numpy as np
 import json
+import time
+
+from app.services.ml_monitoring import ml_monitor
 
 
 # Get the path to trained models
@@ -100,8 +103,15 @@ class TrainedZoneRiskModel:
 
     def predict(self, features: ZoneFeatures) -> float:
         """Returns risk score 0-100."""
+        start_time = time.time()
+        fallback_used = False
+
         if self.model is None or self.city_encoder is None:
-            return self._manual_predict(features)
+            result = self._manual_predict(features)
+            fallback_used = True
+            latency_ms = (time.time() - start_time) * 1000
+            ml_monitor.record_prediction("zone_risk", latency_ms, fallback=fallback_used)
+            return result
 
         try:
             # Explicit unknown-city guard — encoder raises ValueError for unseen labels
@@ -109,7 +119,11 @@ class TrainedZoneRiskModel:
                 city_encoded = self.city_encoder.transform([features.city.lower()])[0]
             except ValueError:
                 print(f"[ML] Unknown city '{features.city}' for zone risk encoder — using manual fallback")
-                return self._manual_predict(features)
+                result = self._manual_predict(features)
+                fallback_used = True
+                latency_ms = (time.time() - start_time) * 1000
+                ml_monitor.record_prediction("zone_risk", latency_ms, fallback=fallback_used)
+                return result
 
             # Prepare features
             X = np.array([[
@@ -126,11 +140,18 @@ class TrainedZoneRiskModel:
             ]])
 
             risk_score = self.model.predict(X)[0]
-            return round(float(np.clip(risk_score, 0, 100)), 2)
+            result = round(float(np.clip(risk_score, 0, 100)), 2)
+            latency_ms = (time.time() - start_time) * 1000
+            ml_monitor.record_prediction("zone_risk", latency_ms, fallback=False)
+            return result
 
         except Exception as e:
             print(f"[ML] Error predicting zone risk: {e} — using manual fallback")
-            return self._manual_predict(features)
+            result = self._manual_predict(features)
+            fallback_used = True
+            latency_ms = (time.time() - start_time) * 1000
+            ml_monitor.record_prediction("zone_risk", latency_ms, fallback=fallback_used)
+            return result
 
     def _manual_predict(self, features: ZoneFeatures) -> float:
         """
@@ -172,8 +193,15 @@ class TrainedPremiumModel:
 
     def predict(self, features: PartnerFeatures) -> dict:
         """Returns weekly_premium + breakdown."""
+        start_time = time.time()
+        fallback_used = False
+
         if self.model is None or self.city_encoder is None or self.tier_encoder is None:
-            return self._manual_predict(features)
+            result = self._manual_predict(features)
+            fallback_used = True
+            latency_ms = (time.time() - start_time) * 1000
+            ml_monitor.record_prediction("premium", latency_ms, fallback=fallback_used)
+            return result
 
         try:
             # Explicit unknown-label guard — encoders raise ValueError for unseen values
@@ -182,7 +210,11 @@ class TrainedPremiumModel:
                 tier_encoded = self.tier_encoder.transform([features.tier.lower()])[0]
             except ValueError as ve:
                 print(f"[ML] Unknown city/tier for premium encoder ('{ve}') — using manual fallback")
-                return self._manual_predict(features)
+                result = self._manual_predict(features)
+                fallback_used = True
+                latency_ms = (time.time() - start_time) * 1000
+                ml_monitor.record_prediction("premium", latency_ms, fallback=fallback_used)
+                return result
 
             # Prepare features
             X = np.array([[
@@ -205,7 +237,7 @@ class TrainedPremiumModel:
             cap = base * 3.0
             premium = float(np.clip(premium, base, cap))
 
-            return {
+            result = {
                 "weekly_premium": int(round(premium)),
                 "base_price": base,
                 "tier": tier,
@@ -218,9 +250,17 @@ class TrainedPremiumModel:
                 }
             }
 
+            latency_ms = (time.time() - start_time) * 1000
+            ml_monitor.record_prediction("premium", latency_ms, fallback=False)
+            return result
+
         except Exception as e:
             print(f"[ML] Error predicting premium: {e} — using manual fallback")
-            return self._manual_predict(features)
+            result = self._manual_predict(features)
+            fallback_used = True
+            latency_ms = (time.time() - start_time) * 1000
+            ml_monitor.record_prediction("premium", latency_ms, fallback=fallback_used)
+            return result
 
     def _manual_predict(self, features: PartnerFeatures) -> dict:
         """
@@ -261,9 +301,16 @@ class TrainedFraudModel:
 
     def score(self, features: ClaimFeatures) -> dict:
         """Returns fraud score 0-1, decision, factor breakdown."""
+        start_time = time.time()
+        fallback_used = False
+
         if self.model is None:
             # Fallback to manual model
-            return self._manual_score(features)
+            result = self._manual_score(features)
+            fallback_used = True
+            latency_ms = (time.time() - start_time) * 1000
+            ml_monitor.record_prediction("fraud", latency_ms, fallback=fallback_used)
+            return result
 
         try:
             hard_reject_reasons = []
@@ -321,7 +368,7 @@ class TrainedFraudModel:
             else:
                 decision = "auto_reject"
 
-            return {
+            result = {
                 "fraud_score": float(fraud_score),
                 "decision": decision,
                 "model_type": "isolation_forest",
@@ -338,9 +385,17 @@ class TrainedFraudModel:
                 "hard_reject_reasons": hard_reject_reasons
             }
 
+            latency_ms = (time.time() - start_time) * 1000
+            ml_monitor.record_prediction("fraud", latency_ms, fallback=False)
+            return result
+
         except Exception as e:
             print(f"[ML] Error scoring fraud: {e} — using manual fallback")
-            return self._manual_score(features)
+            result = self._manual_score(features)
+            fallback_used = True
+            latency_ms = (time.time() - start_time) * 1000
+            ml_monitor.record_prediction("fraud", latency_ms, fallback=fallback_used)
+            return result
 
     def _manual_score(self, features: ClaimFeatures) -> dict:
         """
