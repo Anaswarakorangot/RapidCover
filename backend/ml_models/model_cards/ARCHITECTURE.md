@@ -112,7 +112,7 @@ Partner/Claim Input
 ## Fallback Chain (When ML is Unavailable)
 
 ```
-Trained XGBoost/RandomForest model (normal path)
+Trained XGBoost/IsolationForest model (normal path)
     |
     | model file missing / exception / unknown city
     v
@@ -135,7 +135,7 @@ The system has **zero ML-only failure modes**. If all ML fails, the deterministi
 |-------|------|---------|-----------|
 | Zone Risk | zone_risk_model.pkl | 2.0.0 | XGBoost Regressor |
 | Premium | premium_model.pkl | 2.0.0 | XGBoost Regressor |
-| Fraud | fraud_model.pkl | 2.0.0 | RandomForestClassifier |
+| Fraud | fraud_model.pkl | 2.0.0 | IsolationForest |
 
 Training metadata, metrics, and feature importances are in `model_metadata.json`.
 

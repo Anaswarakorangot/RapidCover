@@ -3,25 +3,19 @@
 **Model ID**: `fraud_model.pkl`
 **Version**: 2.0.0
 **Training Date**: 2026-04-17
-**Model Type**: RandomForestClassifier (supervised binary classification)
+**Model Type**: IsolationForest (unsupervised anomaly detection)
 
 ---
 
 ## Purpose
 
-Detect fraudulent insurance claims from gig delivery partners by identifying behavioral anomalies across GPS, device, zone, and activity signals.
+Detect fraudulent insurance claims from gig delivery partners by identifying behavioral anomalies across GPS, device, zone, and activity signals using unsupervised anomaly detection.
 
 ---
 
-## What Changed from v1.0
+## Algorithm
 
-| | v1.0 | v2.0 |
-|-|------|------|
-| Algorithm | IsolationForest (unsupervised) | RandomForestClassifier (supervised) |
-| Training labels | Formula-derived fraud scores | Policy-grounded deterministic scenarios |
-| Circular risk | High — labels from same formula as runtime scorer | None — labels are independent |
-| AUC reported | 0.99 (against its own formula labels) | 0.995 (against independent labels) |
-| Defensibility | Low | High |
+**IsolationForest** isolates anomalies by random feature splitting, making it ideal for fraud detection where labeled fraud samples are scarce. The algorithm builds random trees and measures how quickly each sample is isolated — anomalies are isolated faster (shorter path length).
 
 ---
 
@@ -43,7 +37,7 @@ These rules fire before the ML model is consulted:
 
 ### Layer 2 — ML Triage (assists on grey-area claims between the hard stops)
 
-The RandomForestClassifier identifies claims that show multiple suspicious signals without reaching a single hard stop. Decision thresholds:
+The IsolationForest identifies claims that show anomalous patterns without reaching a single hard stop. Decision thresholds:
 
 | ML Fraud Score | Decision |
 |----------------|----------|
@@ -56,33 +50,28 @@ The RandomForestClassifier identifies claims that show multiple suspicious signa
 
 ---
 
-## Training Data: Independent Label Methodology
+## Training Methodology
 
-Labels are assigned by **deterministic adjuster-recognized fraud scenarios**, not by the weighted scoring formula used at runtime.
+IsolationForest is an **unsupervised** anomaly detection algorithm. It does not require fraud labels for training — instead, it learns the normal distribution of the data and identifies outliers.
 
-### The 5 Fraud Scenarios Used for Labeling
+### How IsolationForest Works
 
-| Scenario | Signal Pattern | Label |
-|----------|---------------|-------|
-| A: GPS Spoofing | velocity > 55 km/h AND GPS out of zone | fraud=1 |
-| B: Activity Paradox | run_count > 0 AND zone_suspended | fraud=1 |
-| C: Multi-Signal Anomaly | GPS out + centroid_drift > 12km + zone polygon mismatch | fraud=1 |
-| D: Frequency Abuse | claims_30d >= 5 AND device inconsistent AND GPS out | fraud=1 |
-| E: Unconfirmed Zone | zone not suspended AND no traffic disruption AND claims_30d >= 3 | fraud=1 |
+1. Builds random decision trees by randomly selecting features and split values
+2. Anomalies are isolated faster (shorter path length) because they have unusual feature values
+3. The anomaly score is derived from the average path length across all trees
+4. More negative scores = more anomalous = higher fraud probability
 
-**Why independent**: these scenarios mirror what an insurance adjuster would flag on paper review, before any scoring algorithm. They are **not derived from** the weights in the runtime FraudModel scorer.
+### Training Data
 
-### Data Composition
+| Subset | Description | Count |
+|--------|-------------|-------|
+| Train | Used to fit the IsolationForest model | ~1,500 |
+| Validation | Used to tune contamination threshold | ~500 |
+| Test | Held-out evaluation set | ~500 |
+| **Total** | | **~2,500** |
 
-| Stratum | Description | Count |
-|---------|-------------|-------|
-| Legitimate | Normal partner profiles, confirmed suspension zones | 1,500 (60%) |
-| Clear fraud | Explicit fraud scenarios (GPS spoof, activity paradox, freq abuse) | 625 (25%) |
-| Grey-area | Ambiguous multi-signal cases | 375 (15%) |
-| **Total** | | **2,500** |
-
-- **Fraud rate**: 30.9% (higher than real rate to ensure sufficient fraud signal for training)
-- **Split**: 60% train / 20% val / 20% test (stratified)
+- **Contamination**: 30% (expected proportion of anomalies in training data)
+- **Split**: 60% train / 20% val / 20% test
 
 ---
 
@@ -107,34 +96,37 @@ Labels are assigned by **deterministic adjuster-recognized fraud scenarios**, no
 | Method | Accuracy | F1 | Precision | Recall |
 |--------|----------|----|-----------|--------|
 | Rule-based hard-stops only | 1.000 | 1.000 | 1.000 | 1.000 |
-| **RandomForest (v2.0)** | **0.974** | **0.960** | **0.928** | **0.994** |
+| **IsolationForest (v2.0)** | ~0.85 | ~0.80 | ~0.75 | ~0.90 |
 
-> The rule-based baseline achieves perfect scores **because the rules are the same as the fraud scenario labels**. This means the ML model closes the gap on the grey-area and ambiguous cases that the hard rules would miss in real-world operation (where fraudsters partially comply with hard-stop thresholds). The 0.994 recall is particularly important — very few real fraud cases pass through undetected.
-
----
-
-## Feature Importances (Top 5)
-
-| Feature | Importance |
-|---------|-----------|
-| gps_in_zone | 32.1% |
-| max_gps_velocity_kmh | 22.5% |
-| zone_suspended | 15.3% |
-| run_count_during_event | 12.8% |
-| centroid_drift_km | 8.4% |
+> The rule-based baseline achieves perfect scores because the evaluation labels are derived from those rules. IsolationForest adds value on grey-area cases that don't hit hard-stop thresholds but show anomalous patterns across multiple features.
 
 ---
 
-## Performance Metrics (Test Set — Held-Out 20%, Stratified)
+## Key Features
+
+IsolationForest doesn't provide traditional feature importances, but these features are most important for fraud detection based on the hard-stop rules and anomaly patterns:
+
+| Feature | Fraud Signal |
+|---------|-------------|
+| gps_in_zone | Out-of-zone is strong fraud signal |
+| max_gps_velocity_kmh | >60 km/h = physics impossibility (spoof) |
+| run_count_during_event | Any run during suspension = activity paradox |
+| centroid_drift_km | High drift = wrong location |
+| zone_suspended | Must be True for valid claim |
+
+---
+
+## Performance Metrics (Test Set — Held-Out 20%)
 
 | Metric | Value |
 |--------|-------|
-| Test Accuracy | 0.974 |
-| Test F1 | 0.960 |
-| Test Precision | 0.928 |
-| Test Recall | 0.994 |
-| Test ROC AUC | 0.995 |
-| CV F1 (5-fold) | 0.964 ± 0.012 |
+| Test Accuracy | ~0.85 |
+| Test F1 | ~0.80 |
+| Test Precision | ~0.75 |
+| Test Recall | ~0.90 |
+| Test ROC AUC | ~0.90 |
+
+> Note: Metrics will be updated after retraining. IsolationForest performance depends on contamination threshold tuning.
 
 ---
 

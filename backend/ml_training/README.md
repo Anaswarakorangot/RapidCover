@@ -7,7 +7,7 @@ This directory contains the ML training pipeline for RapidCover's three producti
 | | v1.0 | v2.0 |
 |-|------|------|
 | Premium target | Formula-derived `weekly_premium` (circular) | `expected_weekly_payout_pressure` (independent economic signal) |
-| Fraud model | IsolationForest (unsupervised) | RandomForestClassifier (supervised) |
+| Fraud model | IsolationForest (unsupervised) | IsolationForest (unsupervised) |
 | Fraud labels | Formula-derived fraud scores (circular) | Policy-grounded deterministic scenarios |
 | Training split | 80/20 train/test | 60/20/20 train/val/test |
 | Baselines | None | City-mean / tier-mean / rule-based comparisons |
@@ -34,7 +34,7 @@ This directory contains the ML training pipeline for RapidCover's three producti
 - **Top feature**: active_days_last_30 (33.1%)
 - **Model card**: [premium_model_card.md](../ml_models/model_cards/premium_model_card.md)
 
-### 3. Fraud Detector — RandomForestClassifier (supervised)
+### 3. Fraud Detector — IsolationForest (unsupervised)
 - **Predicts**: Binary fraud probability (is_fraud: 0/1)
 - **Labels**: Policy-grounded deterministic scenarios — **NOT derived from runtime scoring formula**
 - **Test F1**: 0.960; AUC: 0.995; Recall: 0.994
@@ -65,7 +65,7 @@ ml_models/
     premium_model.pkl            # Trained premium model
     premium_city_encoder.pkl     # City label encoder
     premium_tier_encoder.pkl     # Tier label encoder
-    fraud_model.pkl              # Trained fraud model (RandomForestClassifier)
+    fraud_model.pkl              # Trained fraud model (IsolationForest)
     model_cards/
         ARCHITECTURE.md          # Learned vs deterministic boundary reference
         JUDGE_FAQ.md             # Sub-45-second answers to all judge questions

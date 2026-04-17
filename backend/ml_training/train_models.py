@@ -20,18 +20,13 @@ Three models are trained:
      Baseline: tier-mean predictor.
      Split: 60% train / 20% val / 20% test
 
-  3. Fraud Detector (RandomForestClassifier -- supervised)
-     Target: is_fraud (0/1) -- deterministic policy-grounded labels from
-             adjuster-recognized fraud scenarios (GPS spoofing, activity
-             paradox, frequency abuse, multi-signal anomaly).
-             This is NOT derived from the run-time weighted scoring formula.
+  3. Fraud Detector (IsolationForest -- unsupervised anomaly detection)
+     Target: Anomaly detection across GPS, device, and activity patterns.
+             IsolationForest isolates anomalies by random feature splitting,
+             ideal for fraud detection where labeled fraud samples are scarce.
      Baseline: rule-based hard-stop only classifier (flags any hard-stop hit).
-     Split: 60% train / 20% val / 20% test (stratified)
-
-IMPORTANT: This project uses a supervised RandomForestClassifier for fraud,
-NOT IsolationForest. The training data has independent labels, so supervised
-learning is both appropriate and more defensible to judges than unsupervised
-anomaly detection on formula-derived labels.
+     Note: Deterministic hard-stops (GPS velocity >60km/h, activity paradox)
+           always override ML output.
 
 Feature importances are saved for all three models to enable explanation.
 """
@@ -43,7 +38,7 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestClassifier
+from sklearn.ensemble import GradientBoostingRegressor, IsolationForest
 from sklearn.metrics import (
     accuracy_score, f1_score, mean_absolute_error, mean_squared_error,
     precision_score, r2_score, recall_score, roc_auc_score,
@@ -345,21 +340,21 @@ def _rule_based_fraud_predict(X: np.ndarray, feature_cols: list) -> np.ndarray:
 
 def train_fraud_model(data_path: Path, output_dir: Path) -> dict:
     """
-    Train supervised RandomForestClassifier on independently labeled fraud data.
+    Train IsolationForest for unsupervised anomaly detection on fraud data.
 
-    Uses policy-grounded deterministic scenario labels (NOT the runtime weighted
-    scoring formula). This is a fully supervised classification problem.
+    IsolationForest isolates anomalies by random feature splitting, making it
+    ideal for fraud detection where labeled fraud samples are scarce.
 
     Baseline: rule-based hard-stop-only classifier (same rules as the deterministic
     gates in the runtime FraudModel -- the ML model adds value on top of these).
     """
-    _section("Model 3: Fraud Detector (supervised RandomForestClassifier)")
+    _section("Model 3: Fraud Detector (IsolationForest - unsupervised)")
 
     df = pd.read_csv(data_path)
     print(f"  Loaded {len(df)} samples")
     fraud_rate = df["is_fraud"].mean() * 100
-    print(f"  Fraud rate: {fraud_rate:.1f}%  (independent policy-grounded labels)")
-    print(f"  Model: RandomForestClassifier (supervised -- labels are NOT from scoring formula)")
+    print(f"  Fraud rate in data: {fraud_rate:.1f}%")
+    print(f"  Model: IsolationForest (unsupervised anomaly detection)")
 
     feature_cols = [
         "gps_in_zone", "run_count_during_event", "zone_polygon_match",
@@ -367,9 +362,9 @@ def train_fraud_model(data_path: Path, output_dir: Path) -> dict:
         "centroid_drift_km", "max_gps_velocity_kmh", "zone_suspended",
     ]
     X = df[feature_cols].values
-    y = df["is_fraud"].values
+    y = df["is_fraud"].values  # Used for evaluation only, not training
 
-    # Stratified 60 / 20 / 20 split
+    # 60 / 20 / 20 split (for evaluation purposes)
     X_tv, X_test, y_tv, y_test = train_test_split(
         X, y, test_size=0.20, random_state=42, stratify=y
     )
@@ -387,21 +382,32 @@ def train_fraud_model(data_path: Path, output_dir: Path) -> dict:
     print(f"\n  Baseline (rule-only):  Acc={baseline_acc:.3f}  F1={baseline_f1:.3f}  "
           f"P={baseline_prec:.3f}  R={baseline_rec:.3f}")
 
-    # ── Train RandomForestClassifier ──
-    model = RandomForestClassifier(
+    # ── Train IsolationForest (unsupervised - no labels used) ──
+    # contamination = expected proportion of outliers (fraud rate)
+    model = IsolationForest(
         n_estimators=200,
-        max_depth=10,
-        min_samples_leaf=5,
-        class_weight="balanced",   # handle class imbalance
+        max_samples='auto',
+        contamination=0.3,  # ~30% anomalies expected based on data
         random_state=42,
         n_jobs=-1,
     )
-    model.fit(X_train, y_train)
+    model.fit(X_train)  # Unsupervised - no y labels
 
-    # ── Evaluate ──
-    y_val_pred  = model.predict(X_val)
-    y_test_pred = model.predict(X_test)
-    y_test_prob = model.predict_proba(X_test)[:, 1]
+    # ── Evaluate using anomaly scores ──
+    # IsolationForest: score_samples returns negative values (more negative = more anomalous)
+    # Convert to predictions: anomaly score < 0 threshold = fraud
+    def get_predictions(X_data):
+        scores = model.score_samples(X_data)
+        # Use threshold to convert scores to binary predictions
+        # More negative = more anomalous = fraud
+        threshold = np.percentile(model.score_samples(X_train), 30)  # ~30% contamination
+        return (scores < threshold).astype(int)
+
+    y_val_pred = get_predictions(X_val)
+    y_test_pred = get_predictions(X_test)
+
+    # Get anomaly scores for ROC-AUC (negate so higher = more fraud)
+    y_test_scores = -model.score_samples(X_test)
 
     val_acc  = float(accuracy_score(y_val, y_val_pred))
     val_f1   = float(f1_score(y_val, y_val_pred, zero_division=0))
@@ -411,40 +417,30 @@ def train_fraud_model(data_path: Path, output_dir: Path) -> dict:
     test_prec = float(precision_score(y_test, y_test_pred, zero_division=0))
     test_rec  = float(recall_score(y_test, y_test_pred, zero_division=0))
     try:
-        test_auc = float(roc_auc_score(y_test, y_test_prob))
+        test_auc = float(roc_auc_score(y_test, y_test_scores))
     except Exception:
         test_auc = 0.5
-
-    cv_scores = cross_val_score(model, X_tv, y_tv, cv=5, scoring="f1")
 
     print(f"  Val:           Acc={val_acc:.3f}  F1={val_f1:.3f}")
     print(f"  Test (held):   Acc={test_acc:.3f}  F1={test_f1:.3f}  "
           f"P={test_prec:.3f}  R={test_rec:.3f}  AUC={test_auc:.3f}")
-    print(f"  CV F1 (5-fold): {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
-    print(f"  Improvement over rule-only: F1 {baseline_f1:.3f} -> {test_f1:.3f}")
-
-    fi = _feature_importances(model, feature_cols)
-    print(f"  Top feature: {fi[0]['feature']} ({fi[0]['importance']:.4f})")
 
     # ── Save ──
     joblib.dump(model, output_dir / "fraud_model.pkl")
-    print(f"\n  [OK] Saved fraud_model.pkl (RandomForestClassifier)")
+    print(f"\n  [OK] Saved fraud_model.pkl (IsolationForest)")
 
     return {
-        "model_type": "RandomForestClassifier",
-        "target": "is_fraud",
+        "model_type": "IsolationForest",
+        "target": "anomaly_detection",
         "target_description": (
-            "Binary label assigned by policy-grounded deterministic scenarios "
-            "(GPS spoofing, activity paradox, frequency abuse, multi-signal anomaly). "
-            "Labels are INDEPENDENT of the runtime weighted scoring formula."
+            "Unsupervised anomaly detection using IsolationForest. "
+            "Isolates anomalies by random feature splitting across GPS, device, "
+            "and activity patterns. Deterministic hard-stops always override ML output."
         ),
         "n_features": len(feature_cols),
         "feature_names": feature_cols,
         "split": {"train": int(len(X_train)), "val": int(len(X_val)), "test": int(len(X_test))},
-        "class_distribution": {
-            "fraud_rate_pct": round(float(fraud_rate), 2),
-            "legitimate_rate_pct": round(float(100 - fraud_rate), 2),
-        },
+        "contamination": 0.3,
         "baseline": {
             "method": "rule_based_hard_stop_only",
             "description": "Flags fraud only when hard deterministic stops are hit",
@@ -461,13 +457,10 @@ def train_fraud_model(data_path: Path, output_dir: Path) -> dict:
             "recall":    round(test_rec, 4),
             "roc_auc":   round(test_auc, 4),
         },
-        "cv_f1_mean": round(float(cv_scores.mean()), 4),
-        "cv_f1_std":  round(float(cv_scores.std()), 4),
-        "feature_importances": fi,
         "architecture_note": (
+            "IsolationForest detects multivariate anomalies by random feature splitting. "
             "Deterministic hard-stops (GPS velocity>60, run_count>0, zone_suspended=False) "
-            "always override ML decision. ML assists triage and grey-area anomaly detection "
-            "between the hard stops. The model never decides alone on high-stakes rejections."
+            "always override ML decision. The model assists triage in grey-area cases."
         ),
     }
 

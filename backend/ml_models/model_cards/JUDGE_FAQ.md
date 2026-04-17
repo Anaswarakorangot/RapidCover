@@ -13,7 +13,7 @@
 
 2. **Premium Engine** — XGBoost Regressor trained to predict *expected weekly payout pressure* (how much the insurer expects to pay out per week for a given partner profile). This is an independent economic signal — not the pricing formula.
 
-3. **Fraud Triage** — RandomForestClassifier trained on policy-grounded fraud scenario labels to identify suspicious claim patterns across GPS, device, zone, and activity features.
+3. **Fraud Triage** — IsolationForest for unsupervised anomaly detection across GPS, device, zone, and activity patterns. Isolates anomalies by random feature splitting.
 
 **The manual/fallback models still exist** as a safety net — if ML fails, the system keeps running. This is a feature, not a weakness: it means the deterministic rules still protect every payout even if all ML is unavailable.
 
@@ -57,7 +57,7 @@ The pricing formula's constraints — IRDAI 3x cap, tier floor prices, loyalty d
 
 2. **Centroid drift check**: A partner's 30-day GPS centroid is compared to the dark store location. Drift > 15km triggers a manual review flag — also deterministic, pre-ML.
 
-3. **ML triage**: The RandomForestClassifier sees `max_gps_velocity_kmh` and `gps_in_zone` as its two highest-importance features (32% and 22% respectively). It catches spoofing attempts that stay below the velocity threshold but show other anomalous patterns.
+3. **ML triage**: The IsolationForest identifies anomalous patterns across GPS, velocity, and zone features. It catches spoofing attempts that stay below the velocity threshold but show other unusual combinations of signals.
 
 The GPS velocity check **alone** is enough to stop naive spoofing. The ML layer catches more sophisticated pattern combinations.
 
