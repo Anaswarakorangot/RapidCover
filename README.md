@@ -1,133 +1,393 @@
 <div align="center">
 
-# 📘 [➡️ Phase 2 Additions — Click Here for Full Details](./PHASE2_README.md)
-
-> **Phase 2 adds 25+ production-grade features:** multi-trigger arbitration, 7-factor fraud model, RIQI urban/rural scoring, zone reassignment, 6 actuarial stress scenarios, social oracle verification, 10-check validation matrix, and a 15-tab admin dashboard.
-
----
-
 # 🛵 RapidCover
-### *The Parametric Engine for India's Dark Store Last-Mile Warriors*
 
-[🚀 Live Demo (Render/Railway)](https://rapidcover.onrender.com) &nbsp; | &nbsp; [📽️ Pitch Video](https://youtube.com/rapidcover) &nbsp; | &nbsp; [📘 Phase 2 Features](./PHASE2_README.md)
+### **Parametric Income Insurance Engine for India's Q-Commerce Delivery Workforce**
+
+[![Platform](https://img.shields.io/badge/Platform-PWA%20(Mobile%20First)-8B2FC9?style=for-the-badge)](/)
+[![Persona](https://img.shields.io/badge/Persona-Zepto%20%2F%20Blinkit%20Partners-FF6B35?style=for-the-badge)](/)
+[![Hackathon](https://img.shields.io/badge/Guidewire-DEVTrails%202026-232F3E?style=for-the-badge)](/)
+[![Insurance](https://img.shields.io/badge/Insurance-Parametric%20Income%20Protection-00B894?style=for-the-badge)](/)
+[![ML Models](https://img.shields.io/badge/ML-3%20Trained%20Models-3498DB?style=for-the-badge)](/)
+[![Tests](https://img.shields.io/badge/Tests-24%20Suites-27AE60?style=for-the-badge)](/)
+[![Phase](https://img.shields.io/badge/Phase-2%20Complete-00B894?style=for-the-badge)](/)
 
 <br/>
 
-> **"Last month, a flash flood hit my dark store zone at 6 PM — peak hour. Zepto suspended the entire zone. I sat outside the dark store for 3 hours waiting. Zero runs. Zero income. Nobody called. Nobody compensated. I just went home."**
+> *"Last month, a flash flood hit my dark store zone at 6 PM — peak hour. Zepto suspended the entire zone. I sat outside for 3 hours. Zero runs. Zero income. Nobody compensated. I just went home."*
 >
-> *— Manoj, 24, Zepto Delivery Partner, Bellandur, Bangalore*
+> — **Manoj, 24**, Zepto Delivery Partner, Bellandur, Bangalore
 
 <br/>
 
-![Platform](https://img.shields.io/badge/Platform-Mobile%20App%20(PWA)-8B2FC9?style=for-the-badge)
-![Persona](https://img.shields.io/badge/Persona-Q--Commerce%20%7C%20Zepto%20%2F%20Blinkit-FF6B35?style=for-the-badge)
-![Hackathon](https://img.shields.io/badge/Guidewire-DEVTrails%202026-232F3E?style=for-the-badge)
-![Insurance Type](https://img.shields.io/badge/Insurance-Parametric%20Income%20Protection-00B894?style=for-the-badge)
-![Coverage](https://img.shields.io/badge/Coverage-Income%20Loss%20ONLY-E74C3C?style=for-the-badge)
-![Phase](https://img.shields.io/badge/Phase-2%20Complete-00B894?style=for-the-badge)
-
-<br/>
-
----
+[📽️ Pitch Video](https://youtube.com/rapidcover) &nbsp;|&nbsp; [📘 Phase 2 Docs](./PHASE2_README.md) &nbsp;|&nbsp; [🧪 Demo Guide](./DEMO_MODE_GUIDE.md)
 
 </div>
 
+---
+
 ## 📌 Table of Contents
 
-0. [**📘 Phase 2 Features (Separate Document)**](./PHASE2_README.md)
-1. [The Problem We're Solving](#-the-problem-were-solving)
-2. [Meet Our Persona — Manoj](#-meet-our-persona--manoj)
-3. [What RapidCover Is](#-what-rapidcover-is)
-4. [Why Mobile App (PWA)](#-why-mobile-app-pwa)
-5. [Weekly Premium Model](#-weekly-premium-model)
-6. [Parametric Triggers](#-parametric-triggers)
-7. [What RapidCover Does NOT Cover](#-what-rapidcover-does-not-cover--standard-exclusions)
-8. [AI/ML Integration Plan](#-aiml-integration-plan)
-9. [Fraud Detection Architecture](#-fraud-detection-architecture)
-10. [Application Workflow](#-application-workflow)
-11. [Analytics Dashboard](#-analytics-dashboard)
-12. [Tech Stack & Architecture](#-tech-stack--architecture)
-13. [Actuarial Model](#-actuarial-model--financial-viability--pricing-basis)
-14. [Phase 2 Features Summary](#-phase-2-features-summary)
-15. [Development Plan](#-development-plan)
-16. [Quick Start (One-Command Setup)](#-quick-start)
-17. [Environment Variables](#-environment-variables)
-18. [Running the Demo](#-running-the-simulation-demo)
-19. [Installation on Mobile](#-pwa-installation-on-android)
-20. [Business Viability](#-business-viability)
+| # | Section |
+|---|---------|
+| 1 | [Problem Statement](#-the-problem) |
+| 2 | [What RapidCover Is](#-what-rapidcover-is) |
+| 3 | [Key Features](#-key-features) |
+| 4 | [System Architecture](#-system-architecture) |
+| 5 | [Tech Stack](#-tech-stack) |
+| 6 | [ML Models & Training](#-ml-models--training-pipeline) |
+| 7 | [Parametric Triggers](#-parametric-triggers) |
+| 8 | [Fraud Detection (7-Factor)](#-fraud-detection-architecture) |
+| 9 | [Zero-Touch Claim Flow](#-zero-touch-claim-flow) |
+| 10 | [Weekly Premium Model](#-weekly-premium-model) |
+| 11 | [Admin Dashboard (15+ Tabs)](#-admin-dashboard) |
+| 12 | [Partner Experience](#-partner-experience) |
+| 13 | [API Reference](#-api-reference) |
+| 14 | [Folder Structure](#-folder-structure) |
+| 15 | [Installation & Setup](#-installation--setup) |
+| 16 | [Environment Variables](#-environment-variables) |
+| 17 | [Running the Demo](#-running-the-demo) |
+| 18 | [Testing](#-testing) |
+| 19 | [Actuarial Model](#-actuarial-model) |
+| 20 | [Exclusions](#-exclusions) |
+| 21 | [Business Viability](#-business-viability) |
+| 22 | [Contributing](#-contributing) |
+| 23 | [License](#-license) |
 
 ---
 
-## 💔 The Problem We're Solving
+## 💔 The Problem
 
-India's Q-Commerce boom — Zepto's 10-minute delivery promise, Blinkit's dark store model — runs on **500,000+ hyper-local delivery partners**. These workers earn per run, per shift. No work = no pay.
-
-When an external disruption hits a Q-Commerce worker, the loss is not gradual — it is instant and total:
+India's Q-Commerce sector — Zepto, Blinkit, Swiggy Instamart — runs on **500,000+ gig delivery partners**. These workers earn per delivery, per shift. When an external disruption hits (flood, heatwave, curfew), income stops instantly:
 
 ```
 Dark Store Suspended → Worker has NO other pickup point → Income = ₹0
 ```
 
-| Event | Duration | Avg Income Lost | Current Compensation |
-|-------|----------|----------------|---------------------|
+| Disruption Event | Duration | Avg Income Lost | Current Compensation |
+|---|---|---|---|
 | Flash flood (zone-level) | 4–8 hours | ₹400–₹700 | ₹0 |
 | Cyclone warning suspension | 2–4 days | ₹2,000–₹4,000 | ₹0 |
 | Extreme heat advisory | 6–10 hours | ₹500–₹900 | ₹0 |
 | Dangerous AQI breach | 3–6 hours | ₹250–₹500 | ₹0 |
 | Curfew / Section 144 | 1–3 days | ₹800–₹2,400 | ₹0 |
 
-No bank product covers this. No platform compensates for it. **RapidCover does — automatically, in under 10 minutes.**
-
----
-
-## 👤 Meet Our Persona — Manoj
-
-**Manoj, 24. Zepto Delivery Partner. Bellandur, Bangalore.**
-
-- Works 6 days a week, 8–10 hours/day at the Bellandur dark store (Zone BLR-047)
-- Earns ₹700–₹900/day — 10–15 runs/hour during peak
-- EMI on his bike. Sends ₹4,000 home monthly to Tumkur
-- Uses a Redmi Note 12. Lives inside WhatsApp, GPay, and the Zepto partner app
-- Last monsoon: 3 zone suspensions in 6 weeks. Lost ₹6,400. Borrowed from his cousin
-
-**What Manoj needs:** Pay a small weekly amount and never think about insurance again. When Zepto suspends his zone — money should just arrive on his phone.
-
-**What RapidCover delivers:** ₹33/week (Standard tier). Rain detected → zone suspension confirmed → 10-check validation matrix → UPI credit in 49 seconds. Manoj did nothing. Money arrived on his lock screen.
+**No bank product covers this. No platform compensates. RapidCover does — automatically, in under 60 seconds.**
 
 ---
 
 ## 🛡️ What RapidCover Is
 
-RapidCover is a **weekly parametric income insurance platform** built exclusively for Zepto and Blinkit delivery partners (the Dark Store warriors).
-
-
-**Strictly covers income loss only.** No health. No vehicle. No accidents. No life insurance.
+RapidCover is a **weekly parametric income insurance platform** that automatically detects disruption events via real-time APIs, validates them through a 10-check pipeline, and credits payouts to the worker's UPI wallet — with **zero human intervention**.
 
 ```
 TRADITIONAL INSURANCE:
-Event happens → Worker files claim → Adjuster reviews → 7–21 days → Maybe payout
+  Event → File claim → Adjuster reviews → 7–21 days → Maybe payout
 
 RAPIDCOVER PARAMETRIC:
-Event happens → APIs detect it → System validates → Push notification + UPI credit → 8 minutes
-                                                      Worker did absolutely nothing
+  Event detected → APIs validate → 10-check matrix → UPI credit in ~49 seconds
+                                                       Worker did nothing.
+```
+
+**Strictly covers income loss only.** No health. No vehicle. No accidents. No life insurance.
+
+---
+
+## ⚡ Key Features
+
+### Core Insurance Engine
+- **5 parametric triggers** — Rain/Flood, Extreme Heat, Dangerous AQI, Civic Shutdown, Dark Store Closure
+- **Zero-touch claims** — 11-step automated pipeline from trigger detection to UPI payout
+- **10-check validation matrix** — Source breach, zone polygon, pin-code, active policy, shift window, partner activity, platform confirmation, fraud score, data freshness, cross-source oracle
+- **Multi-trigger arbitration** — Resolves overlapping events (e.g., rain + closure simultaneously)
+- **Sustained event protocol** — 14-day monsoon mode with 70% payout to preserve reserves
+
+### ML-Powered Intelligence
+- **3 trained XGBoost/RandomForest models** with serialized `.pkl` artifacts and full model metadata
+- **Zone Risk Scorer** — XGBoost Regressor, 10 features, R² = 0.57
+- **Dynamic Premium Engine** — XGBoost Regressor, 8 features, R² = 0.66
+- **Fraud Detector** — RandomForest Classifier, 9 features, F1 = 0.96, ROC-AUC = 0.995
+
+### Fraud Prevention (7-Factor Model)
+- GPS coherence & velocity physics check (>60 km/h = spoof)
+- Activity paradox detection (runs during disruption = hard reject)
+- 30-day GPS centroid drift tracking (>15 km = auto-flag)
+- Device fingerprinting & IP clustering for collusion rings
+- Cryptographic duplicate event rejection
+
+### Partner Experience (PWA)
+- **Progressive Web App** — installable via WhatsApp link, no app store required
+- **Service worker** with offline caching and background sync
+- **Web Push notifications** (VAPID) — lock-screen alerts in English & Hindi
+- **UPI deep links** — GPay/PhonePe one-tap payments
+- **Guided onboarding flow** with eligibility check, shift selection, and RIQI-adjusted plan cards
+- **Trust Center** — full transparency on how claims are validated
+
+### Admin Dashboard (15+ Tabs)
+- Real-time BCR / Loss Ratio monitoring with city-level granularity
+- Interactive zone map with Leaflet (density + trigger overlay)
+- Fraud queue (one-click approve/reject/bulk actions)
+- Drill execution engine (10 structured presets + stress scenarios)
+- Social Oracle verification panel (NLP + live API cross-check)
+- Live API data feeds, RIQI provenance, notification preview, payment reconciliation
+- Demo mode scenario simulation & instant replay
+
+### Infrastructure
+- **Background scheduler** (APScheduler) polling trigger engine every 45 seconds
+- **Payment state machine** with reconciliation job for failed/stuck payouts
+- **Rate limiting** (SlowAPI) and global exception handling
+- **Sentry integration** for error tracking (optional)
+- **Redis caching** (FastAPICache) with InMemory fallback
+- **Structured JSON logging** with configurable levels
+- **WebSocket support** for real-time admin updates
+- **Alembic migrations** for database schema management
+
+---
+
+## 🏗️ System Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                     MOBILE LAYER (PWA)                               │
+│   React 19 + Vite 8 — Partner App + Admin Dashboard                  │
+│   TailwindCSS 4  |  Web Push API  |  Leaflet Maps  |  UPI Deep Link │
+│   Service Worker  |  Offline Mode  |  EN + HI Internationalization   │
+└──────────────────────────────────────────────────────────────────────┘
+                         ↕ REST API (18 route modules)
+┌──────────────────────────────────────────────────────────────────────┐
+│              BACKEND — Python + FastAPI (39 services)                 │
+│                                                                      │
+│  Auth          │  Policy Engine    │  Trigger Engine                  │
+│  Claims Proc.  │  Fraud Service    │  Fraud Detector                 │
+│  Payout Svc.   │  Premium Engine   │  ML Service (3 models)          │
+│  Drill Engine  │  RIQI Service     │  Social Oracle (NLP)            │
+│  Zone Reassign │  Scheduler        │  Reconciliation                 │
+│  Notifications │  Collusion Det.   │  Device Fingerprint             │
+│  Demo Mode     │  Stress Scenarios │  Prediction Service             │
+│  Verification  │  Policy Lifecycle │  Policy Certificate (PDF)       │
+│  Replay Svc.   │  Payment State M. │  Runtime Metadata               │
+└──────────────────────────────────────────────────────────────────────┘
+       ↕                      ↕                       ↕
+┌───────────────┐  ┌─────────────────────┐  ┌──────────────────┐
+│  ML MODELS    │  │   EXTERNAL APIs     │  │  PAYMENT LAYER   │
+│  (Serialized) │  │  OpenWeatherMap     │  │  Razorpay Test   │
+│               │  │  WAQI/CPCB AQI      │  │  Stripe Test     │
+│  zone_risk    │  │  Mock Traffic       │  │  Mock UPI        │
+│  premium      │  │  Mock Civic Alert   │  └──────────────────┘
+│  fraud        │  │  Platform Activity  │
+│               │  │  Social Oracle NLP  │
+│  + encoders   │  │  Groq AI Chat       │
+└───────────────┘  └─────────────────────┘
+                              ↕
+┌──────────────────────────────────────────────────────────────────────┐
+│         DATA LAYER — SQLite (dev) / PostgreSQL (prod)                │
+│                                                                      │
+│   Partners  │ Zones  │ Policies  │ Claims  │ Trigger Events          │
+│   Zone Risk Profiles  │ Zone Reassignments  │ Push Subscriptions     │
+│   Drill Sessions  │ Weather Observations  │ Predictions              │
+│   GPS Pings  │ Partner Devices  │ Sustained Events                   │
+│   Active Event Trackers  │ System Settings                           │
+└──────────────────────────────────────────────────────────────────────┘
+                              ↕
+┌──────────────────────────────────────────────────────────────────────┐
+│   BACKGROUND JOBS — APScheduler (SQLAlchemy persistent job store)    │
+│   Trigger polling (45s) │ Payment reconciliation │ Event tracking    │
+└──────────────────────────────────────────────────────────────────────┘
+                              ↕
+┌──────────────────────────────────────────────────────────────────────┐
+│   NOTIFICATIONS — Web Push (VAPID/pywebpush) + Template Engine      │
+│   English │ Hindi  │ Multilingual fallback chain                     │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📱 Why Mobile App (PWA)
+## 🔧 Tech Stack
 
-Manoj is on a bike. Never at a desk. The core promise — *"money just arrives"* — requires a push notification on his lock screen. A web app cannot do this reliably.
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Frontend** | React 19 + Vite 8 (PWA) | Android-installable app with push notifications, native GPS, UPI deep links |
+| **Styling** | TailwindCSS v4 | Responsive mobile-first design system |
+| **Maps** | Leaflet + React-Leaflet | Zone visualization, dark store mapping |
+| **Routing** | React Router v7 | SPA with protected routes and auth guards |
+| **Backend** | Python + FastAPI | Async REST API with 39 service modules and 18 route modules |
+| **Database** | SQLite (dev) / PostgreSQL (prod) | 16 SQLAlchemy models with Alembic migrations |
+| **Caching** | Redis (primary) / InMemory (fallback) | API response caching via FastAPICache |
+| **ML** | XGBoost + scikit-learn + pandas + NumPy | 3 trained models with joblib serialization |
+| **Scheduler** | APScheduler | Persistent background jobs (trigger polling, reconciliation) |
+| **Weather** | OpenWeatherMap API (free tier) | Real-time rainfall, temperature, humidity per zone GPS |
+| **AQI** | WAQI / aqicn.org + CPCB API | Station-level air quality data for Indian cities |
+| **Traffic** | Mock road condition feed | Cross-validation layer for trigger verification |
+| **Payments** | Razorpay Test Mode + Stripe Test Mode | Full payout demonstration (no real transactions) |
+| **Notifications** | pywebpush (VAPID) | Lock-screen push in English + Hindi |
+| **Auth** | JWT (python-jose) + OTP + bcrypt | Partner OTP login + Admin email/password auth |
+| **PDF** | ReportLab | Policy certificate generation |
+| **Monitoring** | Sentry SDK (optional) | Production error tracking with 10% sampling |
+| **Rate Limiting** | SlowAPI | Request throttling per endpoint |
+| **Testing** | pytest (backend) + Vitest + React Testing Library (frontend) | 24 backend test suites + frontend integration tests |
 
-| Moment | Web App | Mobile PWA |
-|--------|---------|------------|
-| Disruption alert — notify instantly | ❌ Needs browser open | ✅ Push to lock screen |
-| Payout confirmation | ❌ Must open browser | ✅ Appears on lock screen |
-| Onboarding in a 3-min tea break | ❌ Awkward on phone browser | ✅ Native smooth flow |
-| GPS zone validation | ❌ Browser GPS unreliable | ✅ Native GPS, accurate |
-| UPI deep link for payment | ❌ Clunky mobile browser redirect | ✅ Opens GPay/PhonePe directly |
-| Weekly premium reminder | ❌ No reliable mechanism | ✅ Scheduled push notification |
+---
 
-**Why PWA over native Android:** Installs on any Android device from a single WhatsApp link — no app store, no approval wait. Same React codebase, real push notifications, native GPS, UPI deep links. This mirrors exactly how Zepto onboards its own partners today.
+## 🧠 ML Models & Training Pipeline
+
+Three production ML models are trained on synthetic but domain-realistic data, with full provenance tracking:
+
+### Model 1 — Zone Risk Scorer
+
+| Attribute | Value |
+|-----------|-------|
+| Algorithm | XGBoost Regressor |
+| Features | 10 (city, avg rainfall, flood events, AQI, heat advisories, bandh events, dark store suspensions, road flood prone, month) |
+| Training Split | 720 train / 240 val / 240 test |
+| Test R² | 0.5727 |
+| Test MAE | 6.43 |
+| Cross-Val R² | 0.5703 ± 0.066 |
+| Top Feature | `road_flood_prone` (21.9% importance) |
+
+### Model 2 — Dynamic Premium Engine
+
+| Attribute | Value |
+|-----------|-------|
+| Algorithm | XGBoost Regressor |
+| Target | Expected weekly payout pressure (independent of pricing formula) |
+| Features | 8 (city, zone risk score, active days, avg hours, tier, loyalty weeks, month, RIQI score) |
+| Training Split | 900 train / 300 val / 300 test |
+| Test R² | 0.6646 |
+| Test MAE | ₹10.71 |
+| Cross-Val R² | 0.6881 ± 0.033 |
+| Note | Deterministic price floor, IRDAI cap, and loyalty adjustments applied post-prediction |
+
+### Model 3 — Fraud Detector
+
+| Attribute | Value |
+|-----------|-------|
+| Algorithm | RandomForest Classifier |
+| Features | 9 (GPS in zone, run count, zone polygon match, claim frequency, device consistency, traffic disrupted, centroid drift, GPS velocity, zone suspended) |
+| Training Split | 1500 train / 500 val / 500 test |
+| Test Accuracy | 97.4% |
+| Test F1 | 0.9595 |
+| ROC-AUC | 0.9951 |
+| Architecture | Deterministic hard-stops always override ML. Model assists triage in grey areas. |
+
+### Training Pipeline
+
+```
+backend/ml_training/
+├── generate_training_data.py   # Synthetic data generation with domain constraints
+├── train_models.py             # Full training pipeline with cross-validation
+├── data/                       # Generated training datasets
+└── README.md                   # Model cards and methodology
+
+backend/ml_models/
+├── zone_risk_model.pkl         # Serialized zone risk model
+├── premium_model.pkl           # Serialized premium model
+├── fraud_model.pkl             # Serialized fraud model
+├── *_encoder.pkl               # Label encoders (city, tier)
+└── model_metadata.json         # Full provenance, metrics, feature importances
+```
+
+---
+
+## ⚡ Parametric Triggers
+
+Five conditions that automatically fire a payout — no claim form, no human review:
+
+| # | Trigger | Source | Threshold | Validation |
+|---|---------|--------|-----------|------------|
+| 1 | **Heavy Rain / Flood** | OpenWeatherMap + IMD | >55mm/hr sustained 30+ min OR IMD orange/red alert | Zone polygon + ops suspension + traffic + GPS |
+| 2 | **Extreme Heat** | OpenWeatherMap + IMD | >43°C sustained 4+ hours OR state advisory | Zone-level temp + partner GPS in zone |
+| 3 | **Dangerous AQI** | CPCB / WAQI | AQI >400 (Severe) for 3+ hours | Station-level AQI at nearest monitor + zone polygon |
+| 4 | **Civic Shutdown** | Mock civic feed + NLP | Official curfew / Section 144 / bandh for 2+ hours | Zone boundary + traffic cross-check |
+| 5 | **Dark Store Closure** | Mock platform ops API | Assigned dark store closed >90 min (non-maintenance) | Timestamped closure log + active shift + traffic |
+
+### 10-Check Validation Matrix (Every Payout)
+
+```
+[1. Source threshold breach] → [2. Zone polygon match]
+         ↓
+[3. Pin-code / ward match]  → [4. Active policy confirmed]
+         ↓
+[5. Shift-window check]     → [6. Partner activity (not offline)]
+         ↓
+[7. Platform activity]      → [8. 7-Factor Fraud Score < 0.90?]
+         ↓
+[9. Data freshness check]   → [10. Cross-source agreement (Oracle)]
+         ↓
+[Payout Calculated + RIQI]  → [Zone Pool Share Cap Applied]
+         ↓
+[UPI Credit via Razorpay]   → [Push Notification in Partner's Language]
+```
+
+---
+
+## 🔍 Fraud Detection Architecture
+
+Seven weighted factors with deterministic hard-reject rules:
+
+```
+fraud_score = 0.25×gps_coherence + 0.25×run_count_check + 0.15×zone_polygon_match
+            + 0.15×claim_frequency + 0.10×device_fingerprint + 0.05×traffic_cross_check
+            + 0.05×centroid_drift_score
+```
+
+| Score Range | Decision |
+|-------------|----------|
+| < 0.50 | ✅ Auto-approve |
+| 0.50 – 0.75 | 🔍 Enhanced validation |
+| 0.75 – 0.90 | 👁 Manual review queue |
+| > 0.90 | ❌ Auto-reject with explanation |
+
+### Attack Vectors & Detection
+
+| Attack | Method | Detection |
+|--------|--------|-----------|
+| GPS Spoofing | Fake location in suspended zone | Velocity physics check — >60 km/h between pings = spoof |
+| Activity Paradox | Claim disruption while completing runs | `run_count > 0` during window → **hard reject** |
+| Zone Boundary Gaming | Register high-risk zone, operate elsewhere | 30-day GPS centroid must stay within 15 km of declared dark store |
+| Duplicate Events | Claim same disruption twice | Cryptographic event ID per trigger — DB-level rejection |
+| Collusion Ring | Multiple fake partners, same device/network | Device fingerprint + IP clustering (`collusion_detector.py`) |
+| Centroid Drift | GPS suddenly in new zone | 30-day centroid drift >15 km = auto-flag |
+
+---
+
+## 🔄 Zero-Touch Claim Flow
+
+The end-to-end flow from disruption to payout with zero partner intervention:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    ZERO-TOUCH CLAIM PIPELINE                  │
+│                                                              │
+│  1. Trigger detected (ward-level threshold breach)           │
+│  2. Active shift check — is partner in declared window?      │
+│  3. Zone polygon match (GPS coordinates)                     │
+│  4. Platform suspension confirmed (mock ops API)             │
+│  5. Traffic cross-check (road disruption confirmed)          │
+│  6. GPS coherence + centroid drift check                     │
+│  7. Run count = 0 during disruption window                   │
+│  8. 7-Factor fraud score computed (ML + deterministic)       │
+│  9. Payout calculated (RIQI multiplier + zone pool cap)      │
+│  10. UPI credit via Razorpay/Stripe mock                     │
+│  11. Push notification in partner's language (EN / HI)       │
+│                                                              │
+│  Partner action required:  ZERO                              │
+│  Trigger to money in wallet:  ~49 seconds                    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Live Example
+
+> **Wednesday 5:47 PM, Bellandur.** IMD: 72mm/hr. OpenWeatherMap confirms.
+>
+> **5:47:23** — Zone BLR-BEL polygon match confirmed. RIQI: 48.
+> **5:47:28** — Shift window: Manoj active Mon-Sat 8AM-10PM. ✅
+> **5:47:35** — Zepto mock ops: Zone suspended.
+> **5:47:44** — GPS: 200m from dark store. Centroid drift: 0.2 km. ✅
+> **5:47:54** — 7-Factor fraud score: 0.11. Auto-approve.
+> **5:48:02** — Payout: ₹272 × 1.25 RIQI = **₹340**.
+> **5:48:12** — Lock screen (Kannada): *"₹340 ನಿಮ್ಮ UPI ಗೆ ಜಮಾ ಆಗಿದೆ."*
+>
+> **Total time: 49 seconds. Manoj did nothing.**
 
 ---
 
@@ -135,661 +395,535 @@ Manoj is on a bike. Never at a desk. The core promise — *"money just arrives"*
 
 Gig workers earn weekly, spend weekly, plan weekly. RapidCover is priced to match.
 
-### Base Tiers (Aligned to Guidewire Spec: ₹20–50/week range)
+### Base Tiers
 
-| Tier | Weekly Premium | Max Payout / Day | Max Days / Week | Max Weekly | Ratio |
-|------|---------------|-----------------|-----------------|------------|-------|
-| ⚡ **Flex** (Part-time) | ₹22/week | ₹250 | 2 days | ₹500 | ~1:23 |
-| 🛵 **Standard** (Full-time) | ₹33/week | ₹400 | 3 days | ₹1,200 | ~1:36 |
-| 🏆 **Pro** (Peak rider) | ₹45/week | ₹500 | 4 days | ₹2,000 | ~1:44 |
+| Tier | Weekly Premium | Max Payout / Day | Max Days / Week | Ratio |
+|------|---------------|-----------------|-----------------|-------|
+| ⚡ **Flex** (Part-time) | ₹22/week | ₹250 | 2 days | ~1:23 |
+| 🛵 **Standard** (Full-time) | ₹33/week | ₹400 | 3 days | ~1:36 |
+| 🏆 **Pro** (Peak rider) | ₹45/week | ₹500 | 4 days | ~1:44 |
 
-### Underwriting Gates (Phase 2)
-
-- **Minimum 7 active delivery days** in last 30 before cover starts
-- **Auto-downgrade to Flex** if < 5 active days in last 30 (cannot self-select Standard/Pro)
-- Worker on leave / voluntarily offline → no payout even if trigger fires
-
-### ML Dynamic Pricing Layer (7-Factor Formula)
-
-Every partner gets a personalized weekly quote every Monday from our gradient-boosted regression model:
+### 7-Factor Dynamic Pricing (ML-Powered)
 
 ```
 PERSONALIZED WEEKLY PREMIUM =
   Base Tier Price
-  × City Peril Multiplier             (city-specific, per Guidewire formula)
-  × Zone Risk Score Multiplier        (0.8–1.4, pin-code level RIQI score)
-  × Seasonal Disruption Index         (city-specific monthly: BLR +20% Jun-Sep, DEL +18% Oct-Jan)
-  × RIQI Adjustment                   (urban=1.0, fringe=1.15, peri-urban=1.3)
-  × Activity Tier Factor              (Flex=0.8, Standard=1.0, Pro=1.35)
-  × Partner Active Hours Factor       (more hours = more exposure)
-  × Loyalty Discount                  (−6% after 4 clean weeks, −10% after 12 weeks)
+  × City Peril Multiplier           (city-specific)
+  × Zone Risk Score Multiplier      (0.8–1.4, RIQI per pin-code)
+  × Seasonal Disruption Index       (BLR +20% Jun-Sep, DEL +18% Oct-Jan)
+  × RIQI Adjustment                 (urban=1.0, fringe=1.15, peri-urban=1.3)
+  × Activity Tier Factor            (Flex=0.8, Standard=1.0, Pro=1.35)
+  × Partner Active Hours Factor     (more hours = more exposure)
+  × Loyalty Discount                (−6% after 4 weeks, −10% after 12 weeks)
   Capped at 3× base tier (IRDAI microinsurance cap)
 ```
 
-**Example:** Manoj (Bellandur, RIQI 48, flood-prone, 10 hrs/day, July) → ₹48/week. Ravi (Whitefield, RIQI 55, low-risk, 6 hrs/day, January) → ₹33/week. Same product. Fair price. Transparent breakdown shown every Monday.
+### Underwriting Gates
 
-### Why Weekly Works
-- Zepto pays partners weekly — premium aligns with earnings
-- ₹33/week = ₹4.70/day = less than one chai
-- 48-hour grace period on missed payment before lapse
-- Auto-renews every Monday 6 AM via UPI auto-debit
+- **Minimum 7 active delivery days** in last 30 before cover starts
+- **Auto-downgrade to Flex** if <5 active days in last 30
+- Worker on leave / voluntarily offline → no payout even if trigger fires
 
 ---
 
-## ⚡ Parametric Triggers
+## 📊 Admin Dashboard
 
-5 conditions that automatically fire a payout. No claim form. No human review.
+The admin panel is a full-screen dark-themed dashboard with **15+ tabs** for insurer operations:
 
-### Trigger 1: Heavy Rain / Flood
-```
-Source     : OpenWeatherMap API + IMD district advisory + Mock road condition API
-Threshold  : Rainfall > 55mm/hr sustained 30+ mins in dark store pin code
-             OR IMD orange/red alert issued for district
-Validation : Zone polygon match + Zepto mock ops suspension confirmed
-             + Traffic mock API confirms road access disruption
-             + Partner GPS active in zone during window
-Payout     : Proportional to disruption hours × hourly earning baseline
-```
-
-### Trigger 2: Extreme Heat
-```
-Source     : OpenWeatherMap API + IMD heat wave bulletin
-Threshold  : Temperature > 43°C sustained 4+ hours in zone
-             OR State govt issues outdoor work restriction advisory
-Validation : Zone-level temp confirmed at dark store location + Partner GPS in zone
-Payout     : Full disruption window up to daily maximum
-```
-
-### Trigger 3: Dangerous AQI
-```
-Source     : CPCB open data API + aqicn.org (free tier)
-Threshold  : AQI > 400 (Severe) in partner's zone for 3+ hours
-             OR Govt issues outdoor work restriction
-Validation : Station-level AQI at nearest monitor to dark store + zone polygon check
-Payout     : Hours of breach × hourly earning rate
-```
-
-### Trigger 4: Civic Shutdown / Curfew / Bandh
-```
-Source     : Mock civic alert feed + NLP on news headlines (NewsAPI)
-             + Mock traffic / road blockade feed
-Threshold  : Official curfew, Section 144, or bandh in delivery zone for 2+ hours
-Validation : Zone boundary check + Traffic mock confirms road blockades
-             + Cross-reference with public authority announcements
-Payout     : Full income coverage for shutdown duration
-```
-
-### Trigger 5: Dark Store Force Majeure Closure
-```
-Source     : Mock Zepto / Blinkit operational status API + Mock traffic feed
-Threshold  : Assigned dark store closed > 90 mins due to external event
-             (not scheduled maintenance)
-Validation : Platform-side closure log verified (timestamped)
-             + Partner had active shift + Traffic mock confirms access disruption
-Payout     : Full shift income covered
-Note       : Most Q-Commerce-specific trigger in existence — unique to RapidCover
-```
-
-### Validation Pipeline (Every Claim — 10-Check Matrix, Phase 2)
-```
-[1. Source threshold breach confirmed]  → [2. Zone polygon match]
-       ↓
-[3. Pin-code / ward match]  → [4. Active policy confirmed]
-       ↓
-[5. Shift-window check]  → [6. Partner activity (not offline/leave)]
-       ↓
-[7. Platform activity confirmed]  → [8. 7-Factor Fraud Score < 0.90?]
-       ↓
-[9. Data freshness check]  → [10. Cross-source agreement (Oracle)]
-       ↓
-[Payout Calculated + RIQI Multiplier]  → [Zone Pool Share Cap Applied]
-       ↓
-[Razorpay UPI Credit]  → [Push Notification in Partner's Language]
-```
+| Tab | Component | Purpose |
+|-----|-----------|---------|
+| 📊 Overview | `AdminStats.jsx` | Key metrics, active policies, payout flow |
+| 📉 BCR / Loss Ratio | `BCRPanel.jsx` | City-level BCR with 85% suspension toggle |
+| 🗺️ Zone Map | `ZoneMapPanel.jsx` | Interactive Leaflet map with density + trigger overlay |
+| 🔍 Fraud Queue | `FraudQueuePanel.jsx` | Pending claims with approve/reject/bulk actions |
+| 🎯 Drills | `DrillPanel.jsx` | 10 structured drill presets with timeline visualization |
+| 📡 Live API Data | `LiveDataPanel.jsx` | Real-time weather/AQI/traffic per zone |
+| ✅ Verification | `VerificationPanel.jsx` | 9-component system health check |
+| ⚡ Stress Proof | `StressProofPanel.jsx` | 14-day monsoon scenario + reserve calculation |
+| 🔄 Reassignments | `ReassignmentQueuePanel.jsx` | Zone reassignment queue (24hr state machine) |
+| 🎯 Trigger Proof | `TriggerProofPanel.jsx` | 10-check validation matrix per claim |
+| 📊 RIQI Provenance | `RiqiProvenancePanel.jsx` | Zone-level RIQI scores with data source tracking |
+| 🔔 Notifications | `NotificationPreviewPanel.jsx` | Multilingual notification preview + test |
+| 🔮 Social Oracle | `SocialOraclePanel.jsx` | NLP verification engine (paste text → real API cross-check) |
+| 💰 Payments | `PaymentReconciliationPanel.jsx` | Payment reconciliation + premium collection |
+| 🧠 Intelligence | `InsurerIntelligencePanel.jsx` | Insurer intelligence & analytics |
+| 🎬 Demo Mode | `DemoModeScenarioPanel.jsx` | Scenario-based simulation with instant replay |
+| ⚙️ Settings | `SettingsPanel.jsx` | System configuration |
 
 ---
 
-## 🚫 What RapidCover Does NOT Cover — Standard Exclusions
+## 👤 Partner Experience
 
-RapidCover is a **parametric income protection product** with a strictly defined scope. The following are permanently excluded from coverage, in alignment with IRDAI guidelines and standard parametric insurance practice.
+### Pages & Flows
 
-> These exclusions are non-negotiable and are presented to every partner at onboarding before policy activation. A dedicated "What's not covered" screen is shown before the first premium is collected.
+| Route | Page | Description |
+|-------|------|-------------|
+| `/onboarding` | `OnboardingFlow.jsx` | Guided onboarding — eligibility, shift selection, plan cards |
+| `/register` | `Register.jsx` | Partner registration with Zepto/Blinkit ID validation |
+| `/login` | `Login.jsx` | OTP-based authentication |
+| `/dashboard` | `Dashboard.jsx` | Coverage status, earnings protected, payout history, streak |
+| `/policy` | `Policy.jsx` | Policy details, renewal, certificate PDF |
+| `/claims` | `Claims.jsx` | Claim history and status tracking |
+| `/trust-center` | `TrustCenter.jsx` | Transparency — how claims are validated |
+| `/profile` | `Profile.jsx` | Partner profile management |
+| `/admin` | `Admin.jsx` | Full admin dashboard (no Layout wrapper) |
 
-### Excluded Events
+### Key Components
 
-| Exclusion Category | Details |
-|--------------------|---------|
-| **War & Armed Conflict** | Loss of income caused by war, invasion, civil war, military coup, armed insurgency, or terrorism — whether declared or undeclared |
-| **Pandemic / Epidemic Declaration** | National or state government-declared public health emergencies (e.g. COVID-19 type lockdowns). Routine disease outbreaks not classified as emergencies are NOT excluded |
-| **Nuclear & Radioactive Events** | Any disruption arising from nuclear reaction, radiation, or radioactive contamination |
-| **Government Policy Changes** | Income loss caused by regulatory changes, GST/policy shifts, or platform-level policy decisions (e.g. commission restructuring) |
-| **Platform Operational Decisions** | Planned maintenance, scheduled downtimes, algorithm changes, surge pricing removal, or voluntary platform shutdowns unrelated to an external disruption event |
-| **Self-Inflicted / Voluntary Loss** | Worker voluntarily going offline, account suspension due to partner-side violations, deliberate avoidance of runs |
-| **Health, Accident & Life** | Any medical expenses, hospitalisation, disability, or death — strictly excluded. RapidCover is NOT a health or life insurance product |
-| **Vehicle Damage & Repair** | Bike, scooter, or vehicle damage, repair costs, fuel costs, or any mobility-related expense — strictly excluded |
-| **Financial Market Events** | Currency devaluation, fuel price spikes, or inflation-driven earning reductions |
-| **Disruptions Under 45 Minutes** | De minimis threshold — events resolving within 45 minutes do not qualify for a payout to prevent micro-claim abuse |
-| **Claims Filed After 48 Hours** | Any claim submission or trigger validation attempted more than 48 hours after the disruption event window closes |
-| **Collateral or Consequential Loss** | Any indirect loss beyond the verified income window (e.g. loss of tip income, future earning projections, reputational impact) |
-
-### Why These Exclusions Exist
-
-These exclusions serve three purposes:
-
-1. **Regulatory alignment** — IRDAI requires parametric products to define triggers and exclusions with precision. Ambiguous exclusions create claims disputes that defeat the zero-touch model.
-2. **Product integrity** — RapidCover's promise is *automatic payout for verifiable external disruptions*. Events that cannot be objectively verified via API (war, self-infliction) cannot participate in the parametric model.
-3. **Financial sustainability** — Catastrophic or correlated risks (pandemic, war) are uninsurable at the individual policy level without reinsurance treaty support. Including them would make the product non-viable.
-
-### ℹ️ What About Accidents & Health?
-
-If Manoj gets into an accident while delivering, RapidCover does not cover this. However, he is not unprotected:
-
-| Coverage Type | Product | Cost |
-|--------------|---------|------|
-| Accidental death / disability | PM Suraksha Bima Yojana | ₹20/year |
-| Life cover | PM Jeevan Jyoti Bima Yojana | ₹436/year |
-| Accident during active delivery | Zepto / Blinkit platform insurance | ₹0 (included) |
-
-RapidCover is designed to complement — not replace — these products.
+- **`ProofCard.jsx`** — Visual proof of each validation step
+- **`StressWidget.jsx`** — Actuarial stress scenario visualization
+- **`RapidBot.jsx`** — AI-powered support chatbot (Groq integration)
+- **`ReassignmentCountdown.jsx`** — Live countdown for zone reassignment acceptance
+- **`UpiSelector.jsx`** — UPI app selection with deep links
+- **`TermsModal.jsx`** — IRDAI-compliant terms and exclusions
+- **`OfflineFallbackCard.jsx`** — Offline mode graceful degradation
 
 ---
 
-## 🤖 AI/ML Integration Plan
+## 📡 API Reference
 
-Four models — each solving a distinct business problem. AI is load-bearing, not decorative.
+All endpoints are versioned under `/api/v1`. The backend exposes **18 route modules**:
 
-### Model 1 — Zone Risk Scorer
-```
-Purpose   : Risk score (0–100) per dark store zone at onboarding
-Algorithm : XGBoost Classifier
-Features  : 2-yr IMD rainfall, CPCB AQI history, NDMA flood maps,
-            dark store suspension history, OSM road infrastructure,
-            historical traffic blockade frequency
-Output    : Zone Risk Score with plain-language explanation shown to partner
-Training  : Public IMD + CPCB + NDMA + OSM datasets (all free)
-```
+| Module | Prefix | Key Endpoints |
+|--------|--------|---------------|
+| **Partners** | `/partners` | `POST /register`, `POST /login`, `POST /verify`, `GET /me` |
+| **Experience** | `/partners` | Partner experience & engagement endpoints |
+| **Policies** | `/policies` | `POST /`, `GET /{id}`, `GET /quotes`, certificate generation |
+| **Payments** | `/payments` | Stripe checkout, Razorpay orders, payment verification |
+| **Claims** | `/claims` | `GET /`, `POST /process`, claim status tracking |
+| **Zones** | `/zones` | `GET /`, `GET /nearest`, risk profiles, reassignment |
+| **Triggers** | `/triggers` | Active trigger events |
+| **Admin** | `/admin` | Simulation, stats, ML monitoring, partner management |
+| **Admin Panel** | `/admin/panel` | Dashboard data, drill execution, BCR, stress scenarios |
+| **Admin Drills** | `/admin/drills` | Drill sessions, presets, results |
+| **Admin Monitoring** | `/admin/monitoring` | ML model performance metrics |
+| **Notifications** | `/notifications` | Push subscription management, test notifications |
+| **Social Oracle** | `/oracle` | Text verification pipeline |
+| **AI Chat** | `/ai` | Groq-powered conversational assistant |
+| **Intelligence** | `/intelligence` | Insurer analytics and predictions |
+| **WebSocket** | `/ws` | Real-time admin event streaming |
 
-### Model 2 — Dynamic Premium Engine
-```
-Purpose   : Personalized weekly premium every Monday per partner
-Algorithm : Gradient Boosted Regression (scikit-learn)
-Features  : Zone Risk Score, active hours, season index, AQI trend,
-            road condition risk, claim history, dark store suspension frequency
-Output    : Weekly premium in ₹ with itemized breakdown in app
-Retrain   : Weekly with new disruption + claim data
-```
+### Health & Monitoring
 
-### Model 3 — Fraud Anomaly Detector
 ```
-Purpose   : Fraud score per claim before payout release
-Algorithm : Isolation Forest (unsupervised) + deterministic rule layer
-Features  : GPS trajectory coherence, run count during disruption,
-            zone match, claim frequency, device fingerprint, traffic cross-check
-Output    : Fraud score 0–1
-            < 0.50  → Auto-approve
-            0.50–0.75 → Enhanced validation
-            0.75–0.90 → Manual review queue
-            > 0.90  → Auto-reject with explanation to partner
-Baseline  : 60-day rolling partner behavior window
-```
-
-### Model 4 — Disruption Predictor (Admin)
-```
-Purpose   : Forecast next week's claim liability for insurers
-Algorithm : LSTM on weather + traffic time series
-Features  : IMD 7-day forecast, historical claim patterns, AQI trend,
-            traffic disruption history, civic event calendar
-Output    : Expected payout liability (₹) per zone — shown every Sunday evening
+GET /         → Service info + version
+GET /health   → Component health: database, external APIs, demo mode status
+GET /docs     → Interactive Swagger UI (auto-generated OpenAPI 3.0)
 ```
 
 ---
 
-## 🔍 Fraud Detection Architecture (7-Factor Model — Phase 2 Upgrade)
+## 📁 Folder Structure
 
-Seven weighted factors with hard reject rules. Upgraded from Phase 1's 6-factor model.
-
-### 7-Factor Weighted Fraud Score
 ```
-fraud_score = w1×gps_coherence + w2×run_count_check + w3×zone_polygon_match
-            + w4×claim_frequency + w5×device_fingerprint + w6×traffic_cross_check
-            + w7×centroid_drift_score
-
-Weights: w1=0.25, w2=0.25, w3=0.15, w4=0.15, w5=0.10, w6=0.05, w7=0.05
+RapidCover/
+├── README.md                          # This document
+├── PHASE2_README.md                   # Detailed Phase 2 feature documentation
+├── DEMO_MODE_GUIDE.md                 # Demo mode usage guide
+├── SETUP.md                           # Extended setup instructions
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py                    # FastAPI app — lifespan, CORS, OpenAPI
+│   │   ├── config.py                  # Pydantic Settings (env-driven)
+│   │   ├── database.py                # SQLAlchemy engine + session factory
+│   │   │
+│   │   ├── api/                       # 18 route modules
+│   │   │   ├── router.py              # Central router (mounts all modules)
+│   │   │   ├── partners.py            # Partner auth & registration
+│   │   │   ├── experience.py          # Partner experience endpoints
+│   │   │   ├── policies.py            # Policy CRUD + certificate
+│   │   │   ├── payments.py            # Stripe + Razorpay integration
+│   │   │   ├── claims.py              # Claims processing
+│   │   │   ├── zones.py               # Zone management + GPS detection
+│   │   │   ├── triggers.py            # Active trigger events
+│   │   │   ├── admin.py               # Admin operations (53 KB)
+│   │   │   ├── admin_panel.py         # Admin dashboard data (41 KB)
+│   │   │   ├── admin_drills.py        # Drill execution
+│   │   │   ├── admin_monitoring.py    # ML performance monitoring
+│   │   │   ├── notifications.py       # Push notifications
+│   │   │   ├── social_oracle_api.py   # Social Oracle verification
+│   │   │   ├── ai_chat.py             # Groq AI assistant
+│   │   │   ├── insurer_intelligence.py# Insurer analytics
+│   │   │   └── websocket.py           # Real-time WebSocket
+│   │   │
+│   │   ├── models/                    # 16 SQLAlchemy ORM models
+│   │   │   ├── partner.py             # Partner (with device fingerprint)
+│   │   │   ├── zone.py                # Dark store zones
+│   │   │   ├── policy.py              # Insurance policies
+│   │   │   ├── claim.py               # Claims
+│   │   │   ├── trigger_event.py       # Trigger events + sustained events
+│   │   │   ├── zone_reassignment.py   # Zone reassignment state machine
+│   │   │   ├── zone_risk_profile.py   # RIQI risk profiles
+│   │   │   ├── drill_session.py       # Drill sessions
+│   │   │   ├── prediction.py          # Weekly predictions + city risk
+│   │   │   ├── fraud.py               # GPS pings + partner devices
+│   │   │   ├── push_subscription.py   # Web Push subscriptions
+│   │   │   ├── weather_observation.py # Weather data history
+│   │   │   ├── active_event_tracker.py# Active event tracking
+│   │   │   └── system_setting.py      # System settings
+│   │   │
+│   │   ├── services/                  # 39 business logic modules
+│   │   │   ├── claims_processor.py    # 11-step zero-touch pipeline (35 KB)
+│   │   │   ├── trigger_engine.py      # 5-trigger detection engine (28 KB)
+│   │   │   ├── fraud_service.py       # 7-factor fraud model (24 KB)
+│   │   │   ├── social_oracle.py       # NLP + API verification (24 KB)
+│   │   │   ├── ml_service.py          # ML model inference (22 KB)
+│   │   │   ├── drill_service.py       # Drill execution engine (21 KB)
+│   │   │   ├── prediction_service.py  # Disruption prediction (19 KB)
+│   │   │   ├── payout_service.py      # UPI payout processing (17 KB)
+│   │   │   ├── external_apis.py       # API clients with fallback (39 KB)
+│   │   │   ├── premium_service.py     # Dynamic pricing engine (15 KB)
+│   │   │   ├── runtime_metadata.py    # Partner runtime tracking (15 KB)
+│   │   │   ├── payment_state_machine.py# Payment state management (14 KB)
+│   │   │   ├── policy_lifecycle.py    # Renewal, grace, cancellation (13 KB)
+│   │   │   ├── riqi_service.py        # RIQI road infrastructure index (12 KB)
+│   │   │   ├── zone_reassignment_service.py # 24hr reassignment flow (12 KB)
+│   │   │   ├── collusion_detector.py  # Device/IP collusion detection (12 KB)
+│   │   │   ├── multi_trigger_resolver.py   # Overlapping event arbitration (12 KB)
+│   │   │   ├── stress_scenario_service.py  # 6 actuarial stress scenarios (10 KB)
+│   │   │   ├── notification_templates.py   # EN + HI multilingual templates (10 KB)
+│   │   │   ├── verification_service.py     # System health verification (9 KB)
+│   │   │   ├── scheduler.py           # APScheduler background jobs (5 KB)
+│   │   │   ├── reconciliation_job.py  # Payment reconciliation (4 KB)
+│   │   │   ├── policy_certificate.py  # PDF certificate generation (8 KB)
+│   │   │   └── ... (15 more service modules)
+│   │   │
+│   │   ├── schemas/                   # 11 Pydantic request/response schemas
+│   │   ├── data/                      # Seed data (zones, partners)
+│   │   ├── core/                      # Core configuration
+│   │   └── utils/                     # Logging, rate limiting, time utils
+│   │
+│   ├── ml_models/                     # Serialized ML artifacts
+│   │   ├── zone_risk_model.pkl
+│   │   ├── premium_model.pkl
+│   │   ├── fraud_model.pkl
+│   │   ├── *_encoder.pkl
+│   │   └── model_metadata.json        # Full training provenance
+│   │
+│   ├── ml_training/                   # Training pipeline
+│   │   ├── generate_training_data.py
+│   │   ├── train_models.py
+│   │   └── data/
+│   │
+│   ├── tests/                         # 24 test suites
+│   ├── alembic/                       # Database migrations
+│   ├── requirements.txt               # Python dependencies
+│   └── .env.example                   # Environment template
+│
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx                    # Root — routing, auth guards, offline detection
+│   │   ├── main.jsx                   # React DOM entry point
+│   │   │
+│   │   ├── pages/                     # 10 page-level components
+│   │   │   ├── Dashboard.jsx          # Partner dashboard (53 KB)
+│   │   │   ├── Register.jsx           # Registration flow (46 KB)
+│   │   │   ├── Profile.jsx            # Partner profile (43 KB)
+│   │   │   ├── TrustCenter.jsx        # Claim transparency (41 KB)
+│   │   │   ├── Policy.jsx             # Policy management (39 KB)
+│   │   │   ├── Claims.jsx             # Claim history (14 KB)
+│   │   │   ├── Admin.jsx              # Admin dashboard (13 KB)
+│   │   │   ├── AdminDashboard.jsx     # Admin alternate view (15 KB)
+│   │   │   ├── Login.jsx              # OTP login (12 KB)
+│   │   │   └── Admin.css              # Admin styles (37 KB)
+│   │   │
+│   │   ├── components/
+│   │   │   ├── admin/                 # 29 admin panel components
+│   │   │   ├── ui/                    # 13 reusable UI components
+│   │   │   ├── Layout.jsx             # App shell with navigation
+│   │   │   ├── ProofCard.jsx          # Validation proof visualization
+│   │   │   ├── StressWidget.jsx       # Stress scenario widget
+│   │   │   ├── RapidBot.jsx           # AI chatbot
+│   │   │   └── ... (6 more)
+│   │   │
+│   │   ├── context/                   # React Context providers
+│   │   │   ├── AuthContext.jsx        # JWT auth state management
+│   │   │   └── NotificationContext.jsx# Push notification management
+│   │   │
+│   │   ├── hooks/                     # Custom React hooks
+│   │   │   ├── useTranslation.js      # EN/HI internationalization (14 KB)
+│   │   │   └── useNotifications.js    # Push notification hook
+│   │   │
+│   │   ├── services/                  # API client layer
+│   │   │   ├── api.js                 # Core API client (18 KB)
+│   │   │   ├── adminApi.js            # Admin API client (15 KB)
+│   │   │   ├── proofApi.js            # Proof/verification API (5 KB)
+│   │   │   └── pushNotifications.js   # Web Push manager (3 KB)
+│   │   │
+│   │   └── tests/                     # Frontend test suites
+│   │
+│   ├── public/
+│   │   ├── manifest.json              # PWA manifest
+│   │   ├── sw.js                      # Service worker (offline + cache)
+│   │   ├── favicon.svg                # App icon
+│   │   └── icons.svg                  # UI icon set
+│   │
+│   ├── package.json                   # Node dependencies
+│   └── vite.config.js                 # Vite + Tailwind + Vitest config
+│
+└── .gitignore
 ```
-
-| Score Range | Decision |
-|------------|----------|
-| < 0.50 | ✅ Auto-approve |
-| 0.50 – 0.75 | 🔍 Enhanced validation |
-| 0.75 – 0.90 | 👁 Manual review queue |
-| > 0.90 | ❌ Auto-reject |
-
-### Attack Vectors with Detection
-
-| Attack Vector | How It's Attempted | RapidCover Detection |
-|--------------|-------------------|---------------------|
-| GPS Spoofing | Fake location in suspended zone | Velocity physics check — >60 km/h between pings = spoof; centroid drift detection |
-| Activity Paradox | Claim disruption while completing runs | `run_count > 0` during window → **hard reject** (w2) |
-| Zone Boundary Gaming | Register high-risk zone, operate in safe zone | **30-day GPS centroid** must stay within 15km of declared dark store (w7) |
-| Duplicate Event Claiming | Claim same disruption twice | Cryptographic event ID per trigger — duplicate → hard DB reject |
-| Collusion Ring | Multiple fake partners, same device/network | Device fingerprint + IP clustering; shared devices flagged (w5) |
-| Synthetic Identity | Fabricated Zepto partner IDs | Partner ID validated via mock API + Aadhaar KYC + face liveness at onboarding |
-| Centroid Drift | GPS suddenly appears in new zone | **30-day centroid drift** > 15km = auto-flag for manual review (w7, Phase 2) |
-
-> **Double Indemnity:** Policy is Aadhaar-linked, not platform-linked. Payouts capped at verified weekly earning baseline. We recommend IRDAI establish a **Gig Worker Parametric Claims Registry** — RapidCover is architected to plug in from day one.
 
 ---
 
-## 🔄 Application Workflow
+## 🚀 Installation & Setup
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│        ONBOARDING FLOW  (Under 3 minutes, Phase 2)           │
-│                                                              │
-│  Install PWA via WhatsApp link → OTP Login                   │
-│  → Zepto Partner ID Validation → KYC Lite (Aadhaar + Face)  │
-│  → GPS detects Dark Store Zone + RIQI Score                  │
-│  → Eligibility Check (7 active days in last 30?)             │
-│  → Shift Window Selection (active hours + days)              │
-│  → 3 personalised plan cards with RIQI-adjusted premium      │
-│  → UPI linked → Language set → Push permission granted       │
-│  → ✅ POLICY ACTIVE immediately                              │
-└──────────────────────────────────────────────────────────────┘
+### Prerequisites
 
-┌──────────────────────────────────────────────────────────────┐
-│                    WEEKLY RENEWAL FLOW                       │
-│                                                              │
-│  Every Monday 6 AM:                                          │
-│  ML recalculates premium (7-factor formula)                  │
-│  → Push notification to lock screen                          │
-│  → UPI auto-debit → Home screen shows ✅ Coverage Active     │
-└──────────────────────────────────────────────────────────────┘
+| Requirement | Version |
+|-------------|---------|
+| Python | 3.10+ |
+| Node.js | 18+ |
+| PostgreSQL (recommended) | 15+ |
+| Redis (optional) | 7+ |
 
-┌──────────────────────────────────────────────────────────────┐
-│         ZERO-TOUCH CLAIM FLOW  (11-Step, Phase 2)            │
-│                                                              │
-│  1. Trigger detected (ward-level threshold breach)           │
-│  2. Active shift check — is partner in declared window?      │
-│  3. Zone polygon match (Turf.js)                             │
-│  4. Platform suspension confirmed (mock ops API)             │
-│  5. Traffic cross-check (road disruption confirmed)          │
-│  6. GPS coherence + centroid drift check                     │
-│  7. Run count = 0 during disruption window                   │
-│  8. 7-Factor fraud score computed                            │
-│  9. Payout calculated (RIQI multiplier + zone pool cap)      │
-│  10. UPI credit via Razorpay mock                            │
-│  11. Push notification in partner's language                 │
-│                                                              │
-│  Partner action required : ZERO                              │
-│  Trigger to money in wallet : ~49 seconds                    │
-└──────────────────────────────────────────────────────────────┘
+### Option A: PostgreSQL (Recommended)
+
+```powershell
+# 1. Start PostgreSQL via Docker
+docker run --name rapidcover-db \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=rapidcover \
+  -p 5432:5432 -d postgres:15-alpine
+
+# 2. Backend setup
+cd backend
+python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # macOS/Linux
+pip install -r requirements.txt
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env → set DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rapidcover
+
+# 4. Start backend
+python -m uvicorn app.main:app --reload
+
+# 5. Frontend setup (new terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
-### The Zero-Touch Experience — Live
+### Option B: SQLite (Quick Start)
 
-> **Wednesday 5:47 PM, Bellandur.** IMD: 72mm/hr. OpenWeatherMap confirms. Traffic mock API: 2 of 3 zone access roads waterlogged.
->
-> **5:47:23** — Zone BLR-BEL polygon match confirmed. RIQI: 48 (peri-urban fringe).
-> **5:47:25** — Shift window check: Manoj active Mon-Sat 8AM-10PM. ✅ In window.
-> **5:47:28** — Pin-code match: 560103 ∈ BLR-BEL coverage. ✅
-> **5:47:31** — Zepto mock ops: Zone suspended. Logged.
-> **5:47:35** — Platform activity: logged in, 4 orders completed, dwell 60min. ✅
-> **5:47:39** — Traffic cross-validation passed.
-> **5:47:44** — GPS: 200m from dark store. Centroid drift: 0.2km (< 15km limit). ✅
-> **5:47:51** — Run count: 0. Activity Paradox clear. ✅
-> **5:47:54** — 7-Factor fraud score: 0.11. Auto-approve.
-> **5:47:58** — Validation matrix: 10/10 checks passed. Confidence: 0.95.
-> **5:48:02** — Payout: ₹272 × 1.25 RIQI multiplier = ₹340.
-> **5:48:09** — ₹340 UPI credit via Razorpay mock.
-> **5:48:12** — Lock screen in Kannada: *"ನಿಮ್ಮ ಜೋನ್‌ನಲ್ಲಿ ಭಾರೀ ಮಳೆ ಪತ್ತೆಯಾಗಿದೆ. ₹340 ನಿಮ್ಮ UPI ಗೆ ಜಮಾ ಆಗಿದೆ. ಸುರಕ್ಷಿತವಾಗಿರಿ, ಮನೋಜ್."*
->
-> **Manoj did nothing. Total time: 49 seconds.**
+```powershell
+# Backend (no Docker needed — SQLite is the default)
+cd backend
+python -m venv venv && venv\Scripts\activate
+pip install -r requirements.txt
+python -m uvicorn app.main:app --reload
+
+# Frontend
+cd frontend && npm install && npm run dev
+```
+
+### Access Points
+
+| Service | URL |
+|---------|-----|
+| Frontend App | http://localhost:5173 |
+| Backend API | http://localhost:8000 |
+| Swagger Docs | http://localhost:8000/docs |
+| Health Check | http://localhost:8000/health |
+| Admin Panel | http://localhost:5173/admin |
 
 ---
 
-## 📊 Analytics Dashboard
+## ⚙️ Environment Variables
 
-### Worker Dashboard
-- Coverage status banner — Active ✅ (green) / Grace Period (orange) / Expired (red)
-- Earnings protected counter — total payouts received since joining
-- This week: premium paid, max payout available, disruption days remaining
-- Last 4 payouts — trigger type, date, amount, duration
-- Streak counter — clean weeks with progress to loyalty discount (4 weeks / 12 weeks)
-- Zone risk score with RIQI band + plain-language explanation
-- 48-hour weather alert — proactive push if IMD forecasts disruption in zone
-- Renewal countdown — days until Monday 6AM auto-renewal
-- Zone reassignment countdown — if proposal pending, shows hours remaining
+Create `backend/.env` from `backend/.env.example`:
 
-### Insurer / Admin Dashboard (15 Tabs — Phase 2)
+| Key | Description | Default / Example |
+|-----|-------------|-------------------|
+| `DATABASE_URL` | SQLite or PostgreSQL URI | `sqlite:///./rapidcover.db` |
+| `REDIS_URL` | Redis connection (optional) | `redis://localhost:6379/0` |
+| `JWT_SECRET` | Secret for token signing | `your-secret-key` |
+| `OPENWEATHERMAP_API_KEY` | OpenWeatherMap free tier key | `your-owm-key` |
+| `WAQI_API_KEY` | WAQI / aqicn.org API key | `your-waqi-key` |
+| `CPCB_API_KEY` | CPCB AQI API key | `your-cpcb-key` |
+| `NEWS_API_KEY` | NewsAPI key (civic disruptions) | `your-news-key` |
+| `RAZORPAY_KEY_ID` | Razorpay test mode key | `rzp_test_xxxxx` |
+| `RAZORPAY_KEY_SECRET` | Razorpay test secret | `xxxxx` |
+| `STRIPE_SECRET_KEY` | Stripe test secret key | `sk_test_xxxxx` |
+| `GROQ_API_KEY` | Groq AI chat API key | `your-groq-key` |
+| `VAPID_PUBLIC_KEY` | Web Push VAPID public key | (generate with `npx web-push generate-vapid-keys`) |
+| `VAPID_PRIVATE_KEY` | Web Push VAPID private key | (see above) |
+| `AUTO_PAYOUT_ENABLED` | Enable zero-touch auto-payout | `false` |
+| `DEMO_MODE` | Use mock data instead of live APIs | `false` |
+| `SENTRY_DSN` | Sentry error tracking (optional) | `` |
+| `ENVIRONMENT` | `development` or `production` | `development` |
 
-| Tab | Purpose |
-|-----|--------|
-| 📊 Overview | Key metrics, active policies, payout flow |
-| 📉 BCR / Loss Ratio | City-level BCR with 85% suspension toggle |
-| 🗺️ Zone Map | Live zone map with density + trigger overlay |
-| 🔍 Fraud Queue | Pending claims with one-click approve/reject/bulk-reject |
-| 🎯 Drills | Structured drill execution with 10 presets + 5 stress scenarios |
-| 📡 Live API Data | Real-time weather/AQI/traffic readings per zone |
-| 🔍 Verification | 9-component system health check |
-| ⚡ Stress Proof | 14-day monsoon stress scenario + reserve calculation |
-| 🔄 Reassignments | Zone reassignment queue management |
-| 🎯 Trigger Proof | 10-check validation matrix visualization per claim |
-| 📊 RIQI Provenance | Zone-level RIQI scores with data source tracking |
-| 🔔 Notifications | Multilingual notification preview + test |
-| ✅ Demo Checklist | Judging criteria verification checklist |
-| 🔮 Auto-Oracle | Social media verification engine (NLP + API cross-check) |
-| ⚙️ Legacy Sim | Original trigger simulation + exclusions screen |
+> **Note:** The system gracefully degrades when API keys are missing — it falls back to mock data with clear logging.
 
 ---
 
-## 🏗️ Tech Stack & Architecture
+## 🧪 Running the Demo
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                     MOBILE LAYER (PWA)                           │
-│   React.js + Vite — Partner App + 15-Tab Admin Dashboard         │
-│   Web Push API  |  Native GPS  |  UPI Deep Links  |  EN + HI    │
-└──────────────────────────────────────────────────────────────────┘
-                         ↕ REST API (16 route modules)
-┌──────────────────────────────────────────────────────────────────┐
-│              BACKEND — Python + FastAPI (24 services)             │
-│   Auth | Policy Engine | Trigger Engine | Claims Processor       │
-│   Fraud Service | Payout Service | Drill Service | RIQI Service  │
-│   Social Oracle | Premium Engine | Zone Reassignment | Scheduler │
-└──────────────────────────────────────────────────────────────────┘
-       ↕                      ↕                       ↕
-┌───────────────┐  ┌─────────────────────┐  ┌──────────────────┐
-│  ML SERVICE   │  │   EXTERNAL APIs     │  │  PAYMENT LAYER   │
-│  GBR Premium  │  │  OpenWeatherMap     │  │  Razorpay Test   │
-│  Fraud 7-Fctr │  │  WAQI/CPCB AQI      │  │  Mock UPI        │
-│  Zone Risk    │  │  Mock Zepto Ops API │  └──────────────────┘
-└───────────────┘  │  Mock Traffic API   │
-                   │  Mock Civic API     │
-                   │  Platform Activity  │
-                   │  Social Oracle NLP  │
-                   └─────────────────────┘
-                              ↕
-┌──────────────────────────────────────────────────────────────────┐
-│         DATA — SQLite (dev) / PostgreSQL (prod)                  │
-│   Policies | Claims | Triggers | Partners | Zones | Drills       │
-│   Zone Risk Profiles | Zone Reassignments | Push Subscriptions   │
-│   Partner Runtime Metadata | Platform Activity | Zone Coverage   │
-└──────────────────────────────────────────────────────────────────┘
-                              ↕
-┌──────────────────────────────────────────────────────────────────┐
-│   NOTIFICATIONS — Web Push (VAPID) + Template Engine             │
-│   English | Hindi (with fallback chain)                          │
-└──────────────────────────────────────────────────────────────────┘
-```
+### Admin Simulation
 
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| Frontend | React.js + Vite (PWA) | Android install via WhatsApp link; push notifications; native GPS; UPI deep links |
-| Backend | Python + FastAPI (24 services, 16 API modules) | Async performance for real-time trigger pipeline |
-| Database | SQLite (dev) / PostgreSQL (prod) | Records integrity + easy local development |
-| ML | Gradient Boosted Regression + Isolation Forest (calibrated weights) | Premium pricing + 7-factor fraud detection |
-| Weather | OpenWeatherMap (free tier) with mock fallback | Real-time + 7-day forecast, zone GPS-level |
-| AQI | WAQI / aqicn.org + CPCB API (free) with mock fallback | Station-level Indian city data |
-| Traffic | Mock road condition feed | Second-layer trigger cross-validation |
-| Payments | Razorpay Test Mode + Mock UPI | Full payout demo, no real transactions |
-| Notifications | Web Push (VAPID/pywebpush) + multilingual templates | Lock screen push in English + Hindi |
-| Geospatial | Zone polygon matching, GPS centroid tracking | Fraud detection + zone boundary validation |
-| Hosting | Railway / Render (free tier) | Zero-cost hackathon deployment |
+1. Open the **Admin Dashboard** at `/admin`
+2. Navigate to the **Demo Mode** tab
+3. Select a scenario (e.g., "Heavy Rain in Bellandur")
+4. Watch the trigger engine detect the event, run the 10-check validation, compute fraud scores, and dispatch payouts — all in real-time
+
+### Drill Execution
+
+1. Go to the **Drills** tab in the Admin Dashboard
+2. Select one of 10 presets (Monsoon Flood, Heatwave, AQI Crisis, etc.)
+3. Execute the drill and observe the timeline of events
+4. Review results in the **Trigger Proof** tab
+
+### PWA Installation (Android)
+
+1. Open the deployed URL in **Google Chrome** on Android
+2. Tap the three-dot menu (⋮) → **"Install app"**
+3. Launch from home screen for native-like push notifications
 
 ---
 
-## 📐 Actuarial Model — Financial Viability & Pricing Basis
+## 🧪 Testing
 
-RapidCover's weekly premium is not just an ML output — it is grounded in actuarial first principles. This section documents the loss model, reserve methodology, and break-even analysis that underpin the product's financial sustainability.
+### Backend (pytest)
 
-### Key Actuarial Assumptions
+```powershell
+cd backend
+python -m pytest tests/ -v
+```
+
+**24 test suites** covering:
+
+| Suite | Coverage |
+|-------|----------|
+| `test_phase2_tasks.py` | Full Phase 2 feature validation (31 KB) |
+| `test_trust_apis.py` | Trust Center API integration (32 KB) |
+| `test_drills.py` | Drill execution engine (23 KB) |
+| `test_ml_stability.py` | ML model determinism & drift detection |
+| `test_partner_experience.py` | Partner onboarding & engagement flows |
+| `test_payment_reconciliation.py` | Payment state machine & recovery |
+| `test_platform_activity_simulation.py` | Platform activity validation |
+| `test_validation_matrix.py` | 10-check validation matrix correctness |
+| `test_multi_trigger_resolver.py` | Overlapping event arbitration |
+| `test_oracle_reliability.py` | Social Oracle NLP accuracy |
+| `test_notification_templates.py` | Multilingual template rendering |
+| `test_partial_disruption.py` | Partial disruption payout logic |
+| `test_riqi_provenance.py` | RIQI score data source tracking |
+| `test_stress_scenarios.py` | Actuarial stress scenario modeling |
+| `test_zone_reassignment_flow.py` | 24hr zone reassignment state machine |
+| `test_trigger_pincode_strictness.py` | Pin-code level trigger precision |
+| `test_demo_mode_scenarios.py` | Demo mode simulation |
+| ... | 7 more suites |
+
+### Frontend (Vitest)
+
+```powershell
+cd frontend
+npm run test            # Run all tests
+npm run test:watch      # Watch mode
+npm run test:ui         # Interactive UI
+```
+
+---
+
+## 📐 Actuarial Model
+
+### Key Assumptions
 
 | Parameter | Value | Basis |
 |-----------|-------|-------|
-| Target Loss Ratio | 58–65% | Global parametric insurance benchmark (Swiss Re, 2023) |
-| Expected disruption events per partner per year | 18–24 days | IMD event frequency analysis — top 10 Indian cities, 2019–2024 |
-| Average income lost per disruption day | ₹420–₹720 | 8–15 runs/hr × Zepto/Blinkit per-run rates × disruption duration |
-| Average claim payout per event | ₹380 | Blended across all 3 tiers and disruption types |
-| Claim frequency per active policy per week | 0.09 | ~1 claim per 11 weeks per partner at full exposure |
-| Expense ratio (ops + tech + distribution) | 22% | Estimate based on zero-CAC B2B distribution model |
-| Profit / surplus margin | 13–20% | Residual after loss ratio + expense ratio |
-
-### Weekly Premium Break-Even Analysis
-
-```
-MINIMUM VIABLE WEEKLY PREMIUM (Standard Tier — ₹59/week target):
-
-Expected Weekly Payout per Policy  = Claim Frequency × Avg Payout
-                                   = 0.09 × ₹380
-                                   = ₹34.20
-
-Required Premium (at 65% LR)       = ₹34.20 / 0.65
-                                   = ₹52.60  ← break-even floor
-
-Add expense ratio (22%)            = ₹52.60 / (1 - 0.22)
-                                   = ₹67.40  ← fully loaded cost
-
-Standard tier premium set at ₹59/week — below fully loaded cost intentionally
-during Year 1 to drive adoption. Viable at scale with B2B distribution
-eliminating marginal CAC.
-
-PRO TIER (₹89/week):
-Expected payout = 0.13 × ₹620 = ₹80.60
-Required at 65% LR = ₹124 → subsidised in Year 1 at ₹89
-Reaches sustainability at 10,000+ policies due to risk pooling.
-```
-
-### Loss Ratio Monitoring
-
-RapidCover monitors loss ratio at three levels:
-
-| Level | Frequency | Action Trigger |
-|-------|-----------|----------------|
-| Zone-level loss ratio | Weekly | LR > 80% in any zone → automatic premium repricing next Monday |
-| City-level loss ratio | Monthly | LR > 75% city-wide → reinsurance threshold review |
-| Product-level loss ratio | Quarterly | LR > 70% product-wide → IRDAI filing + pricing committee review |
+| Target Loss Ratio | 58–65% | Global parametric benchmark (Swiss Re) |
+| Disruptions per partner per year | 18–24 days | IMD event frequency (top 10 cities, 2019–2024) |
+| Average claim payout per event | ₹380 | Blended across all tiers |
+| Claim frequency per policy per week | 0.09 | ~1 claim per 11 weeks |
+| Expense ratio | 22% | Zero-CAC B2B distribution model |
 
 ### Claims Reserve Methodology
 
-RapidCover maintains a rolling **Incurred But Not Reported (IBNR)** reserve using the Bornhuetter-Ferguson method adapted for parametric products:
+Rolling IBNR reserve using adapted Bornhuetter-Ferguson method:
 
 ```
-Weekly Reserve Requirement = 
-  (Active Policies × Expected Claim Frequency × Avg Payout)
-  + IBNR Buffer (15% of expected weekly liability)
-  + Catastrophe Reserve (5% of gross premium collected)
+Weekly Reserve = (Active Policies × Claim Frequency × Avg Payout)
+              + IBNR Buffer (15%)
+              + Catastrophe Reserve (5% of gross premium)
 
-Example (10,000 active policies, Standard tier):
-  Base liability     = 10,000 × 0.09 × ₹380     = ₹3,42,000 / week
-  IBNR buffer (15%)  = ₹3,42,000 × 0.15          = ₹51,300
-  Cat reserve (5%)   = (10,000 × ₹59) × 0.05     = ₹29,500
-  ─────────────────────────────────────────────────────────────
-  Total weekly reserve requirement                = ₹4,22,800
+Example (10,000 policies, Standard tier):
+  Base liability:    10,000 × 0.09 × ₹380     = ₹3,42,000 / week
+  IBNR buffer (15%): ₹3,42,000 × 0.15         = ₹51,300
+  Cat reserve (5%):  (10,000 × ₹59) × 0.05    = ₹29,500
+  ──────────────────────────────────────────────
+  Total weekly reserve:                        = ₹4,22,800
 ```
 
-### Correlation Risk & Catastrophe Scenario
+### Correlation Risk
 
-The primary risk in a Q-Commerce parametric product is **zone-level correlation** — a single flood event hitting multiple partners in the same dark store zone simultaneously.
-
-| Scenario | Affected Partners | Estimated Payout | % of Weekly Premium Pool |
-|----------|------------------|-----------------|--------------------------|
-| Single zone flood (BLR-047) | 180 partners | ₹68,400 | 11.5% (manageable) |
-| City-wide flood (all Bangalore zones) | 2,400 partners | ₹9,12,000 | 153% → **reinsurance trigger** |
-| Multi-city cyclone (Mumbai + Chennai) | 6,000 partners | ₹22,80,000 | **Requires treaty reinsurance** |
-
-**Mitigation:** RapidCover caps single-event city-level payouts at 120% of that city's weekly premium pool. Above this threshold, a proportional reduction applies — disclosed to partners at onboarding. This is standard parametric practice (Caribbean CCRIF model).
-
-### Year 1 Financial Projections (Bangalore + Mumbai + Delhi Pilot)
-
-| Quarter | Active Policies | Gross Premium | Expected Claims | Loss Ratio | Net Position |
-|---------|----------------|---------------|-----------------|------------|--------------|
-| Q1 | 5,000 | ₹76.7L | ₹49.8L | 65% | −₹16.9L (investment phase) |
-| Q2 | 12,000 | ₹1.84Cr | ₹1.10Cr | 60% | −₹8.1L |
-| Q3 | 20,000 | ₹3.07Cr | ₹1.72Cr | 56% | +₹22.3L |
-| Q4 | 25,000 | ₹3.84Cr | ₹2.11Cr | 55% | +₹48.6L |
-| **Year 1** | **25,000** | **₹9.11Cr** | **₹5.42Cr** | **59.5%** | **+₹45.9L** |
-
-> Note: Year 1 operates below break-even in Q1–Q2 intentionally — standard loss leader strategy for parametric market entry. B2B distribution via Zepto integration eliminates CAC, making this viable.
+City-level payout cap at 120% of that city's weekly premium pool (standard parametric practice per Caribbean CCRIF model). Above threshold, proportional reduction applies — disclosed at onboarding.
 
 ---
 
-## 🚀 Phase 2 Features Summary
+## 🚫 Exclusions
 
-> **📘 For full details on every Phase 2 feature, see [PHASE2_README.md](./PHASE2_README.md)**
+RapidCover is a **parametric income protection product** with strictly defined scope. Full exclusions are presented to every partner at onboarding (`ExclusionsCard.jsx` + `TermsModal.jsx`):
 
-Phase 2 added **25+ production-grade features** on top of the Phase 1 core:
-
-| # | Feature | Status | Key Files |
-|---|---------|--------|----------|
-| 1 | Multi-Trigger Arbitration | ✅ Done | `claims_processor.py`, `trigger_engine.py` |
-| 2 | 7-Factor Fraud Model (GPS centroid + velocity) | ✅ Done | `fraud_service.py`, `ml_service.py` |
-| 3 | RIQI Road Infrastructure Quality Index | ✅ Done | `riqi_service.py`, `zone_risk_profile.py` |
-| 4 | Underwriting Gate & Auto-Downgrade | ✅ Done | `premium_service.py` |
-| 5 | Sustained Event Protocol (14-day monsoon) | ✅ Done | `premium_service.py` |
-| 6 | Zone Pool Share Cap (mass event) | ✅ Done | `premium_service.py`, `claims_processor.py` |
-| 7 | BCR / Loss Ratio Monitoring | ✅ Done | `premium_service.py`, `BCRPanel.jsx` |
-| 8 | City-Specific Seasonal Multipliers | ✅ Done | `ml_service.py` |
-| 9 | Zone Density Risk Bands | ✅ Done | `claims_processor.py`, `ZoneMapPanel.jsx` |
-| 10 | Zone Reassignment (24hr state machine) | ✅ Done | `zone_reassignment_service.py` |
-| 11 | 6 Actuarial Stress Scenarios | ✅ Done | `stress_scenario_service.py`, `drill_service.py` |
-| 12 | Social Oracle Verification (NLP + API) | ✅ Done | `social_oracle.py`, `SocialOraclePanel.jsx` |
-| 13 | Oracle Reliability & Fallback | ✅ Done | `external_apis.py`, `verification_service.py` |
-| 14 | Platform Activity Simulation | ✅ Done | `claims_processor.py`, `external_apis.py` |
-| 15 | 10-Check Validation Matrix | ✅ Done | `claims_processor.py`, `TriggerProofPanel.jsx` |
-| 16 | Payment Reconciliation | ✅ Done | `payout_service.py` |
-| 17 | Active Shift Window Check | ✅ Done | `claims_processor.py` |
-| 18 | Multilingual Notifications (EN + HI) | ✅ Done | `notification_templates.py` |
-| 19 | Pin-Code / Ward-Level Triggers | ✅ Done | `trigger_engine.py`, `claims_processor.py` |
-| 20 | Drill Execution Engine (10 presets) | ✅ Done | `drill_service.py`, `DrillPanel.jsx` |
-| 21 | System Health Verification | ✅ Done | `verification_service.py` |
-| 22 | Live API Data Panel | ✅ Done | `LiveDataPanel.jsx` |
-| 23 | Demo Checklist | ✅ Done | `DemoChecklist.jsx` |
-| 24 | Onboarding Flow (redesigned) | ✅ Done | `OnboardingFlow.jsx` |
-| 25 | Pricing Tier Alignment (₹22/33/45) | ✅ Done | `premium_service.py` |
-| 26 | Exclusions Screen (IRDAI) | ✅ Done | `ExclusionsCard.jsx` |
-| 27 | 15-Tab Admin Dashboard | ✅ Done | `Admin.jsx` + 20 admin components |
-
----
-
-## 📅 Development Plan
-
-### Phase 1 — Ideation & Foundation (Weeks 1–2) ✅
-- [x] Persona research — Q-Commerce delivery partner income model
-- [x] 5 parametric triggers designed with zone-polygon + traffic validation
-- [x] Weekly premium ML model defined
-- [x] 6 fraud attack vectors identified with detection architecture
-- [x] Tech stack finalized — PWA with justification
-- [x] README submitted
-
-**Deliverable:** README + pitch concept
-
-### Phase 2 — Core Product + Production Features (Weeks 3–6) ✅
-- [x] PWA scaffold — Android installable, push notifications live
-- [x] Partner registration, OTP login, Zepto/Blinkit ID validation
-- [x] Native GPS zone detection + Zone Risk Scorer (RIQI per-zone)
-- [x] Policy creation + 7-factor dynamic premium engine
-- [x] All 5 triggers wired to real/mock APIs including traffic data
-- [x] Zero-touch 11-step claim pipeline end-to-end
-- [x] 7-factor fraud detection with centroid drift + velocity check
-- [x] Razorpay test mode payout + lock screen push on claim
-- [x] Worker dashboard — coverage, earnings protected, payout history, streak
-- [x] 15-tab admin dashboard with BCR, fraud queue, zone map, drills
-- [x] Policy lifecycle — renewal, grace period, cancellation, exclusions
-- [x] Policy certificate PDF generation
-- [x] Underwriting gate (7-day activity check) + auto-downgrade
-- [x] Sustained event protocol (14-day monsoon, 70% payout mode)
-- [x] Zone pool share cap (mass event protection)
-- [x] Zone reassignment with 24hr acceptance + premium recalc
-- [x] 6 actuarial stress scenarios modelled
-- [x] Social Oracle (NLP + real API cross-validation)
-- [x] 10-check pre-payout validation matrix
-- [x] Multilingual notifications (English + Hindi)
-- [x] Pin-code / ward-level trigger precision
-- [x] Drill execution engine (10 presets)
-- [x] 12 test suites (4,500+ lines of tests)
-- [x] Onboarding flow redesigned with eligibility + shift selection
-
-**Deliverable:** Working PWA demo + deployed URL
+| Category | Details |
+|----------|---------|
+| War & Armed Conflict | War, invasion, armed insurgency, terrorism |
+| Pandemic / Epidemic | Government-declared public health emergencies |
+| Nuclear Events | Nuclear reaction, radiation, contamination |
+| Government Policy | Regulatory changes, GST shifts, commission restructuring |
+| Platform Operations | Scheduled maintenance, algorithm changes |
+| Self-Inflicted Loss | Voluntary offline, account suspension |
+| Health / Accident / Life | Strictly excluded — not a health/life product |
+| Vehicle Damage | Bike, scooter, repair costs |
+| Disruptions < 45 Min | De minimis threshold |
+| Claims After 48 Hours | Stale claim prevention |
 
 ---
 
 ## 📈 Business Viability
 
-| Metric | Number | Basis |
-|--------|--------|-------|
-| Q-Commerce delivery partners in India | 500,000+ | Zepto + Blinkit disclosed headcounts |
-| Avg disruption days per partner per year | 18–24 days | IMD event frequency in top 10 cities |
-| Income lost per disruption day | ₹600–₹900 | 8–15 runs/hr × peak rates |
-| Annual income at risk per partner | ₹10,800–₹21,600 | 18–24 days × daily loss |
-| Willingness to pay | ₹22–₹45/week | < 1% of weekly earnings |
-| Year 1 target (Bangalore, Mumbai, Delhi) | 25,000 partners | Metro pilot cities |
+| Metric | Value | Basis |
+|--------|-------|-------|
+| Q-Commerce delivery partners | 500,000+ | Zepto + Blinkit headcounts |
+| Avg disruption days per year | 18–24 | IMD top 10 cities |
+| Willingness to pay | ₹22–45/week | <1% of weekly earnings |
+| Year 1 target (BLR + MUM + DEL) | 25,000 partners | Metro pilot |
 | Year 1 gross premium | ₹4.33 Cr | 25,000 × ₹33 avg × 52 weeks |
-| Target loss ratio | 55–70% (BCR 0.55–0.70) | Parametric insurance global benchmark |
+| Target loss ratio | 55–70% (BCR) | Parametric global benchmark |
 
-**The Strategic Moat:** RapidCover generates the first-ever dark-store-zone operational disruption dataset for India's Q-Commerce network — suspension frequency, duration, road condition correlation, zone-level risk scores. Data that Zepto and Blinkit themselves don't have in structured form. That is the licensing and B2B opportunity that outlasts the insurance product.
+**Strategic Moat:** RapidCover generates India's first structured dark-store-zone disruption dataset — suspension frequency, duration, road conditions, zone-level risk scores. Data that Zepto and Blinkit don't have. That is the B2B licensing opportunity that outlasts the insurance product.
 
-**Distribution:** One B2B integration with Zepto's partner app = 100,000+ workers onboarded via a single WhatsApp link. Distribution cost = ₹0 marginal.
+**Distribution:** One B2B integration with Zepto's partner app → 100,000+ workers onboarded via a single WhatsApp link. Marginal CAC = ₹0.
 
 ---
 
-## 🚀 Quick Start & Development Setup
+## 🤝 Contributing
 
-> **Production Recommendation:** The application is transitioning to a persistent, data-driven architecture. Local file-based SQLite is deprecated for development. Please use PostgreSQL.
+We welcome contributions. Please follow these steps:
 
-### 1. Database Setup (PostgreSQL)
-Start a local PostgreSQL instance using Docker:
-```powershell
-docker run --name rapidcover-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=rapidcover -p 5432:5432 -d postgres:15-alpine
-```
-Ensure your `backend/.env` is updated to point to this: `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rapidcover`
+1. **Fork** the repository
+2. **Create a branch** (`git checkout -b feature/your-feature`)
+3. **Commit** your changes with descriptive messages
+4. **Push** to your fork and open a **Pull Request**
 
-### 2. Application Setup
-Get your local dev environment running:
+### Development Guidelines
 
-```powershell
-# Backend (Python 3.10+)
-cd backend && python -m venv venv && venv\Scripts\activate
-pip install -r requirements.txt
-python -m uvicorn app.main:app --reload
+- Backend: Follow PEP 8. Add tests for new services in `backend/tests/`.
+- Frontend: Use existing component patterns. Run `npm run lint` before committing.
+- ML: Document model changes in `ml_models/model_metadata.json`.
+- All API changes must include OpenAPI schema updates (auto-generated by FastAPI).
 
-# Frontend (Node.js)
-cd frontend && npm install && npm run dev
-```
+---
 
-## ⚙️ Environment Variables
+## 📄 License
 
-Create a `.env` file in the `backend/` directory based on `.env.example`:
-
-| Key | Description | Example |
-|-----|-------------|---------|
-| `DATABASE_URL` | SQLite or PostgreSQL connection string | `postgresql://user:pass@localhost/rapidcover` |
-| `JWT_SECRET` | Secret key for auth tokens | `your-secret-key-12345` |
-| `OPENWEATHERMAP_API_KEY` | Key from OpenWeatherMap | `your-owm-api-key` |
-| `CPCB_API_KEY` | CPCB (AQI) API key | `your-cpcb-key` |
-| `AUTO_PAYOUT_ENABLED` | Toggle zero-touch automation | `true` |
-| `VAPID_PUBLIC_KEY` | Web Push public key | `BNxxxxxxxx...` |
-| `VAPID_PRIVATE_KEY` | Web Push private key | `xxxxxxxx...` |
-
-## 🧪 Running the Simulation Demo
-
-To see the parametric engine in action:
-
-1. Log in to the **Admin Dashboard** (`/admin`).
-2. Navigate to the **Trigger Sim** tab.
-3. Use the sliders to force a "Heavy Rain" or "Severe AQI" event in a specific zone.
-4. Watch the **Fraud Queue** or **Claims Queue** process the auto-payout in seconds.
-
-## 📱 PWA Installation on Android Chrome
-
-1. Open the Deployed URL in **Google Chrome** on Android.
-2. Tap the **three-dot menu** (⋮) -> Select **"Install app"**.
-3. Launch from your home screen for native-like push notifications.
+This project was built for the **Guidewire DEVTrails 2026 Hackathon**. License terms are pending finalization.
 
 ---
 
 <div align="center">
-
----
 
 *"Insurance has always been designed for people with bank accounts, salaries, and time to file paperwork.*
 *RapidCover is designed for people with a bike, a phone, and 10 minutes between runs."*
@@ -798,7 +932,7 @@ To see the parametric engine in action:
 
 **RapidCover — Because Manoj's EMI doesn't pause for the rain.**
 
----
+<br/>
 
 *Built for Guidewire DEVTrails 2026*
 
