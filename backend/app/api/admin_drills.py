@@ -114,6 +114,49 @@ def run_drill(
     )
 
 
+# --- GET /admin/panel/drills/history ------------------------------------------
+
+@router.get("/drills/history", response_model=DrillHistoryResponse)
+def get_drill_history_endpoint(
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Get recent drill history."""
+    drills = get_drill_history(db, limit=limit)
+
+    items = [
+        DrillHistoryItem(
+            drill_id=d.drill_id,
+            drill_type=d.drill_type,
+            zone_code=d.zone_code,
+            status=d.status,
+            started_at=d.started_at,
+            completed_at=d.completed_at,
+            claims_created=d.claims_created,
+            total_latency_ms=d.total_latency_ms,
+        )
+        for d in drills
+    ]
+
+    return DrillHistoryResponse(drills=items, total=len(items))
+
+
+# --- GET /admin/panel/drills/presets ------------------------------------------
+
+@router.get("/drills/presets")
+def get_drill_presets():
+    """Get available drill presets."""
+    presets = []
+    for name, config in DRILL_PRESETS.items():
+        presets.append({
+            "name": name,
+            "trigger_type": config["trigger_type"],
+            "description": config.get("description", ""),
+            "conditions": config["conditions"],
+        })
+    return {"presets": presets}
+
+
 # --- GET /admin/panel/drills/{drill_id} --------------------------------------
 
 @router.get("/drills/{drill_id}", response_model=DrillStatusResponse)
@@ -184,49 +227,6 @@ def get_drill_impact_endpoint(
     if not impact:
         raise HTTPException(status_code=404, detail="Drill not found")
     return impact
-
-
-# --- GET /admin/panel/drills/history ------------------------------------------
-
-@router.get("/drills/history", response_model=DrillHistoryResponse)
-def get_drill_history_endpoint(
-    limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),
-):
-    """Get recent drill history."""
-    drills = get_drill_history(db, limit=limit)
-
-    items = [
-        DrillHistoryItem(
-            drill_id=d.drill_id,
-            drill_type=d.drill_type,
-            zone_code=d.zone_code,
-            status=d.status,
-            started_at=d.started_at,
-            completed_at=d.completed_at,
-            claims_created=d.claims_created,
-            total_latency_ms=d.total_latency_ms,
-        )
-        for d in drills
-    ]
-
-    return DrillHistoryResponse(drills=items, total=len(items))
-
-
-# --- GET /admin/panel/drills/presets ------------------------------------------
-
-@router.get("/drills/presets")
-def get_drill_presets():
-    """Get available drill presets."""
-    presets = []
-    for name, config in DRILL_PRESETS.items():
-        presets.append({
-            "name": name,
-            "trigger_type": config["trigger_type"],
-            "description": config.get("description", ""),
-            "conditions": config["conditions"],
-        })
-    return {"presets": presets}
 
 
 # --- POST /admin/panel/verification/run ---------------------------------------
