@@ -1,7 +1,7 @@
 /* global clients */
 // RapidCover Service Worker
 
-const CACHE_NAME = 'rapidcover-v2';
+const CACHE_NAME = 'rapidcover-v3';
 const STATIC_ASSETS = ['/', '/index.html', '/favicon.svg', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
