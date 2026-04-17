@@ -64,6 +64,7 @@ const styles = `
     box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
     position: sticky;
     bottom: 0;
+    z-index: 1000;
   }
   .rc-nav__inner {
     max-width: 480px;
