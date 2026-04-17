@@ -39,7 +39,7 @@ def create_admin_token(admin_id: int) -> str:
     payload = {
         "sub": str(admin_id),
         "type": "admin",
-        "exp": datetime.utcnow() + timedelta(days=7)
+        "exp": utcnow() + timedelta(days=7)
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
