@@ -502,7 +502,7 @@ export default function ZoneMapPanel({ riderZoneId, activeTriggers = [], onZoneC
                               background: t.severity === 'critical' ? '#fee2e2' : '#fef3c7',
                               color: t.severity === 'critical' ? '#dc2626' : '#b45309',
                             }}>
-                              {t.severity.toUpperCase()}
+                              {String(t.severity).toUpperCase()}
                             </span>
                           )}
                         </div>
@@ -595,7 +595,7 @@ export default function ZoneMapPanel({ riderZoneId, activeTriggers = [], onZoneC
                           background: t.severity === 'critical' ? '#fee2e2' : '#fef3c7',
                           color: t.severity === 'critical' ? '#dc2626' : '#b45309',
                         }}>
-                          {t.severity.toUpperCase()}
+                          {String(t.severity).toUpperCase()}
                         </span>
                       )}
                     </div>

@@ -324,14 +324,15 @@ def get_zones(db: Session = Depends(get_db)):
 def get_bcr(db: Session = Depends(get_db)):
     """Return BCR (Burning Cost Rate) stats grouped by city."""
     try:
-        cities = db.query(Zone.city, Zone.code).group_by(Zone.city).all()
+        cities = db.query(Zone.city).distinct().all()
     except Exception:
         return {"cities": []}
     city_stats = []
 
-    for city_name, city_prefix in cities:
-        # Prefix check (e.g. BLR-) for city code group
-        prefix = city_prefix.split('-')[0] + '-'
+    for (city_name,) in cities:
+        # Get first zone code for city prefix
+        first_zone = db.query(Zone.code).filter(Zone.city == city_name).first()
+        prefix = first_zone[0].split('-')[0] if first_zone else city_name[:3].upper()
 
         premiums = (
             db.query(func.sum(Policy.weekly_premium))

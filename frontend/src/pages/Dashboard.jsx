@@ -427,7 +427,7 @@ function ZoneAlertCard({ alert }) {
       <div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <span className="alert-title">48-Hour {alert.type?.charAt(0).toUpperCase() + alert.type?.slice(1)} Alert</span>
-          <span className="alert-badge">{alert.severity?.toUpperCase()}</span>
+          <span className="alert-badge">{alert.severity ? String(alert.severity).toUpperCase() : ''}</span>
         </div>
         <p className="alert-body">{alert.message}</p>
         <p style={{ fontSize: 11, color: '#3b82f6', marginTop: 4 }}>Keep your documents handy for quick claims.</p>
