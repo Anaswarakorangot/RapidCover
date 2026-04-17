@@ -226,7 +226,7 @@ class TrainedPremiumModel:
             print("[ML] Falling back to manual premium model")
 
     def predict(self, features: PartnerFeatures) -> dict:
-        """Returns weekly_premium + breakdown."""
+        """Returns weekly_premium + breakdown + feature_contributions for UI."""
         start_time = time.time()
         fallback_used = False
 
@@ -238,7 +238,7 @@ class TrainedPremiumModel:
             return result
 
         try:
-            # Explicit unknown-label guard — encoders raise ValueError for unseen values
+            # Explicit unknown-label guard
             try:
                 city_encoded = self.city_encoder.transform([features.city.lower()])[0]
                 tier_encoded = self.tier_encoder.transform([features.tier.lower()])[0]
@@ -250,8 +250,8 @@ class TrainedPremiumModel:
                 ml_monitor.record_prediction("premium", latency_ms, fallback=fallback_used)
                 return result
 
-            # Prepare features
-            X = np.array([[
+            # Prepare base feature vector
+            base_vec = np.array([[
                 city_encoded,
                 features.zone_risk_score,
                 features.active_days_last_30,
@@ -262,26 +262,76 @@ class TrainedPremiumModel:
                 features.riqi_score
             ]])
 
-            premium = self.model.predict(X)[0]
+            raw_payout = float(self.model.predict(base_vec)[0])
 
-            # Apply tier base and cap
+            # Deterministic insurance constraints (NEVER learned by ML)
             base_prices = {"flex": 22, "standard": 33, "pro": 45}
             tier = features.tier.lower()
             base = base_prices.get(tier, 33)
             cap = base * 3.0
-            premium = float(np.clip(premium, base, cap))
+            weekly_premium = float(np.clip(raw_payout, base, cap))
+
+            # ------------------------------------------------------------------
+            # Feature contribution — perturbation-based attribution
+            # Replace each feature with a neutral mid-range value and measure
+            # the change in predicted payout pressure.
+            # impact_rs > 0 means the feature raises the premium vs neutral.
+            # Person 2 uses this to display top quote drivers in the UI.
+            # ------------------------------------------------------------------
+            feature_names = [
+                "city_encoded", "zone_risk_score", "active_days_last_30",
+                "avg_hours_per_day", "tier_encoded", "loyalty_weeks",
+                "month", "riqi_score"
+            ]
+            neutral_vec = np.array([[
+                city_encoded, 50.0, 22, 6.0, tier_encoded, 4, 6, 65.0
+            ]])
+            feature_labels = {
+                "zone_risk_score":     "Zone Risk Level",
+                "active_days_last_30": "Active Days This Month",
+                "avg_hours_per_day":   "Avg Daily Hours",
+                "loyalty_weeks":       "Loyalty Duration",
+                "month":               "Current Season",
+                "riqi_score":          "Infrastructure Quality (RIQI)",
+                "city_encoded":        "City Risk Profile",
+                "tier_encoded":        "Coverage Tier",
+            }
+            contributions = []
+            for i, fname in enumerate(feature_names):
+                if fname in ("city_encoded", "tier_encoded"):
+                    continue
+                perturbed = base_vec.copy()
+                perturbed[0, i] = neutral_vec[0, i]
+                perturbed_payout = float(self.model.predict(perturbed)[0])
+                impact = raw_payout - perturbed_payout
+                contributions.append({
+                    "feature": fname,
+                    "label": feature_labels.get(fname, fname),
+                    "value": float(base_vec[0, i]),
+                    "impact_rs": round(float(impact), 2),
+                    "direction": "increases" if impact > 0.5 else ("decreases" if impact < -0.5 else "neutral"),
+                })
+            contributions.sort(key=lambda x: abs(x["impact_rs"]), reverse=True)
 
             result = {
-                "weekly_premium": int(round(premium)),
+                "weekly_premium": int(round(weekly_premium)),
                 "base_price": base,
                 "tier": tier,
                 "cap_value": int(cap),
-                "cap_applied": bool(premium >= cap),
+                "cap_applied": bool(weekly_premium >= cap),
                 "model_type": "trained_ml",
+                "ml_raw_payout_pressure": round(raw_payout, 2),
+                "deterministic_constraints": {
+                    "tier_floor_applied": bool(weekly_premium <= base + 1),
+                    "irdai_cap_applied": bool(weekly_premium >= cap - 1),
+                    "note": "IRDAI 3x cap and tier floor enforced deterministically after ML output"
+                },
                 "breakdown": {
-                    "ml_predicted_premium": float(premium),
-                    "note": "Premium calculated using trained ML model"
-                }
+                    "ml_predicted_payout_pressure_rs": round(raw_payout, 2),
+                    "note": "ML predicts expected payout pressure. Tier floor + IRDAI cap applied deterministically."
+                },
+                "feature_contributions": contributions,
+                "top_driver": contributions[0]["label"] if contributions else "Coverage Tier",
             }
 
             latency_ms = (time.time() - start_time) * 1000
@@ -307,11 +357,16 @@ class TrainedPremiumModel:
 
 
 class TrainedFraudModel:
-    """Isolation Forest for fraud anomaly detection (unsupervised)."""
+    """RandomForestClassifier for fraud detection (supervised, v2.0).
+
+    Trained on policy-grounded independent labels (NOT the runtime weighted
+    scoring formula). Deterministic hard-stops always override ML output.
+    """
 
     # Thresholds from original model
     VELOCITY_SPOOF_KMH = 60.0
     CENTROID_FLAG_KM = 15.0
+
 
     def __init__(self):
         self.model = None
