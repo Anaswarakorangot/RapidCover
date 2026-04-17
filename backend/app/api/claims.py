@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from pydantic import BaseModel
 import json
 
 from app.database import get_db
@@ -114,6 +115,36 @@ def get_claims(
         page=page,
         page_size=page_size,
     )
+
+
+class BulkClaimRequest(BaseModel):
+    claim_ids: list[int]
+
+
+@router.post("/bulk-approve")
+def bulk_approve_claims(
+    request: BulkClaimRequest,
+    db: Session = Depends(get_db),
+):
+    """Bulk approve claims from the fraud queue (Admin only in reality)."""
+    db.query(Claim).filter(Claim.id.in_(request.claim_ids)).update(
+        {"status": ClaimStatus.APPROVED}, synchronize_session=False
+    )
+    db.commit()
+    return {"status": "success", "count": len(request.claim_ids)}
+
+
+@router.post("/bulk-reject")
+def bulk_reject_claims(
+    request: BulkClaimRequest,
+    db: Session = Depends(get_db),
+):
+    """Bulk reject claims from the fraud queue."""
+    db.query(Claim).filter(Claim.id.in_(request.claim_ids)).update(
+        {"status": ClaimStatus.REJECTED}, synchronize_session=False
+    )
+    db.commit()
+    return {"status": "success", "count": len(request.claim_ids)}
 
 
 @router.get("/summary", response_model=ClaimSummary)
