@@ -15,6 +15,7 @@ from app.api.notifications import router as notifications_router
 from app.api.social_oracle_api import router as social_oracle_router
 from app.api.ai_chat import router as ai_chat_router
 from app.api.insurer_intelligence import router as intelligence_router
+from app.api.websocket import router as websocket_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -34,3 +35,4 @@ api_router.include_router(notifications_router)
 api_router.include_router(social_oracle_router)
 api_router.include_router(ai_chat_router)
 api_router.include_router(intelligence_router)
+api_router.include_router(websocket_router)

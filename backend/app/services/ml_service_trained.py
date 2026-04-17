@@ -22,6 +22,40 @@ from app.services.ml_monitoring import ml_monitor
 ML_MODELS_DIR = Path(__file__).parent.parent.parent / "ml_models"
 
 
+# Load ML model metadata (version info, training metrics, features)
+MODEL_METADATA = {}
+try:
+    metadata_path = ML_MODELS_DIR / "model_metadata.json"
+    if metadata_path.exists():
+        with open(metadata_path, "r") as f:
+            MODEL_METADATA = json.load(f)
+        print(f"[ML] Loaded model metadata v{MODEL_METADATA.get('version', '1.0.0')}")
+        print(f"[ML] Training date: {MODEL_METADATA.get('training_date', 'unknown')}")
+
+        # Log individual model info
+        models = MODEL_METADATA.get("models", {})
+        if "zone_risk" in models:
+            print(f"[ML] Zone Risk: {models['zone_risk']['model_type']} (R²={models['zone_risk']['r2_score']:.3f})")
+        if "premium" in models:
+            print(f"[ML] Premium: {models['premium']['model_type']} (R²={models['premium']['r2_score']:.3f})")
+        if "fraud" in models:
+            print(f"[ML] Fraud: {models['fraud']['model_type']} (ROC-AUC={models['fraud']['roc_auc']:.3f})")
+    else:
+        print(f"[ML] Warning: Model metadata file not found at {metadata_path}")
+except Exception as e:
+    print(f"[ML] Warning: Could not load model metadata: {e}")
+
+
+def get_model_metadata() -> dict:
+    """
+    Get ML model metadata including version, training info, and metrics.
+
+    Returns:
+        Dict with version, training_date, and per-model metrics
+    """
+    return MODEL_METADATA
+
+
 # ------------------------------------------------------------------------------
 # INPUT DATACLASSES (same as original)
 # ------------------------------------------------------------------------------

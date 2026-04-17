@@ -42,3 +42,29 @@ def reset_ml_stats():
     """
     ml_monitor.reset_stats()
     return {"message": "ML statistics reset successfully"}
+
+
+@router.get("/metadata", summary="Get ML model metadata and version info")
+def get_ml_metadata():
+    """
+    GET /admin/ml-stats/metadata
+
+    Returns ML model metadata including:
+    - Model versions and training dates
+    - Training/test metrics (MSE, MAE, R², ROC-AUC)
+    - Feature lists for each model
+    - Model types (XGBRegressor, IsolationForest, etc.)
+
+    Useful for MLOps tracking and model versioning.
+    """
+    from app.services.ml_service_trained import get_model_metadata
+
+    metadata = get_model_metadata()
+
+    if not metadata:
+        return {
+            "error": "Model metadata not available",
+            "message": "Model metadata file not found or failed to load"
+        }
+
+    return metadata
