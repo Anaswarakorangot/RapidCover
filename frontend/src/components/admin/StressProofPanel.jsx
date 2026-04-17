@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AdminLoader, AdminError, AdminEmpty, ProofCard, SourceBadge } from './AdminProofShared';
+import { authenticatedFetch } from '../../services/adminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -38,9 +39,8 @@ export default function StressProofPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/admin/panel/stress-scenarios`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setData(await res.json());
+      const data = await authenticatedFetch(`${API}/admin/panel/stress-scenarios`);
+      setData(data);
     } catch (e) {
       setError(e.message);
     } finally {

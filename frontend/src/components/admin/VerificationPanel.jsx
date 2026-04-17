@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { AdminLoader, AdminError, AdminEmpty } from './AdminProofShared';
+import { authenticatedFetch } from '../../services/adminApi';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -33,9 +34,8 @@ export default function VerificationPanel() {
   async function loadProof() {
     setLoadingProof(true); setError(null);
     try {
-      const res = await fetch(`${API}/admin/panel/proof/validation-matrix`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setProofData(await res.json());
+      const data = await authenticatedFetch(`${API}/admin/panel/proof/validation-matrix`);
+      setProofData(data);
     } catch (e) { setError(e.message); }
     finally { setLoadingProof(false); }
   }
@@ -44,9 +44,8 @@ export default function VerificationPanel() {
     if (!claimId) return;
     setLoadingClaim(true); setClaimError(null);
     try {
-      const res = await fetch(`${API}/admin/claims/${claimId}/validation-matrix`);
-      if (!res.ok) throw new Error(`HTTP ${res.status} — claim not found`);
-      setClaimMatrix(await res.json());
+      const data = await authenticatedFetch(`${API}/admin/claims/${claimId}/validation-matrix`);
+      setClaimMatrix(data);
     } catch (e) { setClaimError(e.message); setClaimMatrix(null); }
     finally { setLoadingClaim(false); }
   }
