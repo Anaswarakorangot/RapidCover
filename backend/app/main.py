@@ -62,43 +62,7 @@ async def lifespan(app: FastAPI):
         init_db()
         logger.info("Database tables initialized (SQLite dev mode)")
 
-    # Run Alembic migrations for all databases
-    try:
-        from alembic.config import Config
-        from alembic import command
-        from alembic.runtime.migration import MigrationContext
-        from pathlib import Path
-
-        alembic_cfg = Config(str(Path(__file__).parent.parent / "alembic.ini"))
-        alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
-
-        from app.database import engine
-        from sqlalchemy import inspect
-
-        with engine.connect() as conn:
-            context = MigrationContext.configure(conn)
-            current_rev = context.get_current_revision()
-            inspector = inspect(conn)
-            tables_exist = len(inspector.get_table_names()) > 0
-
-        # For production PostgreSQL: if no migration revision but tables exist, stamp as head
-        if current_rev is None and tables_exist and not settings.database_url.startswith("sqlite"):
-            logger.info("No migration revision found but tables exist — stamping head")
-            command.stamp(alembic_cfg, "head")
-
-        # Run migrations to bring database to latest version
-        command.upgrade(alembic_cfg, "head")
-        logger.info("Database migrations successfully applied")
-
-    except Exception as migration_err:
-        # Check if it's a known non-critical error (like duplicate object if partially migrated)
-        err_str = str(migration_err).lower()
-        if "duplicate" in err_str or "already exists" in err_str:
-            logger.info(f"Database schema already up to date or partially applied: {migration_err}")
-        else:
-            logger.error(f"Critical error during database migration: {migration_err}", exc_info=True)
-            # In production, we might want to exit if migrations fail critically
-            pass  # Log error but continue
+    # Migrations handled by start command
 
     seed_default_admin()
 
